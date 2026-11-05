@@ -330,7 +330,7 @@ function showLock(t, st) {
     let fails = 0, wait = 0;
     const tryIt = async () => {
       if (Date.now() < wait) { err.textContent = 'too many tries, wait a sec'; return; }
-      if (await checkPw(inp.value)) { t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); if (t.wv) t.wv.focus(); }
+      if (await checkPw(inp.value)) { lastUnlock = Date.now(); t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); if (t.wv) t.wv.focus(); }
       else { fails++; err.textContent = 'wrong password 💔'; inp.select(); if (fails >= 5) { wait = Date.now() + 15000; fails = 0; } }
     };
     d.querySelector('.pbtn').onclick = tryIt;
@@ -350,6 +350,7 @@ async function setPw(pw) {
   const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
   store.settings.lockSalt = salt;
   store.settings.lockHash = await window.aura.hashPw(pw, salt);
+  store.settings.lockVer = (store.settings.lockVer || 0) + 1;
   save();
 }
 function relockAll() {
@@ -369,7 +370,7 @@ async function toggleLock(t) {
 async function askPw(title, sub) {
   const v = await modal(title, sub, [{ id: 'p', label: 'Password', type: 'password' }], 'Unlock');
   if (!v) return false;
-  if (await checkPw(v.p)) return true;
+  if (await checkPw(v.p)) { lastUnlock = Date.now(); return true; }
   toast('wrong password 💔'); return false;
 }
 async function pwSetupModal(change) {
@@ -390,7 +391,8 @@ function modal(title, sub, fields, okText) {
     bg.onclick = (e) => { if (e.target === bg || e.target.dataset.a === 'no') done(false); else if (e.target.dataset.a === 'ok') done(true); };
     bg.onkeydown = (e) => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
     document.body.appendChild(bg);
-    const first = bg.querySelector('input'); if (first) first.focus();
+    fields.forEach(f => { if (f.value) bg.querySelector('#mf_' + f.id).value = f.value; });
+    const first = bg.querySelector('input'); if (first) { first.focus(); first.select(); }
   });
 }
 
@@ -587,6 +589,12 @@ function tabMenu(e, t) {
     null,
     ['Close tab', () => closeTab(t)]
   ];
+  showMenu(e, items);
+}
+function showMenu(e, items) {
+  e.preventDefault();
+  closeMenu();
+  const m = document.createElement('div'); m.id = 'ctx';
   let lastSep = true;
   items.forEach(it => {
     if (it === null) { if (!lastSep) { m.appendChild(Object.assign(document.createElement('hr'))); lastSep = true; } return; }
@@ -666,6 +674,13 @@ function renderBookmarks() {
     d.title = b.url;
     d.onclick = (e) => e.ctrlKey ? createTab(b.url, true) : active.wv.loadURL(b.url);
     d.onauxclick = (e) => { if (e.button === 1) createTab(b.url, true); };
+    d.oncontextmenu = (e) => showMenu(e, [
+      ['Open', () => active.wv.loadURL(b.url)],
+      ['Open in new tab', () => createTab(b.url, true)],
+      null,
+      ['Rename', async () => { const v = await modal('Rename bookmark', b.url, [{ id: 'n', label: 'Name', value: b.title }], 'Save'); if (v && v.n.trim()) { b.title = v.n.trim().slice(0, 40); save(); renderBookmarks(); } }],
+      ['&#128465; Remove bookmark', () => { store.bookmarks = store.bookmarks.filter(x => x !== b); save(); renderBookmarks(); updateNav(); toast('bookmark removed'); }]
+    ]);
     bm.appendChild(d);
   });
 }
@@ -750,7 +765,7 @@ function openPanel(kind) {
       if (v.p === 'FORGOT') { tabs.filter(t => t.locked).forEach(t => closeTab(t, true)); }
       else if (!(await checkPw(v.p))) { toast('wrong password 💔'); return; }
       else tabs.forEach(t => { t.locked = false; t.unlocked = false; renderTab(t); });
-      delete store.settings.lockHash; delete store.settings.lockSalt; save(); saveSession(true); layoutViews();
+      delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1; save(); saveSession(true); layoutViews();
       toast('password reset'); reopen();
     };
     $('rst').onclick = () => { store.settings.restore = store.settings.restore === false; save(); $('rst').textContent = store.settings.restore === false ? 'OFF' : 'ON'; };
@@ -1351,7 +1366,14 @@ window.aura.on('tool', (name) => {
 window.aura.on('shortcut', (s) => handleKey(s.key, s.ctrl, s.shift, s.alt));
 window.aura.on('blocked', (n) => { blocked = n; if (store.settings.adblock) $('shield').innerHTML = '&#128737; ' + n + ' blocked'; });
 window.aura.on('download', (d) => toast(d.state === 'completed' ? 'Downloaded ' + d.name + ' 🔥' : 'Download failed 💔'));
-window.aura.on('win-blur', () => relockAll());
+let lastUnlock = 0;
+window.aura.on('win-blur', () => { if (Date.now() - lastUnlock < 1500 || document.hasFocus()) return; relockAll(); });
+window.aura.on('lock-sync', (s) => {
+  if ((s.lockVer || 0) <= (store.settings.lockVer || 0)) return;
+  store.settings.lockVer = s.lockVer;
+  if (s.lockHash) { store.settings.lockHash = s.lockHash; store.settings.lockSalt = s.lockSalt; } else { delete store.settings.lockHash; delete store.settings.lockSalt; }
+  tabs.forEach(renderTab); layoutViews();
+});
 function showUpdate(u) {
   const p = $('updPill'); p.hidden = false;
   p.innerHTML = '&#11014; Update ' + esc(u.version);

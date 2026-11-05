@@ -113,7 +113,13 @@ function createWindow(profileId, opts = {}) {
   win.on('close', () => { if (BrowserWindow.getAllWindows().length > 1) { winProfile.delete(wcId); rememberOpen(); } });
   win.on('closed', () => winProfile.delete(wcId));
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.on('blur', () => { if (!win.isDestroyed()) win.webContents.send('win-blur'); });
+  // only count it as leaving when focus really left Orchard (clicking into a page can fire a fake blur on Windows)
+  win.on('blur', () => setTimeout(() => {
+    if (win.isDestroyed() || win.isFocused()) return;
+    const f = BrowserWindow.getFocusedWindow();
+    if (f === win) return;
+    win.webContents.send('win-blur');
+  }, 250));
   win.on('maximize', () => win.webContents.send('max-state', true));
   win.on('unmaximize', () => win.webContents.send('max-state', false));
   if (!firstWin) firstWin = win;
@@ -183,8 +189,19 @@ ipcMain.handle('store-get', (e) => {
 ipcMain.on('store-set', (e, data) => {
   const id = profileOf(e);
   const { profile, partition, blocked, ...rest } = data;
-  stores[id] = { ...storeFor(id), ...rest };
+  const prev = storeFor(id);
+  const ps = prev.settings || {}, ns = rest.settings || {};
+  // the tab lock password lives on the profile: a window with an older copy never overwrites a newer one
+  if ((ps.lockVer || 0) > (ns.lockVer || 0)) {
+    rest.settings = { ...ns, lockVer: ps.lockVer, lockHash: ps.lockHash, lockSalt: ps.lockSalt };
+    if (!ps.lockHash) { delete rest.settings.lockHash; delete rest.settings.lockSalt; }
+  }
+  stores[id] = { ...prev, ...rest };
   saveStore(id);
+  const s2 = stores[id].settings || {};
+  if ((s2.lockVer || 0) !== (ps.lockVer || 0)) {
+    for (const [wcId, pid] of winProfile) if (pid === id && wcId !== e.sender.id) sendTo(webContents.fromId(wcId), 'lock-sync', { lockVer: s2.lockVer || 0, lockHash: s2.lockHash || null, lockSalt: s2.lockSalt || null });
+  }
 });
 ipcMain.on('win', (e, a) => {
   const win = winOf(e);

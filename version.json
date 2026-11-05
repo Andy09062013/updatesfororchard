@@ -1,6 +1,6 @@
 {
-  "version": "1.8.2",
-  "notes": "Address bar dropdown: history, past searches, bookmarks and live search suggestions as u type",
+  "version": "1.8.3",
+  "notes": "Fixed tab lock relocking right after unlocking, right click bookmarks to rename or remove them",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -25,7 +25,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "4922cc1ff532462eb6ebef397ac5c6909d29ea0ed14ac85a744c5e5179fab149"
+      "sha256": "9a74e435ea5c56ec428fa2e3e7316f43b906cdb54a60b810dcac42eea3018c64"
     },
     {
       "path": "newtab.html",
@@ -33,15 +33,15 @@
     },
     {
       "path": "package.json",
-      "sha256": "26830971cb570a421dc123bfa8d04c6860a756fa2556213c66df6a74a087f968"
+      "sha256": "1ce7bd1a5df8c685404cc0714f58ea1eff27db301794a9c894111644fb528141"
     },
     {
       "path": "preload.js",
-      "sha256": "ad0490deb75950e6aec205207b2d33e13e87cefad1844bb2ab7006cd2d6bee01"
+      "sha256": "a15ed424f53885416663e0af62f8ba4b2374d71a3f3696faed86227871b70b72"
     },
     {
       "path": "renderer.js",
-      "sha256": "6f6e3246692c3e441a9dffd6c5e761e7ac4aa5e787c3594b465d62d78123bce4"
+      "sha256": "cad36a33cb417fa1fa4d2054efa014c349cc8d1f973c8e0f14cfa94dee9a4ff2"
     }
   ]
 }
