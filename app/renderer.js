@@ -260,8 +260,13 @@ function updateSaverUI() {
   b.classList.toggle('on', on); b.classList.toggle('ultra', lvl >= 2);
   b.title = 'Battery: ' + (pct || '?') + (plugged ? ' (charging)' : '') + '\nMode: ' + ['Eco (normal, still frugal)', 'Saver', 'Ultra saver'][lvl] + '\n' + restingCount() + ' tab(s) frozen or asleep, using no power\n' + blocked + ' ads blocked\nclick for battery usage';
 }
+let thrStat = { supported: false, active: false, count: 0, apps: [] };
+function syncThrottle() { window.aura.throttle({ on: store.settings.slowApps !== false, level: saverLevel(), exclude: store.settings.slowExclude || [] }); }
+window.aura.on('throttle-status', (s) => { thrStat = s || thrStat; if (panelIs('battery')) renderBattery(); });
+window.aura.throttleStatus().then(s => { thrStat = s || thrStat; });
 function applySaver() {
   const lvl = saverLevel();
+  syncThrottle();
   updateSaverUI();
   tabs.forEach(t => { if (!isShown(t) && t.ready) scheduleFreeze(t); emulateFor(t); });
   if (lvl >= 2 && lastLvl < 2 && lastLvl !== -1) { tabs.forEach(t => { if (!isShown(t)) sleepTab(t); }); toast('Ultra saver on 🥶 background tabs asleep, pages calmed down'); }
@@ -829,6 +834,7 @@ function renderSettings() {
     + `<div class="set">Battery saver ${sel('svr', SAVER_OPTS)}</div>`
     + `<div class="set">Sleep unused tabs after ${sel('slp', [[2, '2 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [0, 'never']].map(([v, l]) => `<option value="${v}" ${(S.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
     + `<div class="set">Freeze background tabs ${sw(S.freeze !== false, 'frz')}</div>`
+    + (thrStat.supported ? `<div class="set">Slow down other apps on battery ${sw(S.slowApps !== false, 'slowT2')}</div>` : '')
     + `<div class="set">Dark pages always ${sw(!!S.darkPages, 'dkp2')}</div>`
     + `<div class="set">See what's using battery <span class="pbtn" id="battOpen">Open</span></div>`
     + hd('TABS')
@@ -862,6 +868,7 @@ function renderSettings() {
   $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
   toggle('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
   toggle('dkp2', () => !!store.settings.darkPages, (v) => { store.settings.darkPages = v; save(); applySaver(); });
+  toggle('slowT2', () => store.settings.slowApps !== false, (v) => { store.settings.slowApps = v; save(); syncThrottle(); });
   $('battOpen').onclick = () => openPanel('battery');
   toggle('rst', () => store.settings.restore !== false, (v) => { store.settings.restore = v; save(); });
   $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); };
@@ -1506,7 +1513,11 @@ async function renderBattery() {
       <div><span>Orchard CPU</span><b>${totalCpu.toFixed(1)}%</b><span>of your PC</span></div>
       <div><span>Energy</span><b class="${tc}">${tl}</b><span>${fmtB(m.total.mem * 1024)} RAM</span></div></div>
     <div class="set">Battery saver <select id="svr2">${SAVER_OPTS}</select></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> (always on): background tabs freeze after 15s, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' min, ads blocked, background timers throttled.', '<b style="color:var(--leaf)">Saver</b>: tabs freeze after 3s and sleep after 2 min, videos never autoplay, websites told to cut animations, Orchard\'s own animations off.', '<b style="color:#ffb83d">Ultra</b>: everything in Saver, plus every background tab sleeps right away and pages go dark (saves power on OLED screens).'][saverLevel()]}</div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> (always on): background tabs freeze after 15s, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' min, ads blocked, background timers throttled.', '<b style="color:var(--leaf)">Saver</b>: tabs freeze after 3s and sleep after 2 min, videos never autoplay, websites told to cut animations, Orchard\'s own animations off' + (thrStat.supported && store.settings.slowApps !== false ? ', other apps in the background slowed down.' : '.'), '<b style="color:#ffb83d">Ultra</b>: everything in Saver, plus every background tab sleeps right away, pages go dark (saves power on OLED screens)' + (thrStat.supported && store.settings.slowApps !== false ? ' and background apps drop to the lowest priority.' : '.')][saverLevel()]}</div>
+    ${thrStat.supported ? `<div class="set">Slow down other apps on battery <span class="pbtn" id="slowT">${store.settings.slowApps === false ? 'OFF' : 'ON'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${store.settings.slowApps === false ? 'Off. Other apps run at full speed.' : saverLevel() === 0 ? 'Kicks in when u unplug. Background apps get lower priority and Windows Efficiency mode, the app in front always stays full speed.' : thrStat.count ? `&#128034; Slowing <b style="color:var(--txt)">${thrStat.count}</b> background process${thrStat.count === 1 ? '' : 'es'}${saverLevel() >= 2 ? ' (Ultra: lowest priority)' : ''}. Tap one to keep it full speed:` : 'Checking ur apps…'}</div>
+    ${thrStat.count && store.settings.slowApps !== false && saverLevel() > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px" id="slowList">${thrStat.apps.slice(0, 30).map(a => `<span class="pbtn mini" data-app="${esc(a)}" title="Keep ${esc(a)} at full speed">${esc(a)} &#10005;</span>`).join('')}</div>` : ''}
+    ${(store.settings.slowExclude || []).length ? `<div class="set" style="display:block;font-size:12px;color:var(--dim)">Never slowed: ${(store.settings.slowExclude || []).map(a => `<span class="pbtn mini" data-unskip="${esc(a)}" title="Let Orchard slow it again">${esc(a)} &#8635;</span>`).join(' ')}</div>` : ''}` : ''}
     <div class="set">Dark pages always <span class="pbtn" id="dkp">${store.settings.darkPages ? 'ON' : 'OFF'}</span></div>
     <div class="set">Rest all other tabs now <span class="pbtn" id="restNow">&#128164; Rest</span></div>
     <div style="padding:2px 12px 4px;font-size:11px;color:var(--dim)">PER TAB</div>`;
@@ -1520,6 +1531,9 @@ async function renderBattery() {
   });
   $('svr2').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); renderBattery(); };
   $('dkp').onclick = () => { store.settings.darkPages = !store.settings.darkPages; save(); applySaver(); renderBattery(); };
+  if ($('slowT')) $('slowT').onclick = () => { store.settings.slowApps = store.settings.slowApps === false; save(); syncThrottle(); toast(store.settings.slowApps === false ? 'other apps back to full speed' : 'other apps get slowed when ur on battery 🐢'); renderBattery(); };
+  list.querySelectorAll('[data-app]').forEach(b => b.onclick = () => { const a = b.dataset.app.toLowerCase(); store.settings.slowExclude = [...new Set((store.settings.slowExclude || []).concat(a))]; save(); syncThrottle(); toast(b.dataset.app + ' stays full speed now'); renderBattery(); });
+  list.querySelectorAll('[data-unskip]').forEach(b => b.onclick = () => { store.settings.slowExclude = (store.settings.slowExclude || []).filter(x => x !== b.dataset.unskip); save(); syncThrottle(); renderBattery(); });
   $('restNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); renderBattery(); };
 }
 

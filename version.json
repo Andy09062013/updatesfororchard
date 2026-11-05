@@ -1,6 +1,6 @@
 {
-  "version": "2.2.0",
-  "notes": "Every chat button opens Google Chat now, tab locking is back (and the lock screen clears after u unlock)",
+  "version": "2.3.0",
+  "notes": "Orchard now slows down other apps in the background when ur on battery (Windows Efficiency mode), the app in front stays full speed",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -25,7 +25,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "898cffac70842372774859782f5ef16b6d10e5eb94127d803414e6f0af2b8002"
+      "sha256": "861476648b26b8d0d09fb63df190b0978cff7331efa911a897a636d9ff4b0c14"
     },
     {
       "path": "newtab.html",
@@ -33,15 +33,19 @@
     },
     {
       "path": "package.json",
-      "sha256": "ceb9a6f95aacf0c966dfda59448d2d76e422f56c0cc96823f2442c22cfd2c3f7"
+      "sha256": "b32b1d8a111509b399a3403dff53b586c35e0c03d982efe42fcb1f597c67ebb9"
     },
     {
       "path": "preload.js",
-      "sha256": "9e9b5f176c274b0cf703bf460552dd77ce31b9d3702e3e85bee9f279a3a588b5"
+      "sha256": "0535440f311d9035c020d9a18e5acffcc73f5274f2eeb992d732a6e7ae12be05"
     },
     {
       "path": "renderer.js",
-      "sha256": "7569ac7864c3e9cbad354779ac5e6dcc51811762e4ed5b527cf91d1a4e496914"
+      "sha256": "d1ae3c004696e0371586d450dd205782d8e991a6f06ae5b2b1d6e0be08ec7953"
+    },
+    {
+      "path": "throttle.ps1",
+      "sha256": "8b1001cf487eaa4520e0835d1b26ca3749781699c456cbcc6f606a49d1fc171e"
     }
   ]
 }

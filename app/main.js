@@ -565,7 +565,7 @@ app.whenReady().then(() => {
 });
 ipcMain.handle('update-check', () => checkForUpdate());
 ipcMain.handle('app-version', () => ({ version: MY_VERSION, pending: pendingUpdate }));
-ipcMain.on('update-restart', () => { app.relaunch(); app.exit(0); });
+ipcMain.on('update-restart', () => { thrShutdown().then(() => { app.relaunch(); app.exit(0); }); });
 
 // ---------- Orchard Mail: Gmail through Google's official desktop sign-in ----------
 // Sign-in happens in the user's normal browser (Chrome) with a loopback redirect +
@@ -878,6 +878,76 @@ ipcMain.on('native-note', (e, n) => {
     note.on('click', () => { if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send('note-click', n.action || ''); } });
     note.show();
   } catch {}
+});
+
+// ---------- slow down other apps on battery (Windows): priority + Efficiency mode ----------
+const THROTTLE_SKIP = ['explorer', 'dwm', 'csrss', 'winlogon', 'lsass', 'services', 'smss', 'wininit', 'svchost', 'audiodg', 'ctfmon', 'sihost',
+  'searchhost', 'searchapp', 'searchui', 'startmenuexperiencehost', 'shellexperiencehost', 'textinputhost', 'runtimebroker', 'fontdrvhost',
+  'conhost', 'taskmgr', 'securityhealthsystray', 'securityhealthservice', 'applicationframehost', 'systemsettings', 'lockapp', 'msmpeng',
+  'nissrv', 'powershell', 'pwsh', 'orchard', 'electron', 'dllhost', 'taskhostw', 'widgets', 'widgetservice', 'phoneexperiencehost',
+  'gamebar', 'gamebarpresencewriter', 'useroobebroker', 'smartscreen', 'osk', 'magnify', 'narrator',
+  // calls + music: slowing these can make audio stutter
+  'spotify', 'discord', 'zoom', 'teams', 'ms-teams', 'msteams', 'skype', 'whatsapp', 'obs64', 'obs32', 'vlc', 'wmplayer',
+  'microsoft.media.player', 'music.ui', 'itunes', 'amazon music', 'slack', 'webex', 'ciscocollabhost'];
+let thr = null, thrBuf = '', thrTimer = null, thrQuitting = false;
+let thrWant = { on: false, level: 0, exclude: [] };
+const THR_TEST = process.env.ORCHARD_THROTTLE_TEST || '';   // test hook: a fake helper script (dev only)
+let thrStatus = { supported: process.platform === 'win32' || !!THR_TEST, active: false, count: 0, apps: [] };
+const thrWaiters = [];
+function thrStart() {
+  if (thr || !thrStatus.supported) return;
+  try {
+    if (THR_TEST) thr = require('child_process').spawn(process.execPath.includes('electron') ? 'node' : 'node', [THR_TEST], { stdio: ['pipe', 'pipe', 'ignore'] });
+    else {
+      const file = path.join(dataDir, 'throttle.ps1');
+      fs.writeFileSync(file, fs.readFileSync(path.join(__dirname, 'throttle.ps1')));
+      thr = require('child_process').spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', file], { windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] });
+    }
+  } catch { thr = null; return; }
+  thrBuf = '';
+  thr.stdout.setEncoding('utf8');
+  thr.stdout.on('data', (d) => {
+    thrBuf += d;
+    let i;
+    while ((i = thrBuf.indexOf('\n')) >= 0) {
+      const line = thrBuf.slice(0, i).trim(); thrBuf = thrBuf.slice(i + 1);
+      let j; try { j = JSON.parse(line); } catch { continue; }
+      if (j.op === 'applied') thrStatus = { ...thrStatus, active: true, count: +j.count || 0, apps: (Array.isArray(j.apps) ? j.apps : [j.apps]).filter(Boolean).map(String).slice(0, 60) };
+      if (j.op === 'restored') { thrStatus = { ...thrStatus, active: false, count: 0, apps: [] }; thrWaiters.splice(0).forEach(f => f()); }
+      BrowserWindow.getAllWindows().forEach(w => w.webContents.send('throttle-status', thrStatus));
+    }
+  });
+  thr.on('exit', () => { thr = null; thrWaiters.splice(0).forEach(f => f()); });
+  thr.on('error', () => { thr = null; });
+}
+const thrSend = (o) => { try { if (thr && thr.stdin.writable) thr.stdin.write(JSON.stringify(o) + '\n'); } catch {} };
+const thrOn = () => thrWant.on && thrWant.level >= 1;
+function thrTick() {
+  if (!thrOn()) return;
+  thrStart();
+  const own = [process.pid, ...app.getAppMetrics().map(x => x.pid)];
+  thrSend({ op: 'apply', level: thrWant.level, exclude: thrWant.exclude, own });
+}
+ipcMain.on('throttle-set', (e, w) => {
+  const before = { on: thrOn(), level: thrWant.level, ex: thrWant.exclude.join('|') };
+  const user = (Array.isArray(w && w.exclude) ? w.exclude : []).map(x => String(x).toLowerCase().slice(0, 80)).slice(0, 200);
+  thrWant = { on: !!(w && w.on), level: Math.max(0, Math.min(2, +(w && w.level) || 0)), exclude: [...new Set(THROTTLE_SKIP.concat(user))] };
+  const now = thrOn();
+  if (!now) { clearInterval(thrTimer); thrTimer = null; if (before.on && thr) thrSend({ op: 'restore' }); return; }
+  if (!before.on || before.level !== thrWant.level || before.ex !== thrWant.exclude.join('|')) thrTick();
+  if (!thrTimer) thrTimer = setInterval(thrTick, 60000);   // catch apps opened since
+});
+ipcMain.handle('throttle-status', () => thrStatus);
+function thrShutdown() {
+  return new Promise((res) => {
+    if (!thr) return res();
+    thrWaiters.push(res);
+    thrSend({ op: 'quit' });
+    setTimeout(res, 2500);
+  });
+}
+app.on('will-quit', (e) => {
+  if (thr && !thrQuitting) { e.preventDefault(); thrQuitting = true; thrShutdown().then(() => app.quit()); }
 });
 
 app.on('window-all-closed', () => app.quit());
