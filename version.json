@@ -1,6 +1,6 @@
 {
-  "version": "2.1.2",
-  "notes": "The chat button now opens Google Chat (great for school accounts). Orchard Chat moved to the menu",
+  "version": "2.2.0",
+  "notes": "Every chat button opens Google Chat now, tab locking is back (and the lock screen clears after u unlock)",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,11 +29,11 @@
     },
     {
       "path": "newtab.html",
-      "sha256": "f20a9c59ad69169bc3f1a03730caeb6b8f37649950de0c319e3a65c1951a009a"
+      "sha256": "d16035550ae016c47f0aa26ad3d3bc1f9e3f06ba19e45a05ae1d71e868b7cea0"
     },
     {
       "path": "package.json",
-      "sha256": "853741f1991f74064b4cc3b0e354952019aea21881eddfe2c78a5bb45be981e4"
+      "sha256": "ceb9a6f95aacf0c966dfda59448d2d76e422f56c0cc96823f2442c22cfd2c3f7"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "2bb6559243bafae345d241f95a9300d233024a9120ba9ef3ba4d5d06c19ddd86"
+      "sha256": "7569ac7864c3e9cbad354779ac5e6dcc51811762e4ed5b527cf91d1a4e496914"
     }
   ]
 }
