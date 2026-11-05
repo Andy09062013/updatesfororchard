@@ -1105,7 +1105,7 @@ async function renderBattery() {
 let lensShot = null, lensDrag = null;
 async function startLens() {
   if (active && active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
-  if (!active || !active.wv || !active.ready || isNewtab(active.url)) { toast('open a real page first bro 🫩'); return; }
+  if (!active || !active.wv || !active.ready || isNewtab(active.url) || !/^https?:|^file:/.test(active.url)) { createTab('https://lens.google.com/'); toast('Google Lens opened, upload or paste a pic 🔍'); return; }
   $('panel').classList.remove('show'); closeFind();
   await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
   const b = active.wv.getBoundingClientRect();

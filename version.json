@@ -1,6 +1,6 @@
 {
-  "version": "1.9.4",
-  "notes": "Ask about this page now has Answer the questions and Explain what I highlighted",
+  "version": "1.9.5",
+  "notes": "Lens on the new tab page opens Google Lens in a new tab",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "be80ad500b5c2cafa85178d6a1aabc238a230b617daf21c9792ced6cd27a825a"
+      "sha256": "8414fb80ff49767592ef5eece072de189f1de14d2d9cc723b4044f8bc57d41e4"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "00985a3637a8032701586c4fcea9ab5fc1f7aa99fe3e6eb06dd3e7428ab41088"
+      "sha256": "efb649c69923a991b59ce9a07baab221a58708c3a6befb83d89e1886002f2904"
     }
   ]
 }
