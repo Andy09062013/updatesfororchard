@@ -42,7 +42,7 @@ function makeWebview(t, url) {
   wv.addEventListener('did-stop-loading', () => { t.loading = false; renderTab(t); if (t === active) { progress(100); updateNav(); } });
   wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
   wv.addEventListener('page-favicon-updated', (e) => { t.icon = e.favicons[0]; renderTab(t); });
-  const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) updateNav(); renderTab(t); saveSession(); };
+  const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); checkGbar(); } renderTab(t); saveSession(); };
   wv.addEventListener('did-navigate', nav);
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
   wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
@@ -302,6 +302,7 @@ function activate(t) {
   t.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   closeFind();
   updateNav();
+  checkGbar();
   if (isNewtab(t.url) && !(t.locked && !t.unlocked)) setTimeout(() => $('url').focus(), 50);
   saveSession();
 }
@@ -528,6 +529,163 @@ function renderHides() {
   if ($('hideClr')) $('hideClr').onclick = () => { delete store.hideRules[h]; save(); tabs.filter(x => hostOf(x.url) === h).forEach(x => { applyHides(x); if (x.wv && x.ready) x.wv.reload(); }); renderHides(); };
 }
 
+// ---- Orchard Mail (Gmail via Google's official sign-in in Chrome) ----
+const M = window.aura.mail;
+let mailView = 'list', mailQ = 'in:inbox', mailMsgs = [], mailNext = null, mailCur = null, mailCfg = null, mailBusy = false;
+const ext = (u) => window.aura.openExternal(u);
+const nameFrom = (f) => { const m = String(f).match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>/); return m ? (m[1].trim() || m[2]) : f; };
+const addrFrom = (f) => { const m = String(f).match(/<([^>]+)>/); return m ? m[1] : String(f).trim(); };
+const mdate = (ts) => { const d = new Date(ts), n = new Date(); return d.toDateString() === n.toDateString() ? d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : d.getFullYear() === n.getFullYear() ? d.toLocaleDateString([], { day: 'numeric', month: 'short' }) : d.toLocaleDateString(); };
+async function mailShow() {
+  mailCfg = await M.config();
+  if (!mailCfg.signedIn) return mailSetup();
+  if (mailView === 'read' && mailCur) return mailRead(mailCur.id);
+  if (mailView === 'compose') return;
+  mailList();
+}
+function mailSetup(err) {
+  const p = $('mailPane'), c = mailCfg || {};
+  p.innerHTML = `<div class="mtop"><b style="flex:1">&#9993; Orchard Mail</b><span class="pbtn" id="mX">&#10005;</span></div>
+  <div class="msetup">
+    <h3>Ur Gmail, inside Orchard</h3>
+    <p>Google won't let u log in on Orchard's pages, but it does allow apps to sign in through ur normal browser. So u sign in once in <b>Chrome</b>, then ur inbox shows up right here.</p>
+    ${c.clientId && c.hasSecret ? '' : `<p><b>One time setup (about 10 min, do it in Chrome):</b></p>
+    <ol>
+      <li><a data-u="https://console.cloud.google.com/projectcreate">Make a Google Cloud project</a>, name it Orchard, click Create.</li>
+      <li><a data-u="https://console.cloud.google.com/apis/library/gmail.googleapis.com">Turn on the Gmail API</a> (click Enable).</li>
+      <li><a data-u="https://console.cloud.google.com/auth/branding">Set up the sign in screen</a>: app name Orchard, ur email, audience <b>External</b>, finish.</li>
+      <li>On <a data-u="https://console.cloud.google.com/auth/audience">Audience</a>, add ur own Gmail under <b>Test users</b>.</li>
+      <li><a data-u="https://console.cloud.google.com/auth/clients/create">Create a client</a>: type <b>Desktop app</b>, name Orchard, Create.</li>
+      <li>Copy the <b>Client ID</b> and <b>Client secret</b> into the boxes below.</li>
+    </ol>`}
+    <label style="font-size:12px;color:var(--dim)">Client ID<input id="mCid" value="${esc(c.clientId || '')}" placeholder="something.apps.googleusercontent.com"></label>
+    <label style="font-size:12px;color:var(--dim)">Client secret<input id="mSec" type="password" placeholder="${c.hasSecret ? 'saved (paste to change)' : 'GOCSPX-...'}"></label>
+    ${err ? `<p style="color:#ff6b6b">${esc(err)}</p>` : ''}
+    <span class="pbtn ok" id="mGo" style="align-self:flex-start;padding:9px 16px">Sign in with Google (opens Chrome)</span>
+    <p>When Chrome opens, pick ur personal Gmail. If Google says "<b>Google hasn't verified this app</b>", that's normal for ur own project: click <b>Continue</b>. Ur emails go straight between Orchard and Google, nobody else sees them.</p>
+  </div>`;
+  p.querySelectorAll('a[data-u]').forEach(a => a.onclick = () => ext(a.dataset.u));
+  $('mX').onclick = () => toggleAi(false);
+  $('mGo').onclick = async () => {
+    const cid = $('mCid').value.trim(), sec = $('mSec').value.trim();
+    if (!/\.apps\.googleusercontent\.com$/.test(cid)) return mailSetup('that Client ID doesnt look right, it ends with .apps.googleusercontent.com');
+    if (!sec && !c.hasSecret) return mailSetup('paste the Client secret too');
+    await M.setConfig(cid, sec);
+    $('mGo').textContent = 'Waiting for u to sign in in Chrome…';
+    const r = await M.signIn();
+    if (r.ok) { toast('signed in as ' + r.email + ' 🔥'); mailView = 'list'; mailShow(); mailPoll(); }
+    else { mailCfg = await M.config(); mailSetup(r.error); }
+  };
+}
+async function mailList(append) {
+  const p = $('mailPane');
+  if (!append) {
+    p.innerHTML = `<div class="mtop"><input id="mSearch" placeholder="Search mail" value="${mailQ === 'in:inbox' ? '' : esc(mailQ)}"><span class="pbtn" id="mRef" title="Refresh">&#8635;</span><span class="pbtn ok" id="mNew" title="New email">&#9998; Write</span><span class="pbtn" id="mMenu" title="Account">&#8942;</span></div><div class="mlist" id="mList"><div class="empty" style="padding:20px;text-align:center;color:var(--dim)">Loading ur inbox…</div></div>`;
+    $('mSearch').onkeydown = (e) => { if (e.key === 'Enter') { mailQ = e.target.value.trim() || 'in:inbox'; mailList(); } };
+    $('mRef').onclick = () => mailList();
+    $('mNew').onclick = () => mailCompose();
+    $('mMenu').onclick = (e) => showMenu(e, [
+      [esc(mailCfg.email || 'signed in'), () => {}, true],
+      null,
+      ['Inbox', () => { mailQ = 'in:inbox'; mailList(); }],
+      ['Unread', () => { mailQ = 'is:unread in:inbox'; mailList(); }],
+      ['Starred', () => { mailQ = 'is:starred'; mailList(); }],
+      ['Sent', () => { mailQ = 'in:sent'; mailList(); }],
+      null,
+      ['Open Gmail in Chrome', () => ext('https://mail.google.com/')],
+      ['Sign out', async () => { await M.signOut(); mailBadge(0); toast('signed out of Orchard Mail'); mailShow(); }]
+    ]);
+  }
+  if (mailBusy) return; mailBusy = true;
+  const r = await M.list(mailQ, append ? mailNext : null);
+  mailBusy = false;
+  const box = $('mList'); if (!box) return;
+  if (r.error) { if (r.signedOut) return mailShow(); box.innerHTML = `<div style="padding:20px;color:#ff6b6b;font-size:13px">${esc(r.error)}</div>`; return; }
+  mailMsgs = append ? mailMsgs.concat(r.messages) : r.messages; mailNext = r.next;
+  if (!mailMsgs.length) { box.innerHTML = '<div style="padding:24px;text-align:center;color:var(--dim)">nothing here 🍃</div>'; return; }
+  box.innerHTML = '';
+  mailMsgs.forEach(m => {
+    const d = document.createElement('div'); d.className = 'mrow' + (m.unread ? ' unread' : '');
+    d.innerHTML = '<div class="l1"><span class="fr"></span><span class="dt"></span></div><div class="sj"></div><div class="sn"></div>';
+    d.querySelector('.fr').textContent = (m.starred ? '★ ' : '') + nameFrom(m.from);
+    d.querySelector('.dt').textContent = mdate(m.date);
+    d.querySelector('.sj').textContent = m.subject || '(no subject)';
+    d.querySelector('.sn').textContent = m.snippet.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+    d.onclick = () => mailRead(m.id);
+    box.appendChild(d);
+  });
+  if (mailNext) { const mo = document.createElement('div'); mo.className = 'mmore'; mo.innerHTML = '<span class="pbtn">Load more</span>'; mo.firstChild.onclick = () => mailList(true); box.appendChild(mo); }
+}
+async function mailRead(id) {
+  mailView = 'read';
+  const p = $('mailPane');
+  p.innerHTML = `<div class="mtop"><span class="pbtn" id="mBack">&#8592; Back</span><span style="flex:1"></span><span class="pbtn" id="mReply" title="Reply">&#8617; Reply</span><span class="pbtn" id="mArch" title="Archive">&#128229;</span><span class="pbtn" id="mTrash" title="Delete">&#128465;</span><span class="pbtn" id="mMore">&#8942;</span></div><div class="mread" id="mRead"><div style="padding:20px;color:var(--dim)">Opening…</div></div>`;
+  $('mBack').onclick = () => { mailView = 'list'; mailCur = null; mailList(); };
+  const m = await M.get(id);
+  if (m.error) { if (m.signedOut) return mailShow(); $('mRead').innerHTML = `<div style="padding:20px;color:#ff6b6b">${esc(m.error)}</div>`; return; }
+  mailCur = m;
+  const box = $('mRead'); box.innerHTML = '<div class="mhd"><h3></h3><small class="a"></small><small class="b"></small></div>';
+  box.querySelector('h3').textContent = m.subject || '(no subject)';
+  box.querySelector('.a').textContent = 'From: ' + m.from;
+  box.querySelector('.b').textContent = 'To: ' + m.to + ' · ' + new Date(m.date).toLocaleString();
+  if (m.html) {
+    const f = document.createElement('iframe'); f.className = 'mbody';
+    f.setAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox');
+    f.srcdoc = '<meta http-equiv="Content-Security-Policy" content="script-src \'none\'"><base target="_blank"><style>body{font-family:Segoe UI,sans-serif;margin:12px;overflow-wrap:anywhere}img{max-width:100%;height:auto}</style>' + m.html;
+    box.appendChild(f);
+  } else {
+    const t = document.createElement('div'); t.className = 'mtext';
+    const re = /https?:\/\/[^\s<>"]+/g; let i = 0, x; const s = m.text;
+    while ((x = re.exec(s))) { t.append(document.createTextNode(s.slice(i, x.index))); const a = document.createElement('a'); a.textContent = x[0]; a.href = '#'; const u = x[0]; a.onclick = (e) => { e.preventDefault(); createTab(u); }; t.append(a); i = x.index + x[0].length; }
+    t.append(document.createTextNode(s.slice(i)));
+    box.appendChild(t);
+  }
+  if (m.unread) { M.modify(id, 'read').then(() => mailPoll()); const li = mailMsgs.find(x => x.id === id); if (li) li.unread = false; }
+  const act = async (a, msg) => { const r = await M.modify(id, a); if (r.error) toast(r.error); else { toast(msg); mailMsgs = mailMsgs.filter(x => x.id !== id); mailView = 'list'; mailCur = null; mailList(); mailPoll(); } };
+  $('mArch').onclick = () => act('archive', 'archived');
+  $('mTrash').onclick = () => act('trash', 'moved to trash');
+  $('mReply').onclick = () => mailCompose({ to: addrFrom(m.from), subject: /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject, threadId: m.threadId, inReplyTo: m.messageId, quote: m });
+  $('mMore').onclick = (e) => showMenu(e, [
+    ['Mark unread', async () => { await M.modify(id, 'unread'); mailView = 'list'; mailList(); mailPoll(); }],
+    ['Star', async () => { await M.modify(id, 'star'); toast('starred ★'); }],
+    ['Forward', () => mailCompose({ subject: 'Fwd: ' + m.subject, body: '\n\n---------- Forwarded message ----------\nFrom: ' + m.from + '\nSubject: ' + m.subject + '\n\n' + (m.text || '') })],
+    ['Open in Chrome', () => ext('https://mail.google.com/mail/u/0/#all/' + m.threadId)]
+  ]);
+}
+function mailCompose(d = {}) {
+  mailView = 'compose';
+  const p = $('mailPane');
+  p.innerHTML = `<div class="mtop"><span class="pbtn" id="mCancel">&#8592; Cancel</span><b style="flex:1;text-align:center">${d.threadId ? 'Reply' : 'New email'}</b><span class="pbtn ok" id="mSend">Send</span></div>
+  <div class="mform"><input id="mTo" placeholder="To (email)"><input id="mSubj" placeholder="Subject"><textarea id="mBody" placeholder="Write ur email…"></textarea></div>`;
+  $('mTo').value = d.to || ''; $('mSubj').value = d.subject || '';
+  let body = d.body || '';
+  if (d.quote) body = '\n\nOn ' + new Date(d.quote.date).toLocaleString() + ', ' + d.quote.from + ' wrote:\n' + (d.quote.text || '').split('\n').map(l => '> ' + l).join('\n');
+  $('mBody').value = body;
+  (d.to ? $('mBody') : $('mTo')).focus(); if (d.to) $('mBody').setSelectionRange(0, 0);
+  $('mCancel').onclick = () => { mailView = d.threadId && mailCur ? 'read' : 'list'; mailShow(); };
+  $('mSend').onclick = async () => {
+    $('mSend').textContent = 'Sending…';
+    const r = await M.send({ to: $('mTo').value, subject: $('mSubj').value, body: $('mBody').value, threadId: d.threadId, inReplyTo: d.inReplyTo });
+    if (r.error) { $('mSend').textContent = 'Send'; toast(r.error); return; }
+    toast('sent ✉️'); mailView = 'list'; mailCur = null; mailList();
+  };
+}
+function mailBadge(n) { const b = $('mailBadge'); b.hidden = !n; b.textContent = n > 99 ? '99+' : n; $('mailBtn').title = 'Orchard Mail' + (n ? ' · ' + n + ' unread' : '') + ' (Alt+M)'; }
+async function mailPoll() { try { const r = await M.unread(); mailBadge(r.count || 0); } catch {} }
+setTimeout(mailPoll, 4000);
+setInterval(() => { if (saverLevel() < 2) mailPoll(); }, 5 * 60 * 1000);
+
+// ---- google sign-in bar: offer Chrome / Orchard Mail on Google's login page ----
+let gbarDismissed = '';
+function checkGbar() {
+  const t = active, show = !!t && /^https:\/\/accounts\.google\.com\//.test(t.url || '') && gbarDismissed !== t.url;
+  $('gbar').hidden = !show;
+  $('gbarMail').hidden = !/mail\.google|gmail/i.test(decodeURIComponent(t && t.url || ''));
+}
+$('gbarChrome').onclick = () => { if (!active) return; let u = active.url; try { const c = new URL(u).searchParams.get('continue'); if (c && /^https:\/\//.test(c)) u = c; } catch {} ext(u); toast('opened in ur normal browser'); };
+$('gbarMail').onclick = () => { $('gbar').hidden = true; openMail(); };
+$('gbarX').onclick = () => { gbarDismissed = active && active.url; $('gbar').hidden = true; };
+
 // ---- main menu: every feature in one place ----
 const FEATURES = [
   ['BATTERY (THE CORE OF ORCHARD)'],
@@ -541,6 +699,7 @@ const FEATURES = [
   ['&#8634;', 'Reopen closed tab', 'brings back the last tab u closed', 'Ctrl+Shift+T', () => { const u = closed.pop(); if (u) createTab(u); else toast('no closed tabs'); }],
   ['&#128433;', 'Drag tabs', 'drag to reorder, drag out for a new window', 'Drag', () => toast('grab a tab and drag it out of the window')],
   ['SMART STUFF'],
+  ['&#9993;', 'Orchard Mail', 'ur Gmail in a side panel, sign in through Chrome', 'Alt+M', () => openMail()],
   ['&#128172;', 'Orchard Chat', 'chat with friends by email, groups, files', 'Alt+C', () => openChat()],
   ['&#10022;', 'Ask AI', 'Gemini, ChatGPT or Claude on the side', 'Alt+G', () => toggleAi(true)],
   ['&#128269;', 'Google Lens', 'drag over anything to search it', 'Lens icon', () => startLens()],
@@ -579,6 +738,7 @@ function tabMenu(e, t) {
   const items = [
     ['Reload', () => t.wv && t.wv.reload()],
     ['Duplicate', () => createTab(t.url && !isNewtab(t.url) ? t.url : undefined)],
+    /^https?:/.test(t.url || '') ? ['Open in Chrome (default browser)', () => ext(t.url)] : null,
     null,
     t === active ? null : [split.includes(t) && split.includes(active) ? 'Already in split' : 'Split screen with this tab', () => splitWith(t), split.includes(t) && split.includes(active)],
     split.includes(t) ? ['Remove from split', () => unsplit(t)] : null,
@@ -1089,7 +1249,9 @@ function sideWidth(w) {
 }
 function loadAi(which) {
   aiWhich = which; $('aiPick').value = which; setTimeout(markSideBtns);
-  $('askPage').hidden = which === 'chat';
+  $('askPage').hidden = which === 'chat' || which === 'mail';
+  if (which === 'mail') { $('mailPane').hidden = false; if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } mailShow(); return; }
+  $('mailPane').hidden = true;
   if (aiWv) aiWv.remove();
   aiWv = document.createElement('webview');
   if (store.partition) aiWv.setAttribute('partition', store.partition);
@@ -1099,15 +1261,17 @@ function loadAi(which) {
   $('sbody').appendChild(aiWv);
 }
 function markSideBtns() {
-  $('aiBtn').classList.toggle('on', aiOpen && aiWhich !== 'chat');
+  $('aiBtn').classList.toggle('on', aiOpen && aiWhich !== 'chat' && aiWhich !== 'mail');
   $('chatBtn').classList.toggle('on', aiOpen && aiWhich === 'chat');
+  $('mailBtn').classList.toggle('on', aiOpen && aiWhich === 'mail');
 }
 function toggleAi(force) {
   aiOpen = force === undefined ? !aiOpen : force;
   $('side').classList.toggle('show', aiOpen);
   markSideBtns();
   sideWidth(store.settings.sideW || 420);
-  if (aiOpen && !aiWv) loadAi(store.settings.ai || 'gemini');
+  if (aiOpen && aiWhich === 'mail') loadAi('mail');
+  else if (aiOpen && !aiWv) loadAi(store.settings.ai && store.settings.ai !== 'mail' ? store.settings.ai : 'gemini');
   // freeze the ai panel while it's closed so it doesnt eat battery
   if (aiWcId != null) window.aura.freeze(aiWcId, !aiOpen);
   if (aiOpen) setTimeout(() => aiWv && aiWv.focus(), 100);
@@ -1166,6 +1330,7 @@ function handleKey(k, ctrl, shift, alt) {
   else if (alt && k === 'c') openChat();
   else if (alt && k === 'f') openPanel('menu');
   else if (alt && k === 'h') startHidePicker();
+  else if (alt && k === 'm') openMail();
   else if (ctrl && k === 'j') openPanel('downloads');
   else if (k === 'escape' && $('lens').classList.contains('show')) endLens();
   else if (ctrl && k === 'l') { $('url').focus(); $('url').select(); }
@@ -1199,13 +1364,19 @@ $('speedBtn').onclick = () => openPanel('speed');
 $('histBtn').onclick = () => openPanel('history');
 $('setBtn').onclick = () => openPanel('settings');
 $('avatar').onclick = () => openPanel('profiles');
-$('aiBtn').onclick = () => { if (aiOpen && aiWhich === 'chat') { aiWcId = null; loadAi(store.settings.ai && store.settings.ai !== 'chat' ? store.settings.ai : 'gemini'); } else toggleAi(); };
+$('aiBtn').onclick = () => { if (aiOpen && (aiWhich === 'chat' || aiWhich === 'mail')) { aiWcId = null; loadAi(store.settings.ai && store.settings.ai !== 'chat' ? store.settings.ai : 'gemini'); } else toggleAi(); };
 const openChat = () => {
   if (aiOpen && aiWhich === 'chat') { toggleAi(false); return; }
   if (!aiOpen) toggleAi(true);
   if (aiWhich !== 'chat') { aiWcId = null; loadAi('chat'); }
 };
 $('chatBtn').onclick = openChat;
+const openMail = () => {
+  if (aiOpen && aiWhich === 'mail') { toggleAi(false); return; }
+  aiWhich = 'mail';
+  if (!aiOpen) toggleAi(true); else loadAi('mail');
+};
+$('mailBtn').onclick = openMail;
 $('menuBtn').onclick = () => openPanel('menu');
 $('updPill').onclick = () => { saveSession(true); window.aura.restartUpdate(); };
 // middle click empty tab bar = new tab, double click empty = maximize
@@ -1213,7 +1384,7 @@ $('tabs').addEventListener('mousedown', (e) => { if (e.button === 1 && (e.target
 $('tabs').addEventListener('auxclick', (e) => { if (e.button === 1 && e.target.id === 'newtab') { e.preventDefault(); createTab(); } });
 $('sideX').onclick = () => toggleAi(false);
 $('askPage').onclick = askAboutPage;
-$('aiPick').onchange = (e) => { if (e.target.value !== 'chat') { store.settings.ai = e.target.value; save(); } aiWcId = null; loadAi(e.target.value); };
+$('aiPick').onchange = (e) => { if (e.target.value !== 'chat' && e.target.value !== 'mail') { store.settings.ai = e.target.value; save(); } aiWcId = null; loadAi(e.target.value); };
 $('sgrip').onmousedown = (e) => {
   e.preventDefault(); document.body.classList.add('dragging');
   const mv = (ev) => sideWidth(window.innerWidth - ev.clientX);
@@ -1360,7 +1531,7 @@ document.addEventListener('keydown', (e) => { if (handleKey(e.key.toLowerCase(),
 window.aura.on('open-tab', (d) => typeof d === 'string' ? createTab(d) : createTab(d.url, d.bg));
 window.aura.on('tool', (name) => {
   if (name.startsWith('omnibox')) { const q = decodeURIComponent(name.split('/')[1] || ''); omniHandoff = true; $('url').focus(); $('url').value = q; omniTyped = q; omniUpdate(); const n = $('url'); n.setSelectionRange(q.length, q.length); return; }
-  const map = { chat: () => openChat(), ai: () => toggleAi(true), lens: () => startLens(), battery: () => openPanel('battery'), speed: () => openPanel('speed'), downloads: () => openPanel('downloads'), menu: () => openPanel('menu'), theme: () => openPanel('theme'), profiles: () => openPanel('profiles'), history: () => openPanel('history') };
+  const map = { mail: () => openMail(), chat: () => openChat(), ai: () => toggleAi(true), lens: () => startLens(), battery: () => openPanel('battery'), speed: () => openPanel('speed'), downloads: () => openPanel('downloads'), menu: () => openPanel('menu'), theme: () => openPanel('theme'), profiles: () => openPanel('profiles'), history: () => openPanel('history') };
   if (map[name]) map[name]();
 });
 window.aura.on('shortcut', (s) => handleKey(s.key, s.ctrl, s.shift, s.alt));

@@ -122,6 +122,7 @@ function createWindow(profileId, opts = {}) {
   }, 250));
   win.on('maximize', () => win.webContents.send('max-state', true));
   win.on('unmaximize', () => win.webContents.send('max-state', false));
+  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/i.test(url)) win.webContents.send('open-tab', { url, bg: false }); return { action: 'deny' }; });
   if (!firstWin) firstWin = win;
   return win;
 }
@@ -174,7 +175,7 @@ app.on('web-contents-created', (e, contents) => {
     contents.on('before-input-event', (ev, input) => {
       if (input.type !== 'keyDown') return;
       const k = input.key.toLowerCase();
-      if (input.control && ['t','w','l','r','d','h','tab','=','-','0','f','n','j'].includes(k) || k === 'f5' || k === 'f11' || k === 'f12' || (input.alt && (k === 'arrowleft' || k === 'arrowright' || k === 'g' || k === 'c' || k === 'f' || k === 'h'))) {
+      if (input.control && ['t','w','l','r','d','h','tab','=','-','0','f','n','j'].includes(k) || k === 'f5' || k === 'f11' || k === 'f12' || (input.alt && (k === 'arrowleft' || k === 'arrowright' || k === 'g' || k === 'c' || k === 'f' || k === 'h' || k === 'm'))) {
         ev.preventDefault();
         sendTo(contents.hostWebContents, 'shortcut', { key: k, ctrl: input.control, shift: input.shift, alt: input.alt });
       }
@@ -529,5 +530,197 @@ app.whenReady().then(() => {
 ipcMain.handle('update-check', () => checkForUpdate());
 ipcMain.handle('app-version', () => ({ version: MY_VERSION, pending: pendingUpdate }));
 ipcMain.on('update-restart', () => { app.relaunch(); app.exit(0); });
+
+// ---------- Orchard Mail: Gmail through Google's official desktop sign-in ----------
+// Sign-in happens in the user's normal browser (Chrome) with a loopback redirect +
+// PKCE, the way Google wants desktop apps to do it. Tokens are encrypted with
+// Windows' own encryption (safeStorage) and never leave this PC except to Google.
+const http = require('http');
+const { safeStorage } = require('electron');
+const mailFile = (id) => path.join(dataDir, `mail-${id}.json`);
+const mailState = {};
+function ms(id) {
+  if (!mailState[id]) {
+    try {
+      const j = JSON.parse(fs.readFileSync(mailFile(id), 'utf8'));
+      if (j.enc && safeStorage.isEncryptionAvailable()) { try { j.refresh = safeStorage.decryptString(Buffer.from(j.enc, 'base64')); } catch {} }
+      if (j.encSecret && safeStorage.isEncryptionAvailable()) { try { j.clientSecret = safeStorage.decryptString(Buffer.from(j.encSecret, 'base64')); } catch {} }
+      delete j.enc; delete j.encSecret;
+      mailState[id] = j;
+    } catch { mailState[id] = {}; }
+  }
+  return mailState[id];
+}
+function mailSave(id) {
+  const s = ms(id), out = { clientId: s.clientId || '', email: s.email || '' };
+  const enc = safeStorage.isEncryptionAvailable();
+  if (s.refresh) { if (enc) out.enc = safeStorage.encryptString(s.refresh).toString('base64'); else out.refresh = s.refresh; }
+  if (s.clientSecret) { if (enc) out.encSecret = safeStorage.encryptString(s.clientSecret).toString('base64'); else out.clientSecret = s.clientSecret; }
+  try { fs.writeFileSync(mailFile(id), JSON.stringify(out)); } catch {}
+}
+const b64url = (buf) => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64url = (s) => Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+async function tokenRequest(params) {
+  const r = await net.fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params).toString() });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const err = new Error(j.error_description || j.error || ('token error ' + r.status)); err.code = j.error; throw err; }
+  return j;
+}
+async function accessToken(id) {
+  const s = ms(id);
+  if (s.access && s.accessExp > Date.now() + 60000) return s.access;
+  if (!s.refresh) { const e = new Error('not signed in'); e.code = 'signed_out'; throw e; }
+  try {
+    const j = await tokenRequest({ client_id: s.clientId, client_secret: s.clientSecret || '', refresh_token: s.refresh, grant_type: 'refresh_token' });
+    s.access = j.access_token; s.accessExp = Date.now() + (j.expires_in || 3600) * 1000;
+    return s.access;
+  } catch (e) {
+    if (e.code === 'invalid_grant') { s.refresh = null; s.access = null; mailSave(id); e.code = 'signed_out'; e.message = 'ur Google sign in expired, sign in again'; }
+    throw e;
+  }
+}
+async function gmail(id, p, opts = {}, retry = true) {
+  const tok = await accessToken(id);
+  const r = await net.fetch('https://gmail.googleapis.com/gmail/v1/users/me/' + p, {
+    method: opts.method || 'GET',
+    headers: { Authorization: 'Bearer ' + tok, ...(opts.body ? { 'Content-Type': 'application/json' } : {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  if (r.status === 401 && retry) { ms(id).access = null; return gmail(id, p, opts, false); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error((j.error && j.error.message) || ('Gmail error ' + r.status));
+  return j;
+}
+const hdr = (msg, name) => { const h = ((msg.payload && msg.payload.headers) || []).find(x => x.name.toLowerCase() === name.toLowerCase()); return h ? h.value : ''; };
+function bodyOf(payload) {
+  let html = '', text = '';
+  const walk = (p) => {
+    if (!p) return;
+    const mt = (p.mimeType || '').toLowerCase();
+    if (p.body && p.body.data) {
+      if (mt === 'text/html' && !html) html = unb64url(p.body.data).toString('utf8');
+      else if (mt === 'text/plain' && !text) text = unb64url(p.body.data).toString('utf8');
+    }
+    (p.parts || []).forEach(walk);
+  };
+  walk(payload);
+  return { html, text };
+}
+const mailErr = (e) => ({ error: String(e && e.message || e), signedOut: e && e.code === 'signed_out' });
+
+ipcMain.handle('mail-config', (e) => { const s = ms(profileOf(e)); return { clientId: s.clientId || '', hasSecret: !!s.clientSecret, email: s.email || '', signedIn: !!s.refresh }; });
+ipcMain.handle('mail-config-set', (e, clientId, clientSecret) => {
+  const id = profileOf(e), s = ms(id);
+  s.clientId = String(clientId || '').trim().slice(0, 200);
+  if (clientSecret) s.clientSecret = String(clientSecret).trim().slice(0, 200);
+  mailSave(id); return true;
+});
+ipcMain.handle('mail-signin', async (e) => {
+  const id = profileOf(e), s = ms(id);
+  if (!s.clientId || !s.clientSecret) return { error: 'add ur client ID and client secret first' };
+  const verifier = b64url(require('crypto').randomBytes(32));
+  const challenge = b64url(require('crypto').createHash('sha256').update(verifier).digest());
+  const state = require('crypto').randomBytes(16).toString('hex');
+  return await new Promise((resolve) => {
+    let redirect = '', finished = false;
+    const page = (title, msg) => `<!doctype html><meta charset="utf-8"><title>Orchard Mail</title><body style="font-family:Segoe UI,sans-serif;background:#120c0b;color:#f6ece8;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:54px">🍎</div><h2>${title}</h2><p style="color:#c9b3ab">${msg}</p></div>`;
+    const done = (v) => { if (finished) return; finished = true; clearTimeout(timer); try { server.close(); } catch {} resolve(v); };
+    const server = http.createServer(async (req, res) => {
+      const u = new URL(req.url, 'http://127.0.0.1');
+      if (u.pathname !== '/') { res.writeHead(404); res.end(); return; }
+      const code = u.searchParams.get('code'), err = u.searchParams.get('error');
+      if (err || !code || u.searchParams.get('state') !== state) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Sign in cancelled', 'U can close this tab.'));
+        return done({ error: err === 'access_denied' ? 'sign in was cancelled' : (err || 'sign in failed') });
+      }
+      try {
+        const j = await tokenRequest({ code, client_id: s.clientId, client_secret: s.clientSecret, redirect_uri: redirect, grant_type: 'authorization_code', code_verifier: verifier });
+        s.refresh = j.refresh_token || s.refresh; s.access = j.access_token; s.accessExp = Date.now() + (j.expires_in || 3600) * 1000;
+        const prof = await gmail(id, 'profile');
+        s.email = prof.emailAddress || '';
+        mailSave(id);
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Signed in to Orchard Mail', 'Ur all set. Close this tab and go back to Orchard.'));
+        const w = BrowserWindow.fromWebContents(e.sender); if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
+        done({ ok: true, email: s.email });
+      } catch (ex) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Something went wrong', 'Go back to Orchard and try again.'));
+        done({ error: String(ex.message || ex) });
+      }
+    });
+    const timer = setTimeout(() => done({ error: 'sign in timed out, try again' }), 5 * 60 * 1000);
+    server.on('error', (ex) => done({ error: 'could not start sign in: ' + ex.message }));
+    server.listen(0, '127.0.0.1', () => {
+      redirect = 'http://127.0.0.1:' + server.address().port;
+      const auth = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+        client_id: s.clientId, redirect_uri: redirect, response_type: 'code', access_type: 'offline', prompt: 'consent',
+        scope: 'https://www.googleapis.com/auth/gmail.modify', code_challenge: challenge, code_challenge_method: 'S256', state
+      }).toString();
+      shell.openExternal(auth);
+    });
+  });
+});
+ipcMain.handle('mail-signout', async (e) => {
+  const id = profileOf(e), s = ms(id);
+  if (s.refresh) net.fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(s.refresh), { method: 'POST' }).catch(() => {});
+  s.refresh = null; s.access = null; s.email = ''; mailSave(id); return true;
+});
+ipcMain.handle('mail-list', async (e, q, pageToken) => {
+  const id = profileOf(e);
+  try {
+    const params = new URLSearchParams({ maxResults: '30', q: q || 'in:inbox' });
+    if (pageToken) params.set('pageToken', pageToken);
+    const list = await gmail(id, 'messages?' + params.toString());
+    const metas = await Promise.all((list.messages || []).map(m => gmail(id, `messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`).catch(() => null)));
+    return {
+      next: list.nextPageToken || null,
+      messages: metas.filter(Boolean).map(m => ({ id: m.id, threadId: m.threadId, from: hdr(m, 'From'), subject: hdr(m, 'Subject'), date: +m.internalDate || 0, snippet: m.snippet || '', unread: (m.labelIds || []).includes('UNREAD'), starred: (m.labelIds || []).includes('STARRED') }))
+    };
+  } catch (ex) { return mailErr(ex); }
+});
+ipcMain.handle('mail-get', async (e, mid) => {
+  const id = profileOf(e);
+  try {
+    if (!/^[A-Za-z0-9]+$/.test(mid)) return { error: 'bad id' };
+    const m = await gmail(id, `messages/${mid}?format=full`);
+    const b = bodyOf(m.payload);
+    return { id: m.id, threadId: m.threadId, from: hdr(m, 'From'), to: hdr(m, 'To'), cc: hdr(m, 'Cc'), subject: hdr(m, 'Subject'), date: +m.internalDate || 0, messageId: hdr(m, 'Message-ID'), html: b.html, text: b.text || m.snippet || '', unread: (m.labelIds || []).includes('UNREAD') };
+  } catch (ex) { return mailErr(ex); }
+});
+ipcMain.handle('mail-modify', async (e, mid, action) => {
+  const id = profileOf(e);
+  try {
+    if (!/^[A-Za-z0-9]+$/.test(mid)) return { error: 'bad id' };
+    if (action === 'trash') await gmail(id, `messages/${mid}/trash`, { method: 'POST' });
+    else {
+      const body = { read: { removeLabelIds: ['UNREAD'] }, unread: { addLabelIds: ['UNREAD'] }, archive: { removeLabelIds: ['INBOX'] }, star: { addLabelIds: ['STARRED'] }, unstar: { removeLabelIds: ['STARRED'] } }[action];
+      if (!body) return { error: 'bad action' };
+      await gmail(id, `messages/${mid}/modify`, { method: 'POST', body });
+    }
+    return { ok: true };
+  } catch (ex) { return mailErr(ex); }
+});
+ipcMain.handle('mail-send', async (e, d) => {
+  const id = profileOf(e), s = ms(id);
+  try {
+    const clean = (v) => String(v || '').replace(/[\r\n]+/g, ' ').trim();
+    const to = clean(d.to), subject = clean(d.subject);
+    if (!to) return { error: 'who is it to?' };
+    const enc = (v) => /^[\x20-\x7e]*$/.test(v) ? v : '=?UTF-8?B?' + Buffer.from(v, 'utf8').toString('base64') + '?=';
+    const lines = ['From: ' + (s.email || 'me'), 'To: ' + to, 'Subject: ' + enc(subject), 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'];
+    if (d.inReplyTo) { const r = clean(d.inReplyTo); lines.push('In-Reply-To: ' + r, 'References: ' + r); }
+    const raw = lines.join('\r\n') + '\r\n\r\n' + Buffer.from(String(d.body || ''), 'utf8').toString('base64').replace(/.{76}/g, '$&\r\n');
+    const body = { raw: b64url(Buffer.from(raw, 'utf8')) };
+    if (d.threadId && /^[A-Za-z0-9]+$/.test(d.threadId)) body.threadId = d.threadId;
+    await gmail(id, 'messages/send', { method: 'POST', body });
+    return { ok: true };
+  } catch (ex) { return mailErr(ex); }
+});
+ipcMain.handle('mail-unread', async (e) => {
+  const id = profileOf(e);
+  if (!ms(id).refresh) return { count: 0, signedIn: false };
+  try { const l = await gmail(id, 'labels/INBOX'); return { count: l.messagesUnread || 0, signedIn: true }; } catch (ex) { return { count: 0, ...mailErr(ex) }; }
+});
+// open a page in the user's normal browser (Chrome) — only real web links
+ipcMain.on('open-external', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
 
 app.on('window-all-closed', () => app.quit());

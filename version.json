@@ -1,6 +1,6 @@
 {
-  "version": "1.8.3",
-  "notes": "Fixed tab lock relocking right after unlocking, right click bookmarks to rename or remove them",
+  "version": "1.9.0",
+  "notes": "Orchard Mail: ur Gmail in a side panel, signed in through Chrome. Open in Chrome bar on Google logins",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -21,27 +21,27 @@
     },
     {
       "path": "index.html",
-      "sha256": "3a17c83a75cb10d27fb30fb103400aac881c1052e37cc6a653e192fc21d45b95"
+      "sha256": "94ec35f0c2717a01d39b978bdefd1a9169362cc74d620e6090fff65cd42f6fb7"
     },
     {
       "path": "main.js",
-      "sha256": "9a74e435ea5c56ec428fa2e3e7316f43b906cdb54a60b810dcac42eea3018c64"
+      "sha256": "c5a1cd3b5e3107dfc2a0c7584a4fcbb86782024f5ee752b3329cca5e4c1a4c3c"
     },
     {
       "path": "newtab.html",
-      "sha256": "7fbb5d5bde9ecafb11b9df00548f965096eaee6f71c8446eccc7e5ba099f0f97"
+      "sha256": "f20a9c59ad69169bc3f1a03730caeb6b8f37649950de0c319e3a65c1951a009a"
     },
     {
       "path": "package.json",
-      "sha256": "1ce7bd1a5df8c685404cc0714f58ea1eff27db301794a9c894111644fb528141"
+      "sha256": "e47398b04f8afe2786c0d00d141a7b29503693d23b00457bfca6a4701eacfa12"
     },
     {
       "path": "preload.js",
-      "sha256": "a15ed424f53885416663e0af62f8ba4b2374d71a3f3696faed86227871b70b72"
+      "sha256": "860ec192570012bb6df7dffc1485da2f1afec4ebba1dca7b5a3b713500426f12"
     },
     {
       "path": "renderer.js",
-      "sha256": "cad36a33cb417fa1fa4d2054efa014c349cc8d1f973c8e0f14cfa94dee9a4ff2"
+      "sha256": "f8fec27aea2e53be7851d9a3b88ca682672938e89484e4fbc5379aaeb63e1eb0"
     }
   ]
 }

@@ -7,6 +7,18 @@ contextBridge.exposeInMainWorld('aura', {
   showFile: (p) => ipcRenderer.send('show-file', p),
   clearData: () => ipcRenderer.invoke('clear-data'),
   freeze: (id, f) => ipcRenderer.send('freeze', id, f),
+  mail: {
+    config: () => ipcRenderer.invoke('mail-config'),
+    setConfig: (id, secret) => ipcRenderer.invoke('mail-config-set', id, secret),
+    signIn: () => ipcRenderer.invoke('mail-signin'),
+    signOut: () => ipcRenderer.invoke('mail-signout'),
+    list: (q, page) => ipcRenderer.invoke('mail-list', q, page),
+    get: (id) => ipcRenderer.invoke('mail-get', id),
+    modify: (id, a) => ipcRenderer.invoke('mail-modify', id, a),
+    send: (d) => ipcRenderer.invoke('mail-send', d),
+    unread: () => ipcRenderer.invoke('mail-unread')
+  },
+  openExternal: (u) => ipcRenderer.send('open-external', u),
   suggest: (engine, q) => ipcRenderer.invoke('suggest', engine, q),
   emulate: (id, o) => ipcRenderer.send('emulate', id, o),
   onBattery: () => ipcRenderer.invoke('on-battery'),
