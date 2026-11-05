@@ -226,6 +226,91 @@ body.dragging webview{pointer-events:none}
 .note .nx:hover{color:var(--txt)}
 @keyframes noteIn{from{transform:translateX(30px);opacity:0}}
 body.saver .note{animation:none}
+/* ---- motion: one easing everywhere, all of it switched off by Saver/Ultra ---- */
+:root{--ease:cubic-bezier(.2,.8,.2,1)}
+.tab{transition:background .15s,color .15s,opacity .16s var(--ease),max-width .18s var(--ease),min-width .18s var(--ease),padding .18s var(--ease);will-change:transform}
+.tab.new{animation:tabIn .2s var(--ease)}
+@keyframes tabIn{from{max-width:0;min-width:0;opacity:0}}
+.tab.closing{max-width:0!important;min-width:0!important;padding:0!important;opacity:0;pointer-events:none;overflow:hidden}
+.tab.dragging{transition:none!important}
+.tab.settle{transition:transform .2s var(--ease)!important}
+#panel.show{animation:popIn .16s var(--ease)}
+#ctx{animation:popIn .12s var(--ease);transform-origin:top left}
+#omni:not([hidden]){animation:fadeIn .1s ease-out}
+.modal{animation:popIn .16s var(--ease)}
+#opage:not([hidden]){animation:fadeIn .14s ease-out}
+@keyframes popIn{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+@keyframes fadeIn{from{opacity:0}}
+.btn,.pbtn,.bmi,.mi,.row,.oi{transition:background .12s,border-color .12s,color .12s,transform .12s var(--ease)}
+.btn:active,.pbtn:active{transform:scale(.94)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ---- side panel AI switcher ---- */
+#aipills{display:flex;gap:3px;background:#150e0d;border:1px solid #3a2622;border-radius:10px;padding:3px;flex:1;min-width:0}
+#aipills span{flex:1;text-align:center;padding:5px 6px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--dim);white-space:nowrap}
+#aipills span:hover{color:var(--txt);background:#ffffff0d}
+#aipills span.on{background:var(--acc);color:#fff}
+#aipills.off{display:none}
+.askgrp{display:flex;gap:2px}
+.askgrp .pbtn{font-size:12px;white-space:nowrap}
+/* ---- full page overlays: settings + extensions ---- */
+#opage{position:absolute;top:0;left:0;bottom:0;width:calc(100% - var(--sw,0px));background:var(--bg);z-index:12;display:flex;flex-direction:column}
+.ophead{display:flex;align-items:center;gap:10px;padding:14px 22px;border-bottom:1px solid #3a2622}
+.ophead b{font-size:19px;flex:1}
+.opicon{font-size:22px}
+.opbody{flex:1;display:flex;min-height:0}
+#opnav{width:210px;flex:none;padding:14px 10px;border-right:1px solid #2b1c19;display:flex;flex-direction:column;gap:3px;overflow-y:auto}
+#opnav a{padding:9px 12px;border-radius:9px;cursor:pointer;color:var(--dim);display:flex;gap:9px;align-items:center}
+#opnav a:hover{background:#ffffff0a;color:var(--txt)}
+#opnav a.on{background:#e8432e22;color:var(--txt)}
+#opmain{flex:1;overflow-y:auto;padding:20px 30px 60px;scroll-behavior:smooth}
+.opsec{max-width:720px;margin-bottom:30px}
+.opsec h2{font-size:16px;margin:0 0 4px}
+.opsec>p{color:var(--dim);font-size:12.5px;margin-bottom:10px;line-height:1.5}
+.opcard{background:#1b1211;border:1px solid #2e1f1c;border-radius:12px;overflow:hidden}
+.oprow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #2b1c19}
+.oprow:last-child{border-bottom:0}
+.oprow .ol{flex:1;min-width:0}
+.oprow .ol small{display:block;color:var(--dim);font-size:12px;margin-top:2px}
+.oprow .oi2{width:22px;text-align:center;font-size:16px;flex:none}
+.sw{width:40px;height:22px;border-radius:11px;background:#3a2622;position:relative;cursor:pointer;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .18s var(--ease)}
+.sw.on{background:var(--leaf)}
+.sw.on::after{transform:translateX(18px)}
+.extgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.extcard{background:#1b1211;border:1px solid #2e1f1c;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s,transform .15s var(--ease)}
+.extcard:hover{border-color:#5a3a33;transform:translateY(-2px)}
+.extcard .eh{display:flex;gap:12px;align-items:center}
+.extcard .ei{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font-size:26px;background:#2a1c1a;flex:none}
+.extcard .en{font-weight:700;font-size:15px}
+.extcard .lab{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:10px;margin-top:3px}
+.lab.game{background:#e8432e26;color:#ff8a73}
+.lab.educational{background:#6cc35a26;color:#9be08a}
+.extcard p{color:var(--dim);font-size:12.5px;line-height:1.5;flex:1}
+.extcard .ef{display:flex;gap:8px;align-items:center}
+.extcard .ef small{color:var(--dim);font-size:11px;flex:1}
+.chips{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.chip{padding:6px 14px;border-radius:16px;border:1px solid #3a2622;cursor:pointer;font-size:13px;color:var(--dim)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+/* ---- calculator ---- */
+#panel.calcw{width:330px}
+#panel.calcw.sci{width:560px}
+.calc{padding:4px 12px 12px}
+.cdisp{background:#150e0d;border:1px solid #3a2622;border-radius:12px;padding:10px 14px;text-align:right;margin-bottom:10px}
+.cexpr{color:var(--dim);font:14px Consolas,monospace;min-height:19px;overflow-x:auto;white-space:nowrap}
+.cres{font-size:32px;font-weight:300;font-variant-numeric:tabular-nums;overflow-x:auto;white-space:nowrap}
+.cres.err{color:#ff6b6b;font-size:18px}
+.ckeys{display:flex;gap:8px}
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;flex:1}
+.cgrid.sci{grid-template-columns:repeat(3,1fr);flex:.8}
+.ck{padding:12px 0;border-radius:10px;background:#241816;border:1px solid #2e1f1c;text-align:center;cursor:pointer;font-size:16px;user-select:none;transition:background .1s,transform .08s}
+.ck:hover{background:#2e1f1c}
+.ck:active{transform:scale(.93)}
+.ck.op{background:#33201d;color:var(--acc2)}
+.ck.eq{background:var(--acc);color:#fff;border-color:var(--acc)}
+.ck.fn{font-size:13px;color:#e8dcd6}
+.chist{margin-top:10px;font:12px Consolas,monospace;color:var(--dim);max-height:90px;overflow-y:auto}
+.chist div{cursor:pointer;padding:2px 0;text-align:right}
+.chist div:hover{color:var(--txt)}
 #zoom{font-size:11px;color:var(--dim);display:none}
 </style>
 </head>
@@ -255,6 +340,8 @@ body.saver .note{animation:none}
   <div class="btn" id="speedBtn" title="WiFi speed test"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5.5 12.5a10 10 0 0 1 13 0"/><path d="M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor"/></svg></div>
   <div class="btn" id="dlBtn" title="Downloads (Ctrl+J)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 15v4h16v-4"/></svg><span id="dlBadge"></span></div>
   <div class="btn" id="histBtn" title="History (Ctrl+H)">&#128339;</div>
+  <div class="btn" id="calcBtn" title="Calculator (Alt+K)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 7h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15.5h.01M12 15.5h.01M15.5 15.5h.01M8.5 19h.01M12 19h.01M15.5 19h.01"/></svg></div>
+  <div class="btn" id="extBtn" title="Orchard Extensions"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M10 3.5a2 2 0 0 1 4 0V5h4a1 1 0 0 1 1 1v4h-1.5a2 2 0 0 0 0 4H19v4a1 1 0 0 1-1 1h-4v-1.5a2 2 0 0 0-4 0V19H6a1 1 0 0 1-1-1v-4h1.5a2 2 0 0 0 0-4H5V6a1 1 0 0 1 1-1h4z"/></svg></div>
   <div class="btn" id="setBtn" title="Settings">&#9881;</div>
   <span class="sep"></span>
   <div class="btn" id="mailBtn" title="Orchard Mail, ur Gmail (Alt+M)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg><span id="mailBadge" hidden></span></div>
@@ -267,10 +354,11 @@ body.saver .note{animation:none}
 <div id="bm"></div>
 <div id="progress"></div>
 <div id="views">
+  <div id="opage" hidden><div class="ophead"><span class="opicon" id="opicon"></span><b id="optitle"></b><span class="pbtn" id="opX">&#10005; Close</span></div><div class="opbody"><nav id="opnav"></nav><div id="opmain"></div></div></div>
   <div id="panel"><h3><span id="ptitle"></span><span class="pbtn" id="pclose">&#10005;</span></h3><div class="list" id="plist"></div></div>
   <div id="side"><div id="sgrip"></div>
-    <div id="shead"><span class="gem">&#10022;</span><select id="aiPick"><option value="gemini">Gemini</option><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="chat">Orchard Chat</option><option value="mail">Orchard Mail</option></select>
-      <span class="pbtn" id="askPage" title="Summarize, answer the questions or explain">Ask about this page &#9662;</span><span class="pbtn" id="sideX" title="Close">&#10005;</span></div>
+    <div id="shead"><span class="gem">&#10022;</span><div id="aipills"><span data-ai="gemini">Gemini</span><span data-ai="chatgpt">ChatGPT</span><span data-ai="claude">Claude</span></div><select id="aiPick" hidden><option value="gemini">Gemini</option><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="chat">Orchard Chat</option><option value="mail">Orchard Mail</option></select>
+      <span class="askgrp"><span class="pbtn ok" id="askPage" title="Send the questions on this page to the AI">&#9989; Answer questions</span><span class="pbtn" id="askMore" title="More: summarize, explain">&#9662;</span></span><span class="pbtn" id="sideX" title="Close">&#10005;</span></div>
     <div id="sbody"><div id="mailPane" hidden></div></div>
   </div>
   <div id="paneRing" hidden></div>

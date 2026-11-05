@@ -20,6 +20,13 @@ contextBridge.exposeInMainWorld('aura', {
   },
   nativeNote: (n) => ipcRenderer.send('chat-native-note', n),
   chatOpen: (id) => ipcRenderer.send('chat-open-id', id),
+  ext: {
+    catalog: () => ipcRenderer.invoke('ext-catalog'),
+    list: () => ipcRenderer.invoke('ext-list'),
+    install: (id) => ipcRenderer.invoke('ext-install', id),
+    remove: (id) => ipcRenderer.invoke('ext-remove', id),
+    url: (id) => ipcRenderer.invoke('ext-url', id)
+  },
   openExternal: (u) => ipcRenderer.send('open-external', u),
   suggest: (engine, q) => ipcRenderer.invoke('suggest', engine, q),
   emulate: (id, o) => ipcRenderer.send('emulate', id, o),

@@ -1,6 +1,6 @@
 {
-  "version": "1.9.5",
-  "notes": "Lens on the new tab page opens Google Lens in a new tab",
+  "version": "2.0.0",
+  "notes": "Orchard 2.0: settings page (pick ur toolbar), calculator, extensions store, links first in search, answer questions button, smoother tabs, apple icon",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -21,11 +21,11 @@
     },
     {
       "path": "index.html",
-      "sha256": "f61ab789b8aa58daf33dca1e5f00bfaa6ec67d07884926235aa7cadd97b3940b"
+      "sha256": "467717b39439528b6955cce840ae2eb1676f95f4d5949c9169a6f9e0f87555fa"
     },
     {
       "path": "main.js",
-      "sha256": "222ba5453d0e78862b150de26f036841807cd7c01a85904bbee9be6ee0c7d2a9"
+      "sha256": "5ffc9ebe4b0624a364c1ea1b2531aa27623a3192d3faf0839afbc2d87250076c"
     },
     {
       "path": "newtab.html",
@@ -33,15 +33,15 @@
     },
     {
       "path": "package.json",
-      "sha256": "8414fb80ff49767592ef5eece072de189f1de14d2d9cc723b4044f8bc57d41e4"
+      "sha256": "ee5c07da9c4bd6903fcb1aa7dd56f26a74e70c6c756196c487ffabb4b85b78b4"
     },
     {
       "path": "preload.js",
-      "sha256": "bd6d44f66ac390bb3e36b1de0b0ad861565a90e9e60948bc0784121d5a3bc008"
+      "sha256": "b80253530ddc37235e8e11646b971d14442d86616452987fa1e2c739944cccc6"
     },
     {
       "path": "renderer.js",
-      "sha256": "efb649c69923a991b59ce9a07baab221a58708c3a6befb83d89e1886002f2904"
+      "sha256": "13e9cab5b721b6485c02719d53d47bbbb534752de16374f7b88f61e125f8d27f"
     }
   ]
 }

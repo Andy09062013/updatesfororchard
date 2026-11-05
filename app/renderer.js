@@ -57,7 +57,8 @@ function makeWebview(t, url) {
 function createTab(url, bg, asleep) {
   const id = ++idc;
   const el = document.createElement('div');
-  el.className = 'tab';
+  el.className = 'tab new';
+  setTimeout(() => el.classList.remove('new'), 260);
   $('tabs').insertBefore(el, $('newtab'));
   const t = { id, el, title: 'New Tab', url: url || '', lastActive: Date.now() };
   tabs.push(t);
@@ -80,41 +81,56 @@ function startTabDrag(e, t) {
   drag = { t, x0: e.clientX, y0: e.clientY, off: e.clientX - t.el.getBoundingClientRect().left, on: false, out: false, pid: e.pointerId };
   try { t.el.setPointerCapture(e.pointerId); } catch {}
 }
+let dragFrame = 0, dragEvt = null;
 document.addEventListener('pointermove', (e) => {
   if (!drag || e.pointerId !== drag.pid) return;
+  dragEvt = e;
+  if (!dragFrame) dragFrame = requestAnimationFrame(() => { dragFrame = 0; if (drag && dragEvt) dragStep(dragEvt); });
+});
+function glide(el, fromLeft) {
+  // FLIP: start where it was, glide to where it is now
+  const now = el.getBoundingClientRect().left, dx = fromLeft - now;
+  if (!dx) return;
+  el.style.transition = 'none'; el.style.transform = `translateX(${dx}px)`;
+  el.getBoundingClientRect();
+  el.style.transition = 'transform .2s var(--ease)'; el.style.transform = '';
+  setTimeout(() => { if (!el.classList.contains('dragging')) el.style.transition = ''; }, 220);
+}
+function dragStep(e) {
   const d = drag;
   if (!d.on) {
-    if (Math.abs(e.clientX - d.x0) < 6 && Math.abs(e.clientY - d.y0) < 6) return;
+    if (Math.abs(e.clientX - d.x0) < 5 && Math.abs(e.clientY - d.y0) < 5) return;
     d.on = true; d.t.el.classList.add('dragging'); activate(d.t);
   }
   const strip = $('tabs').getBoundingClientRect();
   d.out = e.clientY < strip.top - 40 || e.clientY > strip.bottom + 50 || e.clientX < -20 || e.clientX > innerWidth + 20;
   document.body.classList.toggle('tearing', d.out);
-  if (d.out) { d.t.el.style.transform = ''; return; }
-  // follow the pointer, and swap with neighbours as we pass their middle
-  const els = [...$('tabs').querySelectorAll('.tab')];
+  if (d.out) { d.t.el.style.transform = `translate(${e.clientX - d.x0}px, ${e.clientY - d.y0}px)`; return; }
+  const els = [...$('tabs').querySelectorAll('.tab:not(.closing)')];
   const me = d.t.el;
   const base = me.getBoundingClientRect().left - (parseFloat(me.dataset.dx) || 0);
-  const dx = e.clientX - d.off - base;
+  const maxRight = strip.right - me.offsetWidth - 40;
+  const dx = Math.max(strip.left - base, Math.min(maxRight - base, e.clientX - d.off - base));
   me.style.transform = `translateX(${dx}px)`; me.dataset.dx = dx;
-  const mid = e.clientX - d.off + me.offsetWidth / 2;
+  const mid = base + dx + me.offsetWidth / 2;
   for (const o of els) {
     if (o === me) continue;
-    const r = o.getBoundingClientRect();
-    const om = r.left + r.width / 2;
+    const rr = o.getBoundingClientRect();
+    const om = rr.left + rr.width / 2;
     const idxMe = els.indexOf(me), idxO = els.indexOf(o);
     if ((idxO > idxMe && mid > om) || (idxO < idxMe && mid < om)) {
-      const before = me.getBoundingClientRect().left;
+      const before = me.getBoundingClientRect().left - dx, oBefore = rr.left;
       if (idxO > idxMe) o.after(me); else o.before(me);
-      const shift = me.getBoundingClientRect().left - before;
+      const shift = (me.getBoundingClientRect().left - dx) - before;
       me.dataset.dx = dx - shift; me.style.transform = `translateX(${dx - shift}px)`;
+      glide(o, oBefore);
       syncTabOrder();
       break;
     }
   }
-});
+}
 function syncTabOrder() {
-  const order = [...$('tabs').querySelectorAll('.tab')];
+  const order = [...$('tabs').querySelectorAll('.tab:not(.closing)')];
   tabs.sort((a, b) => order.indexOf(a.el) - order.indexOf(b.el));
   saveSession();
 }
@@ -122,7 +138,10 @@ async function endTabDrag(e) {
   if (!drag || (e && e.pointerId !== drag.pid)) return;
   const d = drag; drag = null;
   document.body.classList.remove('tearing');
-  d.t.el.classList.remove('dragging'); d.t.el.style.transform = ''; d.t.el.dataset.dx = 0;
+  const el = d.t.el;
+  el.classList.remove('dragging'); el.dataset.dx = 0;
+  if (d.on && !d.out) { el.classList.add('settle'); requestAnimationFrame(() => { el.style.transform = ''; setTimeout(() => el.classList.remove('settle'), 220); }); }
+  else el.style.transform = '';
   if (!d.on) return;
   dragJustEnded = true; setTimeout(() => dragJustEnded = false, 50);
   if (!d.out || !e) return;
@@ -737,6 +756,290 @@ setTimeout(mailPoll, 4000);
 setInterval(() => { if (saverLevel() < 2) mailPoll(); }, 5 * 60 * 1000);
 
 
+// ---- toolbar: choose what shows (Settings > Toolbar) ----
+const TOOLBAR = [
+  ['batt', '&#127811;', 'Battery', 'mode, % and resting tabs'],
+  ['shield', '&#128737;', 'Ad blocker counter', 'how many ads got blocked'],
+  ['speedBtn', '&#128246;', 'WiFi speed test', ''],
+  ['dlBtn', '&#11015;', 'Downloads', ''],
+  ['histBtn', '&#128339;', 'History', ''],
+  ['calcBtn', '&#129518;', 'Calculator', ''],
+  ['extBtn', '&#129513;', 'Extensions', ''],
+  ['setBtn', '&#9881;', 'Settings', 'u can still open it from the ☰ menu'],
+  ['mailBtn', '&#9993;', 'Orchard Mail', ''],
+  ['chatBtn', '&#128172;', 'Orchard Chat', ''],
+  ['aiBtn', '&#10022;', 'Ask AI', ''],
+  ['avatar', '&#128100;', 'Profile picture', ''],
+  ['hideBtn', '&#128065;', 'Hide elements (address bar)', ''],
+  ['lensBtn', '&#128269;', 'Google Lens (address bar)', ''],
+  ['star', '&#11088;', 'Bookmark star (address bar)', '']
+];
+function applyToolbar() {
+  const tb = store.settings.toolbar || {};
+  TOOLBAR.forEach(([id]) => { const el = $(id); if (el) el.hidden = tb[id] === false; });
+  // tidy separators so hidden groups don't leave double lines
+  const kids = [...$('nav').children];
+  kids.forEach((el, i) => {
+    if (!el.classList.contains('sep')) return;
+    let before = false, after = false;
+    for (let j = i - 1; j >= 0 && !kids[j].classList.contains('sep'); j--) if (!kids[j].hidden && kids[j].id !== 'urlwrap') before = true;
+    if (kids[i - 1] && kids[i - 1].id === 'urlwrap') before = true;
+    for (let j = i + 1; j < kids.length && !kids[j].classList.contains('sep'); j++) if (!kids[j].hidden && kids[j].id !== 'menuBtn' && kids[j].id !== 'updPill') after = true;
+    el.hidden = !(before && after);
+  });
+}
+
+// ---- full page overlays (settings, extensions) ----
+let pageKind = null;
+function openPage(kind, icon, title, navItems, render) {
+  $('panel').classList.remove('show');
+  pageKind = kind;
+  $('opicon').innerHTML = icon; $('optitle').textContent = title;
+  const nav = $('opnav'); nav.innerHTML = '';
+  navItems.forEach(([key, ic, label]) => {
+    const a = document.createElement('a'); a.dataset.k = key; a.innerHTML = `<span>${ic}</span><span></span>`; a.lastChild.textContent = label;
+    a.onclick = () => render(key);
+    nav.appendChild(a);
+  });
+  $('opage').hidden = false;
+  render(navItems[0][0]);
+}
+function markNav(key) { document.querySelectorAll('#opnav a').forEach(a => a.classList.toggle('on', a.dataset.k === key)); }
+function closePage() { $('opage').hidden = true; pageKind = null; }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('opage').hidden && !document.querySelector('.modalbg')) closePage(); });
+const swHtml = (on, id) => `<span class="sw${on ? ' on' : ''}" id="${id}" role="switch" aria-checked="${on}"></span>`;
+function row(icon, label, sub, control) { return `<div class="oprow"><span class="oi2">${icon}</span><div class="ol">${label}${sub ? `<small>${sub}</small>` : ''}</div>${control}</div>`; }
+function bindSwitch(id, get, set) { const el = $(id); if (!el) return; el.onclick = () => { const v = !get(); set(v); el.classList.toggle('on', v); el.setAttribute('aria-checked', v); }; }
+
+function openSettings() {
+  openPage('settings', '&#9881;', 'Orchard Settings', [
+    ['toolbar', '&#128736;', 'Toolbar'], ['battery', '&#127811;', 'Battery'], ['search', '&#128269;', 'Search'], ['ai', '&#10022;', 'AI, chat & mail'],
+    ['looks', '&#127912;', 'Looks'], ['tabs', '&#128209;', 'Tabs'], ['privacy', '&#128274;', 'Privacy'], ['about', '&#127822;', 'About & updates']
+  ], renderSettings);
+}
+function renderSettings(sec) {
+  markNav(sec);
+  const m = $('opmain'), S = store.settings;
+  const H = (t, p, body) => `<div class="opsec"><h2>${t}</h2>${p ? `<p>${p}</p>` : ''}<div class="opcard">${body}</div></div>`;
+  if (sec === 'toolbar') {
+    const tb = S.toolbar || {};
+    m.innerHTML = H('Toolbar', 'Pick what shows at the top. Everything is on by default. The ☰ menu always stays so u can get back here.',
+      TOOLBAR.map(([id, ic, label, sub]) => row(ic, label, sub, swHtml(tb[id] !== false, 'tb_' + id))).join(''))
+      + `<div class="opsec"><span class="pbtn" id="tbReset">Show everything again</span></div>`;
+    TOOLBAR.forEach(([id]) => bindSwitch('tb_' + id, () => (store.settings.toolbar || {})[id] !== false, (v) => { store.settings.toolbar = { ...(store.settings.toolbar || {}), [id]: v }; save(); applyToolbar(); }));
+    $('tbReset').onclick = () => { store.settings.toolbar = {}; save(); applyToolbar(); renderSettings('toolbar'); };
+  } else if (sec === 'battery') {
+    m.innerHTML = H('Battery', 'Saving battery is what Orchard is built around.',
+      row('&#127811;', 'Battery saver mode', '', `<select id="svr">${SAVER_OPTS}</select>`)
+      + row('&#128164;', 'Sleep unused tabs after', 'asleep tabs use zero power', `<select id="slp">${[[2,'2 min'],[5,'5 min'],[10,'10 min'],[30,'30 min'],[0,'never']].map(([v,l]) => `<option value="${v}" ${(S.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join('')}</select>`)
+      + row('&#10052;', 'Freeze background tabs', 'stops tabs u aren\'t looking at from running', swHtml(S.freeze !== false, 'frz'))
+      + row('&#127769;', 'Dark pages always', 'saves power on OLED screens', swHtml(!!S.darkPages, 'dkp2'))
+      + row('&#128202;', 'See what\'s using battery', '', '<span class="pbtn" id="battOpen">Open</span>'));
+    $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
+    $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
+    bindSwitch('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
+    bindSwitch('dkp2', () => !!store.settings.darkPages, (v) => { store.settings.darkPages = v; save(); applySaver(); });
+    $('battOpen').onclick = () => { closePage(); openPanel('battery'); };
+  } else if (sec === 'search') {
+    m.innerHTML = H('Search', '',
+      row('&#128269;', 'Search engine', '', `<select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${S.engine === k ? 'selected' : ''}>${k}</option>`).join('')}</select>`)
+      + row('&#128172;', 'Search suggestions', 'shows ideas as u type (sends what u type to ur search engine)', swHtml(S.suggest !== false, 'sgT'))
+      + row('&#128339;', 'History in the address bar', 'sites u visited show first', '<span class="pbtn" id="histOpen">View history</span>'));
+    $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
+    bindSwitch('sgT', () => store.settings.suggest !== false, (v) => { store.settings.suggest = v; save(); });
+    $('histOpen').onclick = () => { closePage(); openPanel('history'); };
+  } else if (sec === 'ai') {
+    m.innerHTML = H('AI', '',
+      row('&#10022;', 'AI in the side panel', '', `<select id="aiDef">${[['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`))
+      + H('Chat & mail', '',
+      row('&#128276;', 'Chat notifications', 'pop ups bottom right, Windows notifications when Orchard is in the background', swHtml(S.chatNotify !== false, 'cnT'))
+      + row('&#9993;', 'Orchard Mail', 'ur Gmail in the side panel', '<span class="pbtn" id="mailOpen">Open</span>'));
+    $('aiDef').onchange = (e) => { store.settings.ai = e.target.value; save(); if (aiOpen && aiWhich !== 'chat' && aiWhich !== 'mail') { aiWcId = null; loadAi(e.target.value); } };
+    bindSwitch('cnT', () => store.settings.chatNotify !== false, (v) => { store.settings.chatNotify = v; save(); if (v) ensureChat(); placeChat(); });
+    $('mailOpen').onclick = () => { closePage(); openMail(); };
+  } else if (sec === 'looks') {
+    m.innerHTML = H('Looks', '', row('&#127912;', 'New tab background', 'presets, colours, gradients or ur own pics', '<span class="pbtn" id="thm">Change</span>'));
+    $('thm').onclick = () => { closePage(); openPanel('theme'); };
+  } else if (sec === 'tabs') {
+    m.innerHTML = H('Tabs', '',
+      row('&#8634;', 'Reopen tabs on startup', 'the tabs u had open come back, asleep until u click them', swHtml(S.restore !== false, 'rst'))
+      + row('&#128164;', 'Rest all other tabs now', '', '<span class="pbtn" id="slpNow">Rest</span>'));
+    bindSwitch('rst', () => store.settings.restore !== false, (v) => { store.settings.restore = v; save(); });
+    $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); };
+  } else if (sec === 'privacy') {
+    m.innerHTML = H('Privacy', '',
+      row('&#128737;', 'Ad blocker', 'blocks ad and tracker servers', swHtml(!!S.adblock, 'adT'))
+      + row('&#128065;', 'Hidden elements', 'stuff u hid on websites', '<span class="pbtn" id="hidesOpen">Manage</span>')
+      + row('&#129529;', 'Clear history, cookies, cache', 'logs u out of websites in this profile', '<span class="pbtn" id="clr">Clear</span>'));
+    bindSwitch('adT', () => !!store.settings.adblock, () => { toggleAdblock(); });
+    $('hidesOpen').onclick = () => { closePage(); openPanel('hides'); };
+    let armed = false;
+    $('clr').onclick = async () => { if (!armed) { armed = true; $('clr').textContent = 'Click again to clear'; return; } await window.aura.clearData(); store.history = []; toast('everything wiped 🥶'); $('clr').textContent = 'Cleared'; };
+  } else if (sec === 'about') {
+    m.innerHTML = H('About Orchard', 'The battery saving browser.',
+      row('&#127822;', 'Version', '<span id="verTxt">…</span>', '<span class="pbtn" id="updChk">Check for updates</span>')
+      + row('&#9000;', 'Keyboard shortcuts', 'Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+F find · Ctrl+N new window · Alt+G AI · Alt+C chat · Alt+M mail · Alt+K calculator · Alt+H hide elements · Alt+F menu · F11 fullscreen · F12 devtools', ''));
+    window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version + (v.pending ? ' · update ' + v.pending.version + ' ready' : ''); });
+    $('updChk').onclick = async () => {
+      $('updChk').textContent = 'Checking…';
+      const res = await window.aura.checkUpdate();
+      const msg = { latest: 'ur on the newest version 🔥', ready: 'update ' + res.version + ' ready, restart to get it', busy: 'already checking', full: 'v' + res.version + ' needs a fresh download of the full zip', error: 'couldnt check: ' + res.error };
+      $('updChk').textContent = 'Check for updates';
+      toast(msg[res.status] || 'hmm');
+      if (res.status === 'ready') showUpdate(res);
+    };
+  }
+  m.scrollTop = 0;
+}
+
+// ---- extensions (games + learning apps from the Orchard repo, run in tabs) ----
+const EXT = window.aura.ext;
+let extFilter = 'all', extCatalogCache = null;
+async function extMenu(e) {
+  const list = await EXT.list();
+  showMenu(e, list.map(x => [`${esc(x.icon || '&#129513;')} ${esc(x.name)}`, () => extPlay(x.id)]).concat(list.length ? [null] : [], [
+    ['&#129513; ' + (list.length ? 'Manage extensions' : 'Get extensions'), () => openExtensions()]
+  ]));
+}
+async function extPlay(id) { const u = await EXT.url(id); if (u) createTab(u); }
+function openExtensions() {
+  openPage('extensions', '&#129513;', 'Orchard Extensions', [
+    ['all', '&#10024;', 'Discover'], ['game', '&#127918;', 'Games'], ['educational', '&#128218;', 'Educational'], ['installed', '&#9989;', 'Installed']
+  ], renderExtensions);
+}
+async function renderExtensions(f) {
+  extFilter = f; markNav(f);
+  const m = $('opmain');
+  const head = { all: ['Discover', 'Games and learning apps that run right inside Orchard. Get one and it works offline too.'], game: ['Games', ''], educational: ['Educational', ''], installed: ['Installed', 'Extensions on this computer.'] }[f];
+  m.innerHTML = `<div class="opsec" style="max-width:none"><h2>${head[0]}</h2>${head[1] ? `<p>${head[1]}</p>` : ''}<div class="extgrid" id="extGrid"><div style="color:var(--dim)">Loading…</div></div></div>`;
+  const installed = await EXT.list();
+  let items;
+  if (f === 'installed') items = installed.map(x => ({ ...x, installed: x }));
+  else {
+    const cat = extCatalogCache || await EXT.catalog();
+    if (cat.error) { $('extGrid').innerHTML = `<div style="color:#ff6b6b">couldn't reach the extension store: ${esc(cat.error)}</div>`; if (!installed.length) return; items = installed.map(x => ({ ...x, installed: x })); }
+    else { extCatalogCache = cat; items = cat.items.filter(x => f === 'all' || x.category === f).map(x => ({ ...x, installed: installed.find(i => i.id === x.id) })); }
+  }
+  const g = $('extGrid');
+  if (!items.length) { g.innerHTML = `<div style="color:var(--dim)">${f === 'installed' ? 'nothing installed yet, check Discover' : 'nothing here yet'}</div>`; return; }
+  g.innerHTML = '';
+  items.forEach(x => {
+    const c = document.createElement('div'); c.className = 'extcard';
+    const upd = x.installed && x.version && x.installed.version !== x.version && f !== 'installed';
+    c.innerHTML = `<div class="eh"><div class="ei"></div><div><div class="en"></div><span class="lab ${x.category === 'educational' ? 'educational' : 'game'}">${x.category === 'educational' ? 'Educational' : 'Game'}</span></div></div><p></p><div class="ef"><small></small>${x.installed ? `<span class="pbtn" data-a="rm">Remove</span>${upd ? '<span class="pbtn" data-a="get">Update</span>' : ''}<span class="pbtn ok" data-a="play">&#9654; Play</span>` : '<span class="pbtn ok" data-a="get">Get</span>'}</div>`;
+    c.querySelector('.ei').textContent = x.icon || '🧩';
+    c.querySelector('.en').textContent = x.name;
+    c.querySelector('p').textContent = x.description || '';
+    c.querySelector('small').textContent = (x.size ? (x.size / 1e6).toFixed(1) + ' MB' : '') + (x.version ? ' · v' + x.version : '');
+    c.onclick = async (ev) => {
+      const a = ev.target.dataset.a; if (!a) return;
+      if (a === 'play') { closePage(); extPlay(x.id); }
+      if (a === 'get') { ev.target.textContent = 'Getting…'; const res = await EXT.install(x.id); if (res.error) { toast("couldn't get it: " + res.error); ev.target.textContent = 'Get'; return; } toast(x.name + ' installed 🔥'); renderExtensions(extFilter); }
+      if (a === 'rm') { await EXT.remove(x.id); toast(x.name + ' removed'); renderExtensions(extFilter); }
+    };
+    g.appendChild(c);
+  });
+}
+
+// ---- calculator (normal + scientific) ----
+let calcExpr = '', calcAns = 0, calcHist = [], calcDeg = true, calcJust = false;
+function calcEval(src) {
+  const s = src.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-').replace(/π/g, ' pi ').replace(/√/g, ' sqrt ');
+  const toks = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (/[0-9.]/.test(c)) { let j = i; while (j < s.length && /[0-9.]/.test(s[j])) j++; const v = Number(s.slice(i, j)); if (isNaN(v)) throw 0; toks.push({ t: 'n', v }); i = j; continue; }
+    if (/[a-z]/i.test(c)) { let j = i; while (j < s.length && /[a-z]/i.test(s[j])) j++; toks.push({ t: 'id', v: s.slice(i, j).toLowerCase() }); i = j; continue; }
+    if ('+-*/^()!%'.includes(c)) { toks.push({ t: 'op', v: c }); i++; continue; }
+    throw 0;
+  }
+  let p = 0;
+  const peek = () => toks[p], take = () => toks[p++];
+  const isOp = (v) => peek() && peek().t === 'op' && peek().v === v;
+  const toRad = (x) => calcDeg ? x * Math.PI / 180 : x, fromRad = (x) => calcDeg ? x * 180 / Math.PI : x;
+  const F = { sin: x => Math.sin(toRad(x)), cos: x => Math.cos(toRad(x)), tan: x => Math.tan(toRad(x)), asin: x => fromRad(Math.asin(x)), acos: x => fromRad(Math.acos(x)), atan: x => fromRad(Math.atan(x)), ln: Math.log, log: Math.log10, sqrt: Math.sqrt, abs: Math.abs, exp: Math.exp };
+  const fact = (n) => { if (n < 0 || n !== Math.floor(n) || n > 170) throw 0; let r = 1; for (let k = 2; k <= n; k++) r *= k; return r; };
+  function expr() { let v = term(); while (isOp('+') || isOp('-')) { const o = take().v, b = term(); v = o === '+' ? v + b : v - b; } return v; }
+  function term() {
+    let v = unary();
+    while (true) {
+      if (isOp('*') || isOp('/')) { const o = take().v, b = unary(); v = o === '*' ? v * b : v / b; }
+      else if (peek() && (peek().t === 'n' || peek().t === 'id' || isOp('('))) v *= power(); // 2π, 3(4)
+      else break;
+    }
+    return v;
+  }
+  function unary() { if (isOp('-')) { take(); return -unary(); } if (isOp('+')) { take(); return unary(); } return power(); }
+  function power() { const b = post(); if (isOp('^')) { take(); return Math.pow(b, unary()); } return b; }
+  function post() { let v = prim(); while (isOp('!') || isOp('%')) { const o = take().v; v = o === '!' ? fact(v) : v / 100; } return v; }
+  function prim() {
+    const t = take(); if (!t) throw 0;
+    if (t.t === 'n') return t.v;
+    if (t.t === 'op' && t.v === '(') { const v = expr(); if (isOp(')')) take(); return v; }
+    if (t.t === 'id') {
+      if (t.v === 'pi') return Math.PI; if (t.v === 'e') return Math.E; if (t.v === 'ans') return calcAns;
+      if (F[t.v]) return F[t.v](unary());
+    }
+    throw 0;
+  }
+  const v = expr();
+  if (p < toks.length) throw 0;
+  if (!isFinite(v)) throw 0;
+  return v;
+}
+const calcFmt = (v) => { if (Math.abs(v) < 1e-12) return '0'; const s = Math.abs(v) >= 1e12 || Math.abs(v) < 1e-6 ? v.toExponential(8) : String(+v.toPrecision(12)); return s.replace(/(\.\d*?)0+e/, '$1e').replace(/\.e/, 'e'); };
+function calcPress(k) {
+  if (k === 'C') { calcExpr = ''; calcJust = false; }
+  else if (k === '⌫') { calcExpr = calcExpr.replace(/(sin\(|cos\(|tan\(|asin\(|acos\(|atan\(|ln\(|log\(|√\(|ans|.)$/, ''); }
+  else if (k === '=') {
+    if (!calcExpr.trim()) return;
+    try { const v = calcEval(calcExpr); calcHist.unshift(calcExpr + ' = ' + calcFmt(v)); calcHist = calcHist.slice(0, 8); calcAns = v; calcExpr = calcFmt(v); calcJust = true; }
+    catch { renderCalcDisp('error, check ur sum'); return; }
+  }
+  else if (k === 'DEG') { calcDeg = !calcDeg; renderCalc(); return; }
+  else {
+    const fn = { 'x²': '^2', 'xʸ': '^', '√': '√(', 'sin': 'sin(', 'cos': 'cos(', 'tan': 'tan(', 'sin⁻¹': 'asin(', 'cos⁻¹': 'acos(', 'tan⁻¹': 'atan(', 'ln': 'ln(', 'log': 'log(', 'eˣ': 'e^(', '10ˣ': '10^(', '1/x': '^(-1)', 'Ans': 'ans' }[k] || k;
+    if (calcJust && /^[0-9.π(√a-z]/.test(fn) && !/^ans/.test(fn)) calcExpr = '';
+    calcJust = false;
+    calcExpr += fn;
+  }
+  renderCalcDisp();
+}
+function renderCalcDisp(err) {
+  if (!$('cExpr')) return;
+  $('cExpr').textContent = calcExpr || ' ';
+  let preview = '';
+  if (!err && calcExpr) { try { preview = calcFmt(calcEval(calcExpr)); } catch {} }
+  $('cRes').textContent = err || preview || (calcExpr ? '…' : '0');
+  $('cRes').classList.toggle('err', !!err);
+  $('cHist').innerHTML = ''; calcHist.forEach(h => { const d = document.createElement('div'); d.textContent = h; d.onclick = () => { calcExpr = h.split(' = ')[1]; calcJust = true; renderCalcDisp(); }; $('cHist').appendChild(d); });
+}
+function renderCalc() {
+  const sci = !!store.settings.calcSci, p = $('panel');
+  p.classList.add('calcw'); p.classList.toggle('sci', sci);
+  $('ptitle').innerHTML = '&#129518; Calculator <span class="pbtn" id="cMode" style="margin-left:8px;font-size:11px">' + (sci ? 'Normal' : 'Scientific') + '</span>';
+  const K = (k, cls) => `<div class="ck ${cls || ''}" data-k="${k}">${k === '*' ? '×' : k === '/' ? '÷' : k === '-' ? '−' : k}</div>`;
+  const basic = ['C', '⌫', '%', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', 'Ans', '0', '.', '='];
+  const sciKeys = ['DEG', '(', ')', 'sin', 'cos', 'tan', 'sin⁻¹', 'cos⁻¹', 'tan⁻¹', 'ln', 'log', '√', 'x²', 'xʸ', '!', 'π', 'e', '1/x', 'eˣ', '10ˣ'];
+  $('plist').innerHTML = `<div class="calc"><div class="cdisp"><div class="cexpr" id="cExpr"></div><div class="cres" id="cRes">0</div></div>
+    <div class="ckeys">${sci ? `<div class="cgrid sci">${sciKeys.map(k => k === 'DEG' ? `<div class="ck fn" data-k="DEG">${calcDeg ? 'DEG' : 'RAD'}</div>` : K(k, 'fn')).join('')}</div>` : ''}
+    <div class="cgrid">${basic.map(k => K(k, k === '=' ? 'eq' : '/*-+%'.includes(k) || k === '⌫' || k === 'C' ? 'op' : '')).join('')}</div></div>
+    ${sci ? '' : `<div class="cgrid" style="grid-template-columns:repeat(2,1fr);margin-top:7px">${K('(', 'fn')}${K(')', 'fn')}</div>`}
+    <div class="chist" id="cHist"></div></div>`;
+  $('plist').querySelectorAll('.ck').forEach(b => b.onmousedown = (e) => { e.preventDefault(); calcPress(b.dataset.k); });
+  $('cMode').onclick = () => { store.settings.calcSci = !sci; save(); renderCalc(); };
+  renderCalcDisp();
+}
+document.addEventListener('keydown', (e) => {
+  if (!$('panel').classList.contains('show') || $('panel').dataset.kind !== 'calc') return;
+  if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const map = { Enter: '=', '=': '=', Backspace: '⌫', Escape: 'C', Delete: 'C', '*': '*', '/': '/', x: '*' };
+  const k = map[e.key] || (/^[0-9.+\-()%^!]$/.test(e.key) ? e.key : null);
+  if (k) { e.preventDefault(); e.stopPropagation(); calcPress(k); }
+}, true);
+
 // ---- main menu: every feature in one place ----
 const FEATURES = [
   ['BATTERY (THE CORE OF ORCHARD)'],
@@ -764,7 +1067,9 @@ const FEATURES = [
   ['&#128100;', 'Profiles', 'separate logins and bookmarks', 'Avatar', () => openPanel('profiles')],
   ['&#127912;', 'Backgrounds', 'colors, gradients, ur own pics', 'Settings', () => openPanel('theme')],
   ['&#11088;', 'Bookmark page', 'adds it to the bar', 'Ctrl+D', () => toggleBookmark()],
-  ['&#9881;', 'Settings', 'search engine, adblock, passwords', '', () => openPanel('settings')]
+  ['&#129513;', 'Extensions', 'games and learning apps that run in Orchard', '', () => openExtensions()],
+  ['&#129518;', 'Calculator', 'normal or scientific', 'Alt+K', () => openPanel('calc')],
+  ['&#9881;', 'Settings', 'toolbar, search, battery, chat and more', '', () => openSettings()]
 ];
 function renderMenu() {
   $('ptitle').textContent = 'Everything in Orchard';
@@ -827,7 +1132,7 @@ function closeTab(t, moved) {
   clearTimeout(t.freezeT);
   if (t.wv) t.wv.remove();
   if (t.lockEl) t.lockEl.remove();
-  t.el.remove();
+  const gone = t.el; gone.classList.add('closing'); setTimeout(() => gone.remove(), document.body.classList.contains('saver') ? 0 : 190);
   if (split.includes(t)) { split = split.filter(x => x !== t); if (split.length < 2) split = []; }
   tabs.splice(i, 1);
   saveSession();
@@ -903,9 +1208,13 @@ function toggleBookmark() {
 
 // panel
 function openPanel(kind) {
+  if (kind === 'settings') { openSettings(); return; }
+  if (kind === 'extensions') { openExtensions(); return; }
   const p = $('panel'), list = $('plist');
+  p.classList.toggle('calcw', kind === 'calc'); p.classList.toggle('sci', kind === 'calc' && !!store.settings.calcSci);
   if (p.classList.contains('show') && p.dataset.kind === kind) { p.classList.remove('show'); return; }
   p.dataset.kind = kind; p.classList.add('show'); list.innerHTML = '';
+  if (kind === 'calc') { renderCalc(); return; }
   if (kind === 'history') {
     $('ptitle').textContent = 'History';
     if (!store.history.length) list.innerHTML = '<div class="set" style="color:var(--dim)">nothing here yet</div>';
@@ -1286,7 +1595,7 @@ function sideWidth(w) {
 }
 function loadAi(which) {
   aiWhich = which; $('aiPick').value = which; setTimeout(markSideBtns);
-  $('askPage').hidden = which === 'chat' || which === 'mail';
+  $('askPage').parentElement.hidden = which === 'chat' || which === 'mail';
   if (which === 'mail') { $('mailPane').hidden = false; if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } placeChat(); mailShow(); return; }
   $('mailPane').hidden = true;
   if (which === 'chat') { if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } ensureChat(); placeChat(); return; }
@@ -1302,6 +1611,8 @@ function markSideBtns() {
   $('aiBtn').classList.toggle('on', aiOpen && aiWhich !== 'chat' && aiWhich !== 'mail');
   $('chatBtn').classList.toggle('on', aiOpen && aiWhich === 'chat');
   $('mailBtn').classList.toggle('on', aiOpen && aiWhich === 'mail');
+  document.querySelectorAll('#aipills span').forEach(s => s.classList.toggle('on', s.dataset.ai === aiWhich));
+  $('aipills').classList.toggle('off', aiWhich === 'chat' || aiWhich === 'mail');
 }
 function toggleAi(force) {
   aiOpen = force === undefined ? !aiOpen : force;
@@ -1379,6 +1690,7 @@ function handleKey(k, ctrl, shift, alt) {
   else if (alt && k === 'f') openPanel('menu');
   else if (alt && k === 'h') startHidePicker();
   else if (alt && k === 'm') openMail();
+  else if (alt && k === 'k') openPanel('calc');
   else if (ctrl && k === 'j') openPanel('downloads');
   else if (k === 'escape' && $('lens').classList.contains('show')) endLens();
   else if (ctrl && k === 'l') { $('url').focus(); $('url').select(); }
@@ -1410,7 +1722,11 @@ $('batt').onclick = () => openPanel('battery');
 $('dlBtn').onclick = () => openPanel('downloads');
 $('speedBtn').onclick = () => openPanel('speed');
 $('histBtn').onclick = () => openPanel('history');
-$('setBtn').onclick = () => openPanel('settings');
+$('setBtn').onclick = () => openSettings();
+$('calcBtn').onclick = () => openPanel('calc');
+$('extBtn').onclick = (e) => extMenu(e);
+$('opX').onclick = closePage;
+document.querySelectorAll('#aipills span').forEach(s => s.onclick = () => { store.settings.ai = s.dataset.ai; save(); aiWcId = null; loadAi(s.dataset.ai); });
 $('avatar').onclick = () => openPanel('profiles');
 $('aiBtn').onclick = () => { if (aiOpen && (aiWhich === 'chat' || aiWhich === 'mail')) { aiWcId = null; loadAi(store.settings.ai && store.settings.ai !== 'chat' ? store.settings.ai : 'gemini'); } else toggleAi(); };
 const openChat = () => {
@@ -1431,12 +1747,13 @@ $('updPill').onclick = () => { saveSession(true); window.aura.restartUpdate(); }
 $('tabs').addEventListener('mousedown', (e) => { if (e.button === 1 && (e.target.id === 'tabs')) { e.preventDefault(); createTab(); } });
 $('tabs').addEventListener('auxclick', (e) => { if (e.button === 1 && e.target.id === 'newtab') { e.preventDefault(); createTab(); } });
 $('sideX').onclick = () => toggleAi(false);
-$('askPage').onclick = async (e) => {
+$('askPage').onclick = () => askAboutPage('answer');
+$('askMore').onclick = async (e) => {
   let hasSel = false;
   try { hasSel = !!(active && active.wv && active.ready && (await active.wv.executeJavaScript('String(getSelection()).trim().length')) > 0); } catch {}
   showMenu(e, [
-    ['&#128221; Summarize this page', () => askAboutPage('summary')],
     ['&#9989; Answer the questions' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answer')],
+    ['&#128221; Summarize this page', () => askAboutPage('summary')],
     hasSel ? ['&#128161; Explain what I highlighted', () => askAboutPage('explain')] : null
   ]);
 };
@@ -1538,27 +1855,40 @@ function omniGo(it, newTab) {
   if (newTab) { const u = toUrl(it.go); if (u) createTab(u, true); return; }
   go(it.go);
 }
-async function omniUpdate(keepSel) {
-  const q = $('url').value, seq = ++omniSeq, trimmed = q.trim();
+// links (history + bookmarks) go first, like Chrome; the best site match is picked by default when what u typed starts its address
+let omniDefaultLink = false;
+function omniAssemble(trimmed, sugg) {
+  const local = localMatches(trimmed);
+  const links = local.filter(i => i.kind === 'hist' || i.kind === 'bm').slice(0, trimmed ? 4 : 8);
+  const past = local.filter(i => i.kind === 'past').slice(0, trimmed ? 2 : 3);
   const base = [];
   if (trimmed) {
     const asUrl = toUrl(trimmed), isUrl = asUrl && !asUrl.startsWith(ENGINES[store.settings.engine || 'google']);
     if (isUrl) base.push({ kind: 'url', text: trimmed, sub: 'open site', go: trimmed });
     base.push({ kind: 'search', text: trimmed, sub: 'search ' + (store.settings.engine || 'google'), go: trimmed.startsWith('?') ? trimmed.slice(1) : trimmed });
   }
-  const local = localMatches(trimmed).slice(0, trimmed ? 5 : 8);
-  omniItems = base.concat(local);
-  if (!keepSel) omniSel = 0;
+  const have = new Set(base.concat(past).map(i => i.text.toLowerCase()));
+  const extra = (sugg || []).filter(s => s && !have.has(s.toLowerCase())).slice(0, 5).map(s => ({ kind: 'sugg', text: s, sub: '', go: s }));
+  const items = links.concat(base, past, extra);
+  const t = trimmed.toLowerCase().replace(/^https?:\/\/(www\.)?/, '');
+  const strong = links.length && t.length >= 2 && links[0].url.replace(/^https?:\/\/(www\.)?/, '').toLowerCase().startsWith(t);
+  return { items, def: strong ? 0 : (trimmed ? links.length : 0), strong };
+}
+async function omniUpdate(keepSel) {
+  const q = $('url').value, seq = ++omniSeq, trimmed = q.trim();
+  let a = omniAssemble(trimmed, []);
+  omniItems = a.items; omniDefaultLink = a.strong;
+  if (!keepSel) omniSel = a.def;
   omniRender();
   if (!trimmed || store.settings.suggest === false || /^[a-z]+:\/\//i.test(trimmed)) return;
   // live suggestions from the search engine (fetched by the main process)
   const sugg = await window.aura.suggest(store.settings.engine || 'google', trimmed).catch(() => []);
   if (seq !== omniSeq || document.activeElement !== $('url')) return;
-  const have = new Set(omniItems.map(i => (i.kind === 'past' || i.kind === 'search' ? i.text.toLowerCase() : '')));
-  const extra = sugg.filter(s => s && !have.has(s.toLowerCase())).slice(0, 5).map(s => ({ kind: 'sugg', text: s, sub: '', go: s }));
-  const firstLocal = omniItems.findIndex(i => i.kind !== 'url' && i.kind !== 'search');
-  const head = firstLocal < 0 ? omniItems : omniItems.slice(0, firstLocal), tail = firstLocal < 0 ? [] : omniItems.slice(firstLocal);
-  omniItems = head.concat(extra.slice(0, 3), tail.slice(0, 5), extra.slice(3));
+  const prevSel = omniItems[omniSel];
+  a = omniAssemble(trimmed, sugg);
+  omniItems = a.items; omniDefaultLink = a.strong;
+  const keep = prevSel ? omniItems.findIndex(i => i.kind === prevSel.kind && i.text === prevSel.text) : -1;
+  omniSel = keep >= 0 ? keep : a.def;
   omniRender();
 }
 $('url').addEventListener('input', () => { omniTyped = $('url').value; omniUpdate(); });
@@ -1571,7 +1901,7 @@ $('url').addEventListener('keydown', (e) => {
     e.preventDefault();
     const it = open ? omniItems[omniSel] : null;
     const typedNow = $('url').value;
-    if (it && (it.text === typedNow || it.url === typedNow)) omniGo(it, e.altKey); else { omniClose(); if (e.altKey) { const u = toUrl(typedNow); if (u) createTab(u, true); } else go(typedNow); $('url').blur(); }
+    if (it && (it.text === typedNow || it.url === typedNow || (omniDefaultLink && omniSel === 0 && typedNow === omniTyped))) omniGo(it, e.altKey); else { omniClose(); if (e.altKey) { const u = toUrl(typedNow); if (u) createTab(u, true); } else go(typedNow); $('url').blur(); }
   }
   else if (e.key === 'Escape') { if (open) { omniClose(); $('url').value = omniTyped || $('url').value; } else { updateNav(); $('url').blur(); } }
 });
@@ -1620,6 +1950,7 @@ window.aura.getStore().then(async (s) => {
   if (!store.settings.adblock) $('shield').innerHTML = '&#128737; off';
   if (store.settings.sleepMins === undefined) store.settings.sleepMins = 5;
   applyProfile(store.profile);
+  applyToolbar();
   if (store.settings.lockHash || store.settings.lockSalt) { delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1; save(); }
   $('aiPick').value = store.settings.ai || 'gemini';
   blocked = store.blocked || 0;

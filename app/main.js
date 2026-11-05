@@ -12,6 +12,7 @@ try {
   if (fs.existsSync(oldDir)) app.setPath('userData', oldDir);
 } catch {}
 const dataDir = app.getPath('userData');
+if (process.platform === 'win32') { try { app.setAppUserModelId('Orchard.Browser'); } catch {} }
 const profilesFile = path.join(dataDir, 'profiles.json');
 const COLORS = ['#e8432e', '#ffb83d', '#6cc35a', '#c0447a', '#f2752e', '#8a5a3c', '#4fa3d1', '#e4e45e'];
 
@@ -183,7 +184,7 @@ app.on('web-contents-created', (e, contents) => {
     contents.on('before-input-event', (ev, input) => {
       if (input.type !== 'keyDown') return;
       const k = input.key.toLowerCase();
-      if (input.control && ['t','w','l','r','d','h','tab','=','-','0','f','n','j'].includes(k) || k === 'f5' || k === 'f11' || k === 'f12' || (input.alt && (k === 'arrowleft' || k === 'arrowright' || k === 'g' || k === 'c' || k === 'f' || k === 'h' || k === 'm'))) {
+      if (input.control && ['t','w','l','r','d','h','tab','=','-','0','f','n','j'].includes(k) || k === 'f5' || k === 'f11' || k === 'f12' || (input.alt && (k === 'arrowleft' || k === 'arrowright' || k === 'g' || k === 'c' || k === 'f' || k === 'h' || k === 'm' || k === 'k'))) {
         ev.preventDefault();
         sendTo(contents.hostWebContents, 'shortcut', { key: k, ctrl: input.control, shift: input.shift, alt: input.alt });
       }
@@ -760,5 +761,69 @@ ipcMain.handle('mail-unread', async (e) => {
 });
 // open a page in the user's normal browser (Chrome) — only real web links
 ipcMain.on('open-external', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
+
+// ---------- Orchard Extensions: games + learning apps from the repo, run in tabs ----------
+const extDir = path.join(dataDir, 'extensions');
+const extIndex = path.join(extDir, 'installed.json');
+const readExt = () => { try { return JSON.parse(fs.readFileSync(extIndex, 'utf8')); } catch { return []; } };
+const writeExt = (l) => { fs.mkdirSync(extDir, { recursive: true }); fs.writeFileSync(extIndex, JSON.stringify(l)); };
+const okExtId = (id) => typeof id === 'string' && /^[a-z0-9-]{1,40}$/.test(id);
+async function extCatalog() {
+  const r = await net.fetch(UPDATE_BASE + 'extensions/catalog.json?t=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('store answered ' + r.status);
+  const j = await r.json();
+  return (j.extensions || []).filter(x => x && okExtId(x.id) && typeof x.file === 'string' && /^[A-Za-z0-9_.-]+\.html$/.test(x.file)).map(x => ({
+    id: x.id, name: String(x.name || x.id).slice(0, 60), category: x.category === 'educational' ? 'educational' : 'game',
+    description: String(x.description || '').slice(0, 300), icon: String(x.icon || '🧩').slice(0, 4), version: String(x.version || '1.0.0').slice(0, 20),
+    size: +x.size || 0, file: x.file, sha256: String(x.sha256 || '')
+  }));
+}
+ipcMain.handle('ext-catalog', async () => { try { return { items: await extCatalog() }; } catch (e) { return { error: String(e.message || e) }; } });
+ipcMain.handle('ext-list', () => readExt());
+ipcMain.handle('ext-install', async (e, id) => {
+  try {
+    if (!okExtId(id)) return { error: 'bad id' };
+    const x = (await extCatalog()).find(i => i.id === id);
+    if (!x) return { error: 'not in the store any more' };
+    const r = await net.fetch(UPDATE_BASE + 'extensions/' + x.file + '?v=' + encodeURIComponent(x.version), { cache: 'no-store' });
+    if (!r.ok) return { error: 'download failed (' + r.status + ')' };
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (x.sha256 && require('crypto').createHash('sha256').update(buf).digest('hex') !== x.sha256) return { error: 'the download got corrupted, try again' };
+    fs.mkdirSync(extDir, { recursive: true });
+    fs.writeFileSync(path.join(extDir, id + '.html'), buf);
+    const list = readExt().filter(i => i.id !== id);
+    list.push({ id, name: x.name, category: x.category, description: x.description, icon: x.icon, version: x.version, size: buf.length, installed: Date.now() });
+    writeExt(list);
+    return { ok: true };
+  } catch (ex) { return { error: String(ex.message || ex) }; }
+});
+ipcMain.handle('ext-remove', (e, id) => {
+  if (!okExtId(id)) return false;
+  try { fs.unlinkSync(path.join(extDir, id + '.html')); } catch {}
+  writeExt(readExt().filter(i => i.id !== id));
+  return true;
+});
+ipcMain.handle('ext-url', (e, id) => {
+  if (!okExtId(id)) return null;
+  const f = path.join(extDir, id + '.html');
+  return fs.existsSync(f) ? pathToFileURL(f).href : null;
+});
+
+// ---------- Windows: apple icon on the Start menu + desktop shortcuts ----------
+function ensureShortcuts() {
+  if (process.platform !== 'win32' || !app.isPackaged) return;
+  try {
+    const ico = path.join(dataDir, 'orchard.ico');
+    fs.copyFileSync(path.join(__dirname, 'icon.ico'), ico);
+    const opts = { target: process.execPath, cwd: path.dirname(process.execPath), icon: ico, iconIndex: 0, appUserModelId: 'Orchard.Browser', description: 'Orchard, the battery saving browser' };
+    const startDir = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+    const startLnk = path.join(startDir, 'Orchard.lnk');
+    shell.writeShortcutLink(startLnk, fs.existsSync(startLnk) ? 'update' : 'create', opts);
+    const desk = path.join(app.getPath('desktop'), 'Orchard.lnk'), flag = path.join(dataDir, 'desktop-shortcut-made');
+    if (!fs.existsSync(flag)) { shell.writeShortcutLink(desk, fs.existsSync(desk) ? 'update' : 'create', opts); fs.writeFileSync(flag, '1'); }
+    else if (fs.existsSync(desk)) shell.writeShortcutLink(desk, 'update', opts);
+  } catch {}
+}
+app.whenReady().then(() => setTimeout(ensureShortcuts, 3000));
 
 app.on('window-all-closed', () => app.quit());
