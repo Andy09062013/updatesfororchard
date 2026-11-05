@@ -763,6 +763,7 @@ const TOOLBAR = [
   ['speedBtn', '&#128246;', 'WiFi speed test', ''],
   ['dlBtn', '&#11015;', 'Downloads', ''],
   ['histBtn', '&#128339;', 'History', ''],
+  ['calBtn', '&#128197;', 'Calendar', ''],
   ['calcBtn', '&#129518;', 'Calculator', ''],
   ['extBtn', '&#129513;', 'Extensions', ''],
   ['setBtn', '&#9881;', 'Settings', 'u can still open it from the ☰ menu'],
@@ -878,7 +879,7 @@ function renderSettings(sec) {
   } else if (sec === 'about') {
     m.innerHTML = H('About Orchard', 'The battery saving browser.',
       row('&#127822;', 'Version', '<span id="verTxt">…</span>', '<span class="pbtn" id="updChk">Check for updates</span>')
-      + row('&#9000;', 'Keyboard shortcuts', 'Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+F find · Ctrl+N new window · Alt+G AI · Alt+C chat · Alt+M mail · Alt+K calculator · Alt+H hide elements · Alt+F menu · F11 fullscreen · F12 devtools', ''));
+      + row('&#9000;', 'Keyboard shortcuts', 'Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+F find · Ctrl+N new window · Alt+G AI · Alt+C chat · Alt+M mail · Alt+K calculator · Alt+E calendar · Alt+H hide elements · Alt+F menu · F11 fullscreen · F12 devtools', ''));
     window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version + (v.pending ? ' · update ' + v.pending.version + ' ready' : ''); });
     $('updChk').onclick = async () => {
       $('updChk').textContent = 'Checking…';
@@ -1040,6 +1041,107 @@ document.addEventListener('keydown', (e) => {
   if (k) { e.preventDefault(); e.stopPropagation(); calcPress(k); }
 }, true);
 
+// ---- calendar: month view + events with reminders ----
+let calView = new Date(), calSel = null;
+const pad2 = (n) => String(n).padStart(2, '0');
+const ymd = (d) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+const evAt = (ev) => { const [y, m, d] = ev.date.split('-').map(Number), [h, mi] = ev.time.split(':').map(Number); return new Date(y, m - 1, d, h, mi); };
+const fmtT = (t) => { const [h, mi] = t.split(':').map(Number); return new Date(2000, 0, 1, h, mi).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+const eventsOn = (key) => (store.events || []).filter(e => e.date === key).sort((a, b) => a.time.localeCompare(b.time));
+function openCalendar(dateKey) {
+  if (dateKey) { const [y, m, d] = dateKey.split('-').map(Number); calView = new Date(y, m - 1, 1); calSel = dateKey; }
+  openPage('calendar', '&#128197;', 'Calendar', [['month', '&#128197;', 'Month'], ['upcoming', '&#9200;', 'Upcoming']], renderCalendar);
+}
+function renderCalendar(sec) {
+  markNav(sec);
+  const m = $('opmain');
+  if (!calSel) calSel = ymd(new Date());
+  if (sec === 'upcoming') {
+    const now = Date.now();
+    const up = (store.events || []).filter(e => evAt(e).getTime() >= now - 3600e3).sort((a, b) => evAt(a) - evAt(b));
+    m.innerHTML = `<div class="opsec"><h2>Upcoming</h2><p>Everything coming up. Orchard pings u when it's time (while it's open), and tells u if u missed one.</p><div class="agenda" id="upList"></div></div>`;
+    const box = $('upList');
+    if (!up.length) box.innerHTML = '<div style="color:var(--dim)">nothing coming up 🍃</div>';
+    up.forEach(ev => box.appendChild(agendaItem(ev, true)));
+    return;
+  }
+  const y = calView.getFullYear(), mo = calView.getMonth();
+  const first = new Date(y, mo, 1), start = new Date(y, mo, 1 - ((first.getDay() + 6) % 7)); // weeks start Monday
+  const todayKey = ymd(new Date());
+  let cells = '';
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i), key = ymd(d), evs = eventsOn(key);
+    cells += `<div class="cday${d.getMonth() !== mo ? ' other' : ''}${key === todayKey ? ' today' : ''}${key === calSel ? ' sel' : ''}" data-d="${key}"><span class="dn">${d.getDate()}</span><div class="evs">${evs.slice(0, 2).map(e => `<span class="ev" title="${esc(fmtT(e.time))} ${esc(e.title)}">${esc(e.title)}</span>`).join('')}${evs.length > 2 ? `<span class="more">+${evs.length - 2} more</span>` : ''}</div></div>`;
+  }
+  const selD = (() => { const [a, b, c] = calSel.split('-').map(Number); return new Date(a, b - 1, c); })();
+  m.innerHTML = `<div class="calwrap">
+    <div class="calmonth">
+      <div class="calhead"><b>${first.toLocaleDateString([], { month: 'long', year: 'numeric' })}</b><span class="pbtn" id="calPrev">&#8249;</span><span class="pbtn" id="calToday">Today</span><span class="pbtn" id="calNext">&#8250;</span></div>
+      <div class="calgrid">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(x => `<div class="dow">${x}</div>`).join('')}${cells}</div>
+    </div>
+    <div class="calday">
+      <h3>${selD.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+      <small>${eventsOn(calSel).length ? eventsOn(calSel).length + ' event' + (eventsOn(calSel).length > 1 ? 's' : '') : 'no events yet'}</small>
+      <div class="agenda" id="agList"></div>
+      <form class="evform" id="evForm">
+        <b style="font-size:13px">Add an event</b>
+        <input id="evTitle" placeholder="What's happening? (e.g. maths test)" maxlength="80" required>
+        <div class="r2"><input id="evTime" type="time" value="${pad2(Math.min(23, new Date().getHours() + 1))}:00" required>
+        <select id="evRemind"><option value="0">At the time</option><option value="5">5 min before</option><option value="10">10 min before</option><option value="15">15 min before</option><option value="30">30 min before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></div>
+        <input id="evNote" placeholder="Note (optional)" maxlength="200">
+        <button class="pbtn ok" type="submit" style="padding:9px">Add to ${selD.toLocaleDateString([], { day: 'numeric', month: 'short' })}</button>
+      </form>
+    </div></div>`;
+  eventsOn(calSel).forEach(ev => $('agList').appendChild(agendaItem(ev)));
+  m.querySelectorAll('.cday').forEach(c => c.onclick = () => { calSel = c.dataset.d; const [a, b] = calSel.split('-').map(Number); if (b - 1 !== mo) calView = new Date(a, b - 1, 1); renderCalendar('month'); });
+  $('calPrev').onclick = () => { calView = new Date(y, mo - 1, 1); renderCalendar('month'); };
+  $('calNext').onclick = () => { calView = new Date(y, mo + 1, 1); renderCalendar('month'); };
+  $('calToday').onclick = () => { calView = new Date(); calSel = ymd(new Date()); renderCalendar('month'); };
+  $('evForm').onsubmit = (e) => {
+    e.preventDefault();
+    const title = $('evTitle').value.trim(), time = $('evTime').value;
+    if (!title || !/^\d\d:\d\d$/.test(time)) return;
+    const ev = { id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), date: calSel, time, title, note: $('evNote').value.trim(), remind: +$('evRemind').value };
+    store.events = (store.events || []).concat(ev); save();
+    const when = evAt(ev);
+    toast(when < new Date() ? 'added (that time already passed)' : 'event added, Orchard will ping u 🔔');
+    renderCalendar('month');
+  };
+}
+function agendaItem(ev, showDate) {
+  const d = document.createElement('div');
+  const past = evAt(ev) < new Date();
+  d.className = 'agi' + (past ? ' past' : '');
+  d.innerHTML = '<span class="at"></span><div class="ab"><b></b><small></small></div><span class="ax" title="Delete">&#10005;</span>';
+  d.querySelector('.at').textContent = (showDate ? evAt(ev).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' : '') + fmtT(ev.time);
+  d.querySelector('b').textContent = ev.title;
+  const remindTxt = { 0: '', 5: '5 min before', 10: '10 min before', 15: '15 min before', 30: '30 min before', 60: '1 hour before', 1440: '1 day before' }[ev.remind || 0];
+  d.querySelector('small').textContent = [ev.note, remindTxt ? '🔔 ' + remindTxt : (past ? 'done' : '🔔 at the time')].filter(Boolean).join(' · ');
+  d.querySelector('.ax').onclick = () => { store.events = (store.events || []).filter(x => x.id !== ev.id); save(); renderCalendar(pageKind === 'calendar' && document.querySelector('#opnav a.on') ? document.querySelector('#opnav a.on').dataset.k : 'month'); };
+  return d;
+}
+function showEventNote(ev) {
+  const box = $('notes');
+  while (box.children.length >= 4) box.lastElementChild.remove();
+  const d = document.createElement('div'); d.className = 'note';
+  d.style.borderLeftColor = ev.passed ? '#8a5a3c' : 'var(--acc2)';
+  const head = ev.passed ? 'Event passed' : ev.soon ? 'Coming up at ' + fmtT(ev.time) : 'Happening now';
+  d.innerHTML = '<div class="nav" style="background:#33201d;font-size:18px">' + (ev.passed ? '&#8987;' : '&#128197;') + '</div><div class="nb"><div class="nt"><span class="ntt"></span><small></small></div><div class="nm"></div></div><span class="nx" title="Dismiss">&#10005;</span>';
+  d.querySelector('.ntt').textContent = ev.title;
+  d.querySelector('small').textContent = head;
+  d.querySelector('.nm').textContent = (ev.passed ? 'Was ' + evAt(ev).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' at ' + fmtT(ev.time) : fmtT(ev.time)) + (ev.note ? ' · ' + ev.note : '');
+  const kill = () => { d.style.transition = 'opacity .2s'; d.style.opacity = 0; setTimeout(() => d.remove(), 200); };
+  d.onclick = (e) => { kill(); if (!e.target.classList.contains('nx')) openCalendar(ev.date); };
+  box.prepend(d);
+  if (!ev.passed) setTimeout(kill, 30000); // reminders stay longer than chat pings
+}
+window.aura.on('cal-due', (ev) => {
+  if (!ev || !ev.title) return;
+  if (document.hasFocus()) showEventNote(ev);
+  else window.aura.notify({ title: (ev.passed ? 'Event passed: ' : ev.soon ? 'Coming up: ' : '📅 ') + ev.title, body: (ev.passed ? 'Was at ' : 'At ') + fmtT(ev.time) + (ev.note ? ' · ' + ev.note : ''), action: 'cal:' + ev.date });
+});
+window.aura.on('note-click', (a) => { if (String(a).startsWith('cal:')) openCalendar(String(a).slice(4)); });
+
 // ---- main menu: every feature in one place ----
 const FEATURES = [
   ['BATTERY (THE CORE OF ORCHARD)'],
@@ -1068,6 +1170,7 @@ const FEATURES = [
   ['&#127912;', 'Backgrounds', 'colors, gradients, ur own pics', 'Settings', () => openPanel('theme')],
   ['&#11088;', 'Bookmark page', 'adds it to the bar', 'Ctrl+D', () => toggleBookmark()],
   ['&#129513;', 'Extensions', 'games and learning apps that run in Orchard', '', () => openExtensions()],
+  ['&#128197;', 'Calendar', 'events with reminders', 'Alt+E', () => openCalendar()],
   ['&#129518;', 'Calculator', 'normal or scientific', 'Alt+K', () => openPanel('calc')],
   ['&#9881;', 'Settings', 'toolbar, search, battery, chat and more', '', () => openSettings()]
 ];
@@ -1691,6 +1794,7 @@ function handleKey(k, ctrl, shift, alt) {
   else if (alt && k === 'h') startHidePicker();
   else if (alt && k === 'm') openMail();
   else if (alt && k === 'k') openPanel('calc');
+  else if (alt && k === 'e') openCalendar();
   else if (ctrl && k === 'j') openPanel('downloads');
   else if (k === 'escape' && $('lens').classList.contains('show')) endLens();
   else if (ctrl && k === 'l') { $('url').focus(); $('url').select(); }
@@ -1724,6 +1828,7 @@ $('speedBtn').onclick = () => openPanel('speed');
 $('histBtn').onclick = () => openPanel('history');
 $('setBtn').onclick = () => openSettings();
 $('calcBtn').onclick = () => openPanel('calc');
+$('calBtn').onclick = () => { if (pageKind === 'calendar') closePage(); else openCalendar(); };
 $('extBtn').onclick = (e) => extMenu(e);
 $('opX').onclick = closePage;
 document.querySelectorAll('#aipills span').forEach(s => s.onclick = () => { store.settings.ai = s.dataset.ai; save(); aiWcId = null; loadAi(s.dataset.ai); });

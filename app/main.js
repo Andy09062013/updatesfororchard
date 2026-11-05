@@ -184,7 +184,7 @@ app.on('web-contents-created', (e, contents) => {
     contents.on('before-input-event', (ev, input) => {
       if (input.type !== 'keyDown') return;
       const k = input.key.toLowerCase();
-      if (input.control && ['t','w','l','r','d','h','tab','=','-','0','f','n','j'].includes(k) || k === 'f5' || k === 'f11' || k === 'f12' || (input.alt && (k === 'arrowleft' || k === 'arrowright' || k === 'g' || k === 'c' || k === 'f' || k === 'h' || k === 'm' || k === 'k'))) {
+      if (input.control && ['t','w','l','r','d','h','tab','=','-','0','f','n','j'].includes(k) || k === 'f5' || k === 'f11' || k === 'f12' || (input.alt && (k === 'arrowleft' || k === 'arrowright' || k === 'g' || k === 'c' || k === 'f' || k === 'h' || k === 'm' || k === 'k' || k === 'e'))) {
         ev.preventDefault();
         sendTo(contents.hostWebContents, 'shortcut', { key: k, ctrl: input.control, shift: input.shift, alt: input.alt });
       }
@@ -200,6 +200,8 @@ ipcMain.handle('store-get', (e) => {
 });
 ipcMain.on('store-set', (e, data) => {
   const id = profileOf(e);
+  const evChanged = JSON.stringify((storeFor(id).events) || []) !== JSON.stringify(data.events || []);
+  setImmediate(() => { if (evChanged) calPlan(id); });
   const { profile, partition, blocked, ...rest } = data;
   const prev = storeFor(id);
   const ps = prev.settings || {}, ns = rest.settings || {};
@@ -825,5 +827,57 @@ function ensureShortcuts() {
   } catch {}
 }
 app.whenReady().then(() => setTimeout(ensureShortcuts, 3000));
+
+// ---------- Calendar reminders: timers in the main process, one notification per event ----------
+const calTimers = {};
+const calSentFile = (id) => path.join(dataDir, `cal-sent-${id}.json`);
+const calSent = (id) => { try { return new Set(JSON.parse(fs.readFileSync(calSentFile(id), 'utf8'))); } catch { return new Set(); } };
+const calMark = (id, key) => { const s = calSent(id); s.add(key); try { fs.writeFileSync(calSentFile(id), JSON.stringify([...s].slice(-2000))); } catch {} };
+const evWhen = (ev) => { const [y, mo, d] = String(ev.date).split('-').map(Number), [h, mi] = String(ev.time || '09:00').split(':').map(Number); return new Date(y, mo - 1, d, h, mi, 0, 0).getTime(); };
+function calDeliver(id, payload) {
+  let target = null;
+  for (const [wcId, pid] of winProfile) {
+    if (pid !== id) continue;
+    const w = BrowserWindow.fromWebContents(webContents.fromId(wcId));
+    if (!w) continue;
+    if (!target || w.isFocused()) target = w;
+  }
+  if (!target) return false;
+  target.webContents.send('cal-due', payload);
+  return true;
+}
+function calPlan(id, startup) {
+  (calTimers[id] || []).forEach(clearTimeout);
+  calTimers[id] = [];
+  const events = (storeFor(id).events || []).filter(ev => ev && ev.id && ev.date && ev.time);
+  const sent = calSent(id), now = Date.now();
+  for (const ev of events) {
+    const at = evWhen(ev), remind = Math.max(0, +ev.remind || 0), fire = at - remind * 60000;
+    const key = ev.id + '@' + ev.date + 'T' + ev.time + '-' + remind;
+    if (sent.has(key) || isNaN(at)) continue;
+    if (fire <= now) {
+      // missed while Orchard was closed (or the time just hit): say it passed, but only within the last week
+      if (now - at < 7 * 864e5) {
+        const passed = at <= now - 60000;
+        setTimeout(() => { if (calDeliver(id, { ...ev, passed, soon: !passed && remind > 0 })) calMark(id, key); }, startup ? 4000 : 50);
+      } else calMark(id, key);
+      continue;
+    }
+    const wait = fire - now;
+    if (wait < 2147483000) calTimers[id].push(setTimeout(() => { if (calDeliver(id, { ...ev, passed: false, soon: remind > 0 })) calMark(id, key); }, wait));
+  }
+  // timers longer than ~24 days can't be set, so re-plan daily
+  calTimers[id].push(setTimeout(() => calPlan(id), 24 * 3600 * 1000));
+}
+app.whenReady().then(() => setTimeout(() => { for (const p of profiles) if (storeFor(p.id).events) calPlan(p.id, true); }, 3000));
+ipcMain.on('native-note', (e, n) => {
+  try {
+    if (!Notification.isSupported()) return;
+    const w = BrowserWindow.fromWebContents(e.sender);
+    const note = new Notification({ title: String(n.title || 'Orchard').slice(0, 80), body: String(n.body || '').slice(0, 200), icon: path.join(__dirname, 'icon.png') });
+    note.on('click', () => { if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send('note-click', n.action || ''); } });
+    note.show();
+  } catch {}
+});
 
 app.on('window-all-closed', () => app.quit());
