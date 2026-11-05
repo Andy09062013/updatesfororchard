@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0",
-  "notes": "Calendar: add events to any day and time, get a notification when it's time or a heads up if u missed one",
+  "version": "2.1.1",
+  "notes": "Settings back to a simple scrolling panel instead of a full page",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "6e568b0fc62d228a0dc0fa1feceefae3082fef70ac7ba02942a9066d3d4ab9c6"
+      "sha256": "7b311189c9571bcf6c9bb63b9e9d4a20e6d07c48d96c065f0bd0fcdee923ea25"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "68808e4f01e513adf15abf97b02369d9a044ef6f268c9fbb6178a0f432406d30"
+      "sha256": "d2d763029cd9c21ff8e6ac5308c195a2d73bb1b7cb1b67a721d78a8ce25a75a1"
     }
   ]
 }

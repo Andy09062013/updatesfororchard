@@ -812,85 +812,74 @@ const swHtml = (on, id) => `<span class="sw${on ? ' on' : ''}" id="${id}" role="
 function row(icon, label, sub, control) { return `<div class="oprow"><span class="oi2">${icon}</span><div class="ol">${label}${sub ? `<small>${sub}</small>` : ''}</div>${control}</div>`; }
 function bindSwitch(id, get, set) { const el = $(id); if (!el) return; el.onclick = () => { const v = !get(); set(v); el.classList.toggle('on', v); el.setAttribute('aria-checked', v); }; }
 
-function openSettings() {
-  openPage('settings', '&#9881;', 'Orchard Settings', [
-    ['toolbar', '&#128736;', 'Toolbar'], ['battery', '&#127811;', 'Battery'], ['search', '&#128269;', 'Search'], ['ai', '&#10022;', 'AI, chat & mail'],
-    ['looks', '&#127912;', 'Looks'], ['tabs', '&#128209;', 'Tabs'], ['privacy', '&#128274;', 'Privacy'], ['about', '&#127822;', 'About & updates']
-  ], renderSettings);
-}
-function renderSettings(sec) {
-  markNav(sec);
-  const m = $('opmain'), S = store.settings;
-  const H = (t, p, body) => `<div class="opsec"><h2>${t}</h2>${p ? `<p>${p}</p>` : ''}<div class="opcard">${body}</div></div>`;
-  if (sec === 'toolbar') {
-    const tb = S.toolbar || {};
-    m.innerHTML = H('Toolbar', 'Pick what shows at the top. Everything is on by default. The ☰ menu always stays so u can get back here.',
-      TOOLBAR.map(([id, ic, label, sub]) => row(ic, label, sub, swHtml(tb[id] !== false, 'tb_' + id))).join(''))
-      + `<div class="opsec"><span class="pbtn" id="tbReset">Show everything again</span></div>`;
-    TOOLBAR.forEach(([id]) => bindSwitch('tb_' + id, () => (store.settings.toolbar || {})[id] !== false, (v) => { store.settings.toolbar = { ...(store.settings.toolbar || {}), [id]: v }; save(); applyToolbar(); }));
-    $('tbReset').onclick = () => { store.settings.toolbar = {}; save(); applyToolbar(); renderSettings('toolbar'); };
-  } else if (sec === 'battery') {
-    m.innerHTML = H('Battery', 'Saving battery is what Orchard is built around.',
-      row('&#127811;', 'Battery saver mode', '', `<select id="svr">${SAVER_OPTS}</select>`)
-      + row('&#128164;', 'Sleep unused tabs after', 'asleep tabs use zero power', `<select id="slp">${[[2,'2 min'],[5,'5 min'],[10,'10 min'],[30,'30 min'],[0,'never']].map(([v,l]) => `<option value="${v}" ${(S.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join('')}</select>`)
-      + row('&#10052;', 'Freeze background tabs', 'stops tabs u aren\'t looking at from running', swHtml(S.freeze !== false, 'frz'))
-      + row('&#127769;', 'Dark pages always', 'saves power on OLED screens', swHtml(!!S.darkPages, 'dkp2'))
-      + row('&#128202;', 'See what\'s using battery', '', '<span class="pbtn" id="battOpen">Open</span>'));
-    $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
-    $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
-    bindSwitch('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
-    bindSwitch('dkp2', () => !!store.settings.darkPages, (v) => { store.settings.darkPages = v; save(); applySaver(); });
-    $('battOpen').onclick = () => { closePage(); openPanel('battery'); };
-  } else if (sec === 'search') {
-    m.innerHTML = H('Search', '',
-      row('&#128269;', 'Search engine', '', `<select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${S.engine === k ? 'selected' : ''}>${k}</option>`).join('')}</select>`)
-      + row('&#128172;', 'Search suggestions', 'shows ideas as u type (sends what u type to ur search engine)', swHtml(S.suggest !== false, 'sgT'))
-      + row('&#128339;', 'History in the address bar', 'sites u visited show first', '<span class="pbtn" id="histOpen">View history</span>'));
-    $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
-    bindSwitch('sgT', () => store.settings.suggest !== false, (v) => { store.settings.suggest = v; save(); });
-    $('histOpen').onclick = () => { closePage(); openPanel('history'); };
-  } else if (sec === 'ai') {
-    m.innerHTML = H('AI', '',
-      row('&#10022;', 'AI in the side panel', '', `<select id="aiDef">${[['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>`))
-      + H('Chat & mail', '',
-      row('&#128276;', 'Chat notifications', 'pop ups bottom right, Windows notifications when Orchard is in the background', swHtml(S.chatNotify !== false, 'cnT'))
-      + row('&#9993;', 'Orchard Mail', 'ur Gmail in the side panel', '<span class="pbtn" id="mailOpen">Open</span>'));
-    $('aiDef').onchange = (e) => { store.settings.ai = e.target.value; save(); if (aiOpen && aiWhich !== 'chat' && aiWhich !== 'mail') { aiWcId = null; loadAi(e.target.value); } };
-    bindSwitch('cnT', () => store.settings.chatNotify !== false, (v) => { store.settings.chatNotify = v; save(); if (v) ensureChat(); placeChat(); });
-    $('mailOpen').onclick = () => { closePage(); openMail(); };
-  } else if (sec === 'looks') {
-    m.innerHTML = H('Looks', '', row('&#127912;', 'New tab background', 'presets, colours, gradients or ur own pics', '<span class="pbtn" id="thm">Change</span>'));
-    $('thm').onclick = () => { closePage(); openPanel('theme'); };
-  } else if (sec === 'tabs') {
-    m.innerHTML = H('Tabs', '',
-      row('&#8634;', 'Reopen tabs on startup', 'the tabs u had open come back, asleep until u click them', swHtml(S.restore !== false, 'rst'))
-      + row('&#128164;', 'Rest all other tabs now', '', '<span class="pbtn" id="slpNow">Rest</span>'));
-    bindSwitch('rst', () => store.settings.restore !== false, (v) => { store.settings.restore = v; save(); });
-    $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); };
-  } else if (sec === 'privacy') {
-    m.innerHTML = H('Privacy', '',
-      row('&#128737;', 'Ad blocker', 'blocks ad and tracker servers', swHtml(!!S.adblock, 'adT'))
-      + row('&#128065;', 'Hidden elements', 'stuff u hid on websites', '<span class="pbtn" id="hidesOpen">Manage</span>')
-      + row('&#129529;', 'Clear history, cookies, cache', 'logs u out of websites in this profile', '<span class="pbtn" id="clr">Clear</span>'));
-    bindSwitch('adT', () => !!store.settings.adblock, () => { toggleAdblock(); });
-    $('hidesOpen').onclick = () => { closePage(); openPanel('hides'); };
-    let armed = false;
-    $('clr').onclick = async () => { if (!armed) { armed = true; $('clr').textContent = 'Click again to clear'; return; } await window.aura.clearData(); store.history = []; toast('everything wiped 🥶'); $('clr').textContent = 'Cleared'; };
-  } else if (sec === 'about') {
-    m.innerHTML = H('About Orchard', 'The battery saving browser.',
-      row('&#127822;', 'Version', '<span id="verTxt">…</span>', '<span class="pbtn" id="updChk">Check for updates</span>')
-      + row('&#9000;', 'Keyboard shortcuts', 'Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+F find · Ctrl+N new window · Alt+G AI · Alt+C chat · Alt+M mail · Alt+K calculator · Alt+E calendar · Alt+H hide elements · Alt+F menu · F11 fullscreen · F12 devtools', ''));
-    window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version + (v.pending ? ' · update ' + v.pending.version + ' ready' : ''); });
-    $('updChk').onclick = async () => {
-      $('updChk').textContent = 'Checking…';
-      const res = await window.aura.checkUpdate();
-      const msg = { latest: 'ur on the newest version 🔥', ready: 'update ' + res.version + ' ready, restart to get it', busy: 'already checking', full: 'v' + res.version + ' needs a fresh download of the full zip', error: 'couldnt check: ' + res.error };
-      $('updChk').textContent = 'Check for updates';
-      toast(msg[res.status] || 'hmm');
-      if (res.status === 'ready') showUpdate(res);
-    };
-  }
-  m.scrollTop = 0;
+function openSettings() { openPanel('settings'); }
+// simple scrolling settings panel (the familiar dropdown, not a whole page)
+function renderSettings() {
+  $('ptitle').innerHTML = '&#9881; Settings';
+  const list = $('plist'), S = store.settings;
+  const hd = (t) => `<div class="mhead">${t}</div>`;
+  const sw = (on, id) => `<span class="sw${on ? ' on' : ''}" id="${id}"></span>`;
+  const sel = (id, opts) => `<select id="${id}">${opts}</select>`;
+  list.innerHTML =
+    hd('SEARCH')
+    + `<div class="set">Search engine ${sel('eng', Object.keys(ENGINES).map(k => `<option value="${k}" ${S.engine === k ? 'selected' : ''}>${k}</option>`).join(''))}</div>`
+    + `<div class="set">Search suggestions ${sw(S.suggest !== false, 'sgT')}</div>`
+    + hd('BATTERY')
+    + `<div class="set">Battery saver ${sel('svr', SAVER_OPTS)}</div>`
+    + `<div class="set">Sleep unused tabs after ${sel('slp', [[2, '2 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [0, 'never']].map(([v, l]) => `<option value="${v}" ${(S.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
+    + `<div class="set">Freeze background tabs ${sw(S.freeze !== false, 'frz')}</div>`
+    + `<div class="set">Dark pages always ${sw(!!S.darkPages, 'dkp2')}</div>`
+    + `<div class="set">See what's using battery <span class="pbtn" id="battOpen">Open</span></div>`
+    + hd('TABS')
+    + `<div class="set">Reopen tabs on startup ${sw(S.restore !== false, 'rst')}</div>`
+    + `<div class="set">Rest all other tabs now <span class="pbtn" id="slpNow">Rest</span></div>`
+    + hd('AI, CHAT & MAIL')
+    + `<div class="set">AI side panel ${sel('aiDef', [['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
+    + `<div class="set">Chat notifications ${sw(S.chatNotify !== false, 'cnT')}</div>`
+    + `<div class="set">Orchard Mail <span class="pbtn" id="mailOpen">Open</span></div>`
+    + hd('LOOKS')
+    + `<div class="set">New tab background <span class="pbtn" id="thm">Change</span></div>`
+    + hd('PRIVACY')
+    + `<div class="set">Ad blocker ${sw(!!S.adblock, 'adT')}</div>`
+    + `<div class="set">Hidden elements <span class="pbtn" id="hidesOpen">Manage</span></div>`
+    + `<div class="set">Clear history, cookies, cache <span class="pbtn" id="clr">Clear</span></div>`
+    + hd('TOOLBAR BUTTONS')
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Turn the top buttons on or off. The ☰ menu always stays.</div>`
+    + TOOLBAR.map(([id, ic, label]) => `<div class="set"><span style="display:flex;gap:8px;align-items:center"><span style="width:18px;text-align:center">${ic}</span>${label}</span>${sw((S.toolbar || {})[id] !== false, 'tb_' + id)}</div>`).join('')
+    + `<div class="set"><span></span><span class="pbtn" id="tbReset">Show everything</span></div>`
+    + hd('ABOUT & UPDATES')
+    + `<div class="set">Orchard <b id="verTxt">v…</b></div>`
+    + `<div class="set">Updates <span class="pbtn" id="updChk">Check for updates</span></div>`
+    + `<div class="set" style="color:var(--dim);font-size:11px;line-height:1.7;display:block">Shortcuts: Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+F find · Ctrl+N new window · Alt+G AI · Alt+C chat · Alt+M mail · Alt+K calculator · Alt+E calendar · Alt+H hide elements · Alt+F menu · F11 fullscreen · F12 devtools</div>`;
+  const toggle = (id, get, set2) => { const el = $(id); if (el) el.onclick = () => { const v = !get(); set2(v); el.classList.toggle('on', v); }; };
+  $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
+  toggle('sgT', () => store.settings.suggest !== false, (v) => { store.settings.suggest = v; save(); });
+  $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
+  $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
+  toggle('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
+  toggle('dkp2', () => !!store.settings.darkPages, (v) => { store.settings.darkPages = v; save(); applySaver(); });
+  $('battOpen').onclick = () => openPanel('battery');
+  toggle('rst', () => store.settings.restore !== false, (v) => { store.settings.restore = v; save(); });
+  $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); };
+  $('aiDef').onchange = (e) => { store.settings.ai = e.target.value; save(); if (aiOpen && aiWhich !== 'chat' && aiWhich !== 'mail') { aiWcId = null; loadAi(e.target.value); } };
+  toggle('cnT', () => store.settings.chatNotify !== false, (v) => { store.settings.chatNotify = v; save(); if (v) ensureChat(); placeChat(); });
+  $('mailOpen').onclick = () => openMail();
+  $('thm').onclick = () => openPanel('theme');
+  toggle('adT', () => !!store.settings.adblock, () => { toggleAdblock(); });
+  $('hidesOpen').onclick = () => openPanel('hides');
+  let armed = false;
+  $('clr').onclick = async () => { if (!armed) { armed = true; $('clr').textContent = 'Click again'; return; } await window.aura.clearData(); store.history = []; toast('everything wiped 🥶'); $('clr').textContent = 'Cleared'; };
+  TOOLBAR.forEach(([id]) => toggle('tb_' + id, () => (store.settings.toolbar || {})[id] !== false, (v) => { store.settings.toolbar = { ...(store.settings.toolbar || {}), [id]: v }; save(); applyToolbar(); }));
+  $('tbReset').onclick = () => { store.settings.toolbar = {}; save(); applyToolbar(); renderSettings(); };
+  window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version + (v.pending ? ' · update ' + v.pending.version + ' ready' : ''); });
+  $('updChk').onclick = async () => {
+    $('updChk').textContent = 'Checking…';
+    const res = await window.aura.checkUpdate();
+    const msg = { latest: 'ur on the newest version 🔥', ready: 'update ' + res.version + ' ready, restart to get it', busy: 'already checking', full: 'v' + res.version + ' needs a fresh download of the full zip', error: 'couldnt check: ' + res.error };
+    $('updChk').textContent = 'Check for updates';
+    toast(msg[res.status] || 'hmm');
+    if (res.status === 'ready') showUpdate(res);
+  };
 }
 
 // ---- extensions (games + learning apps from the Orchard repo, run in tabs) ----
@@ -1311,7 +1300,6 @@ function toggleBookmark() {
 
 // panel
 function openPanel(kind) {
-  if (kind === 'settings') { openSettings(); return; }
   if (kind === 'extensions') { openExtensions(); return; }
   const p = $('panel'), list = $('plist');
   p.classList.toggle('calcw', kind === 'calc'); p.classList.toggle('sci', kind === 'calc' && !!store.settings.calcSci);
@@ -1338,6 +1326,8 @@ function openPanel(kind) {
     renderHides();
   } else if (kind === 'menu') {
     renderMenu();
+  } else if (kind === 'settings') {
+    renderSettings();
   } else if (kind === 'theme') {
     renderTheme();
   } else if (kind === 'downloads') {
