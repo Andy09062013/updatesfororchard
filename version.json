@@ -1,6 +1,6 @@
 {
-  "version": "2.5.0",
-  "notes": "Password manager with a save popup + autofill, sticky notes u right-click to place on a tab, and a proper page right-click menu. Ask AI now has Answer quickly, Answer only and Explain this page",
+  "version": "2.6.0",
+  "notes": "New Unanchored extension (floating UI falls with gravity, drag & throw it), guest mode that saves nothing, and the right-click sticky note menu now lands at ur cursor",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -25,11 +25,11 @@
     },
     {
       "path": "index.html",
-      "sha256": "8ea56667589fc8ac884371ac9439df4e14653bdbfce7fe89f3b7a451ab808a1a"
+      "sha256": "9facb7f8927fe6a0067d4ab9631de5aba09947c5e915fe64a0d2a15d8c03f2c4"
     },
     {
       "path": "main.js",
-      "sha256": "98366271ec0a9345e93c54a5031288871966476ce790453c6de9839761f2b6bc"
+      "sha256": "1399fa534deb8405a670e027153fb9e197727b14fc1ba18888a1d0e06311cb04"
     },
     {
       "path": "newtab.html",
@@ -37,19 +37,19 @@
     },
     {
       "path": "package.json",
-      "sha256": "c48bc02d1a60770cd78f81513108d35facd8589cfd8c8f959c4a232bb2a87394"
+      "sha256": "045b55bb93e415773625ff5e2901c5e330edd75af103893badf1b5dbb6e7d88c"
     },
     {
       "path": "preload.js",
-      "sha256": "8bb55c7389bc40baeac5c3ed4a59a94981392978352577fbec6bd437bed4115d"
+      "sha256": "34f9c7ff15a6415bc0639e2d4b36ef81b8b9eb81e3631a47fab35e01f3606b3e"
     },
     {
       "path": "pw-preload.js",
-      "sha256": "a9ef6bb3fdc1055696e90cf396b78164f2d3da29ca4c927a77968c7d9a44144a"
+      "sha256": "803f2ac81855da70175c48ec76b949e6346fc0700009627b51a1cb39c9b76d90"
     },
     {
       "path": "renderer.js",
-      "sha256": "ce70444c048e76c195e698792037a0d4224fd70e03c02c8e5aa5a73c2f3f9023"
+      "sha256": "c1ba38f3c26384b8ece72e9fbc0c5540287cb41727439c39d0e5360453edcaad"
     },
     {
       "path": "throttle.ps1",

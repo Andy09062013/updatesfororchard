@@ -34,7 +34,8 @@ contextBridge.exposeInMainWorld('aura', {
     list: () => ipcRenderer.invoke('ext-list'),
     install: (id) => ipcRenderer.invoke('ext-install', id),
     remove: (id) => ipcRenderer.invoke('ext-remove', id),
-    url: (id) => ipcRenderer.invoke('ext-url', id)
+    url: (id) => ipcRenderer.invoke('ext-url', id),
+    code: (id) => ipcRenderer.invoke('ext-code', id)
   },
   openExternal: (u) => ipcRenderer.send('open-external', u),
   suggest: (engine, q) => ipcRenderer.invoke('suggest', engine, q),
@@ -43,6 +44,7 @@ contextBridge.exposeInMainWorld('aura', {
   profiles: () => ipcRenderer.invoke('profiles-list'),
   openProfile: (id) => ipcRenderer.invoke('profile-open', id),
   newWindow: () => ipcRenderer.invoke('profile-new-window'),
+  openGuest: () => ipcRenderer.invoke('open-guest'),
   addProfile: (n, c) => ipcRenderer.invoke('profile-add', n, c),
   editProfile: (id, n, c) => ipcRenderer.invoke('profile-edit', id, n, c),
   deleteProfile: (id) => ipcRenderer.invoke('profile-delete', id),

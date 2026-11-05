@@ -365,6 +365,9 @@ body.saver .note{animation:none}
 .snote textarea::placeholder{color:inherit;opacity:.5}
 @keyframes crumple{40%{transform:rotate(8deg) scale(.6);filter:blur(1px)}100%{transform:rotate(30deg) scale(0);opacity:0}}
 .snote.crumpling{animation:crumple .45s ease-in forwards;pointer-events:none}
+#guestChip{font-size:11px;font-weight:700;color:#cfcfe6;background:#2a2230;border:1px solid #4a3a5a;border-radius:11px;padding:3px 9px;margin-left:4px;white-space:nowrap}
+body.guestmode #logo{filter:grayscale(.3)}
+body.guestmode #top{background:linear-gradient(90deg,#1c1626,#241a2e)}
 #zoom{font-size:11px;color:var(--dim);display:none}
 </style>
 </head>
@@ -402,6 +405,7 @@ body.saver .note{animation:none}
   <div class="btn" id="mailBtn" title="Orchard Mail, ur Gmail (Alt+M)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg><span id="mailBadge" hidden></span></div>
   <div class="btn" id="chatBtn" title="Google Chat (Alt+C)"><span id="chatBadge" hidden></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg></div>
   <div class="btn" id="aiBtn" title="Ask Gemini (Alt+G)"><span class="gem">&#10022;</span></div>
+  <span id="guestChip" hidden>🕶 Guest</span>
   <div id="avatar" title="Profiles"></div>
   <span id="updPill" class="pill" hidden title="Click to restart into the new version">&#11014; Update ready</span>
   <div class="btn" id="menuBtn" title="Menu: every feature in one place (Alt+F)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>

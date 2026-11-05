@@ -43,7 +43,7 @@ function makeWebview(t, url) {
   wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
   wv.addEventListener('page-favicon-updated', (e) => { t.icon = e.favicons[0]; renderTab(t); });
   const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); } renderTab(t); saveSession(); };
-  wv.addEventListener('context-menu', (e) => showPageMenu(t, e.params));
+  wv.addEventListener('ipc-message', (e) => { if (e.channel === 'orchard-context') showPageMenu(t, e.args[0]); });
   wv.addEventListener('did-navigate', nav);
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
   wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
@@ -927,7 +927,17 @@ async function extMenu(e) {
     ['&#129513; ' + (list.length ? 'Manage extensions' : 'Get extensions'), () => openExtensions()]
   ]));
 }
-async function extPlay(id) { const u = await EXT.url(id); if (u) createTab(u); }
+async function extPlay(id) {
+  const it = (await EXT.list()).find(x => x.id === id);
+  if (it && it.inject) {
+    if (!active || !active.wv || !active.ready || isNewtab(active.url) || !/^https?:|^file:/.test(active.url)) { toast('open a website first, then run it 🫩'); return; }
+    const code = await EXT.code(id);
+    if (!code) { toast("couldn't load the extension"); return; }
+    try { await active.wv.executeJavaScript(code, true); } catch (e) { toast('that page blocked it'); }
+    return;
+  }
+  const u = await EXT.url(id); if (u) createTab(u);
+}
 function openExtensions() {
   openPage('extensions', '&#129513;', 'Orchard Extensions', [
     ['all', '&#10024;', 'Discover'], ['game', '&#127918;', 'Games'], ['educational', '&#128218;', 'Educational'], ['installed', '&#9989;', 'Installed']
@@ -952,7 +962,7 @@ async function renderExtensions(f) {
   items.forEach(x => {
     const c = document.createElement('div'); c.className = 'extcard';
     const upd = x.installed && x.version && x.installed.version !== x.version && f !== 'installed';
-    c.innerHTML = `<div class="eh"><div class="ei"></div><div><div class="en"></div><span class="lab ${x.category === 'educational' ? 'educational' : 'game'}">${x.category === 'educational' ? 'Educational' : 'Game'}</span></div></div><p></p><div class="ef"><small></small>${x.installed ? `<span class="pbtn" data-a="rm">Remove</span>${upd ? '<span class="pbtn" data-a="get">Update</span>' : ''}<span class="pbtn ok" data-a="play">&#9654; Play</span>` : '<span class="pbtn ok" data-a="get">Get</span>'}</div>`;
+    c.innerHTML = `<div class="eh"><div class="ei"></div><div><div class="en"></div><span class="lab ${x.category === 'educational' ? 'educational' : 'game'}">${x.category === 'educational' ? 'Educational' : 'Game'}</span></div></div><p></p><div class="ef"><small></small>${x.installed ? `<span class="pbtn" data-a="rm">Remove</span>${upd ? '<span class="pbtn" data-a="get">Update</span>' : ''}<span class="pbtn ok" data-a="play">${x.inject ? '&#9889; Activate' : '&#9654; Play'}</span>` : '<span class="pbtn ok" data-a="get">Get</span>'}</div>`;
     c.querySelector('.ei').textContent = x.icon || '🧩';
     c.querySelector('.en').textContent = x.name;
     c.querySelector('p').textContent = x.description || '';
@@ -1217,11 +1227,10 @@ function crumpleNote(tab, n, el) {
 window.addEventListener('resize', () => { if ($('noteLayer').children.length) renderNotes(); });
 
 // ---- page right-click menu (also where "add sticky note" lives) ----
-function showPageMenu(t, pr) {
-  if (!t || !t.wv) return;
+function showPageMenu(t, p) {
+  if (!t || !t.wv || !p) return;
   if (t.locked && !t.unlocked && lockReady()) return;
   if (t !== active && visibleSet().length === 1) activate(t);
-  const p = { x: pr.x, y: pr.y, sel: (pr.selectionText || '').slice(0, 300), link: pr.linkURL || '', src: pr.mediaType === 'image' ? (pr.srcURL || '') : '', isEditable: !!pr.isEditable, canCopy: !!(pr.editFlags && pr.editFlags.canCopy), canPaste: !!(pr.editFlags && pr.editFlags.canPaste), canCut: !!(pr.editFlags && pr.editFlags.canCut) };
   const b = t.wv.getBoundingClientRect();
   const ev = { clientX: b.left + p.x, clientY: b.top + p.y, preventDefault() {} };
   const wv = t.wv, items = [];
@@ -1318,6 +1327,7 @@ const FEATURES = [
   ['&#128270;', 'Find in page', 'search words on this page', 'Ctrl+F', () => openFind()],
   ['YOU'],
   ['&#128100;', 'Profiles', 'separate logins and bookmarks', 'Avatar', () => openPanel('profiles')],
+  ['\uD83D\uDD76', 'Guest window', 'nothing saved, like incognito', 'Ctrl+Shift+N', () => window.aura.openGuest()],
   ['&#127912;', 'Backgrounds', 'colors, gradients, ur own pics', 'Settings', () => openPanel('theme')],
   ['&#11088;', 'Bookmark page', 'adds it to the bar', 'Ctrl+D', () => toggleBookmark()],
   ['&#129513;', 'Extensions', 'games and learning apps that run in Orchard', '', () => openExtensions()],
@@ -1799,10 +1809,13 @@ const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt
 function applyProfile(p) {
   if (!p) return;
   store.profile = p;
-  document.documentElement.style.setProperty('--acc', p.color);
-  $('avatar').textContent = (p.name || '?')[0].toUpperCase();
-  $('avatar').title = 'Profile: ' + p.name + (p.email ? '\n' + p.email : '\nnot signed in to Google');
-  document.title = 'Orchard - ' + p.name;
+  const guest = !!p.guest;
+  document.body.classList.toggle('guestmode', guest);
+  if (!guest) document.documentElement.style.setProperty('--acc', p.color);
+  $('avatar').textContent = guest ? '\uD83D\uDD76' : (p.name || '?')[0].toUpperCase();
+  $('avatar').title = guest ? 'Guest window — nothing is saved' : 'Profile: ' + p.name + (p.email ? '\n' + p.email : '\nnot signed in to Google');
+  const chip = $('guestChip'); if (chip) chip.hidden = !guest;
+  document.title = (guest ? 'Guest — Orchard' : 'Orchard - ' + p.name);
 }
 async function renderProfiles(editing) {
   const list = $('plist'), me = store.profile || { id: 'default' };
@@ -1829,6 +1842,12 @@ async function renderProfiles(editing) {
   add.innerHTML = '<div class="av" style="background:#2e2e48;color:var(--txt)">+</div><div class="rt"><div>Add profile</div><small>separate logins, bookmarks and history</small></div>';
   add.onclick = () => profileForm(null);
   list.appendChild(add);
+  if (!(store.profile && store.profile.guest)) {
+    const g = document.createElement('div'); g.className = 'row';
+    g.innerHTML = '<div class="av" style="background:#2a2230;color:#cfcfe6">\uD83D\uDD76</div><div class="rt"><div>Guest window</div><small>nothing saved, like incognito</small></div>';
+    g.onclick = () => { window.aura.openGuest(); $('panel').classList.remove('show'); };
+    list.appendChild(g);
+  }
   const nw = document.createElement('div');
   nw.className = 'set';
   nw.innerHTML = '<span style="color:var(--dim)">New window (Ctrl+N)</span><span class="pbtn" id="nwBtn">Open</span>';
@@ -1957,7 +1976,7 @@ function zoom(d) {
 function handleKey(k, ctrl, shift, alt) {
   if (ctrl && k === 't') { if (shift) { const u = closed.pop(); if (u) createTab(u); } else createTab(); }
   else if (ctrl && k === 'w') active && closeTab(active);
-  else if (ctrl && k === 'n') window.aura.newWindow();
+  else if (ctrl && k === 'n') { if (shift) window.aura.openGuest(); else window.aura.newWindow(); }
   else if (alt && k === 'g') toggleAi();
   else if (alt && k === 'c') openGoogleChat();
   else if (alt && k === 'f') openPanel('menu');

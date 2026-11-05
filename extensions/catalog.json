@@ -1,37 +1,16 @@
 {
   "extensions": [
     {
-      "id": "dungeon-cards",
-      "name": "Dungeon Cards: Spellbound Crawler",
-      "category": "game",
-      "icon": "🃏",
+      "id": "unanchored",
+      "name": "Unanchored",
+      "category": "fun",
+      "icon": "⚓",
       "version": "1.0.0",
-      "file": "dungeon-cards.html",
-      "description": "Crawl a dungeon one card at a time. Fight, cast spells and grab loot.",
-      "size": 873789,
-      "sha256": "b319fb066695c6aec7408937b2e061200281321f30d7b8a8d22df9aefad50f4e"
-    },
-    {
-      "id": "shutters",
-      "name": "Shutters",
-      "category": "game",
-      "icon": "🌒",
-      "version": "1.0.0",
-      "file": "shutters.html",
-      "description": "First person work-from-home horror. Keep the shutters closed.",
-      "size": 688703,
-      "sha256": "83f18faa41b6273baf9c0f26889a8662496a40185afc95ad5b4b9994305b5047"
-    },
-    {
-      "id": "year8-revision",
-      "name": "Year 8 Revision",
-      "category": "educational",
-      "icon": "📚",
-      "version": "1.0.0",
-      "file": "year8-revision.html",
-      "description": "Revision quizzes made from Year 8 class slides.",
-      "size": 699520,
-      "sha256": "42403effb358506a6484847e5271774914536c643f33c445e9177fbf402b9750"
+      "file": "unanchored.js",
+      "inject": true,
+      "description": "Floating bars, buttons and popups fall with gravity. Drag them, throw them, bounce them off the edges, and they still work when u tap them. Run it again to put everything back.",
+      "size": 5939,
+      "sha256": "90f92502f57ff4db0e02e11020d94ae98a296ba76d72f6431353602efab89387"
     }
   ]
 }

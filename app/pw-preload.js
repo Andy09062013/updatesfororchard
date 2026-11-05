@@ -4,6 +4,17 @@
 // Passwords are stored encrypted on this PC by the main process; this script
 // only ever sees them for the site it's already running on.
 const { ipcRenderer } = require('electron');
+// right-click anywhere -> tell Orchard where (reliable page coords) and what was clicked
+addEventListener('contextmenu', function (e) {
+  try {
+    var el = e.target, link = '';
+    for (var a = el; a; a = a.parentElement) { if (a.tagName === 'A' && a.href) { link = a.href; break; } }
+    var src = (el.tagName === 'IMG') ? (el.currentSrc || el.src || '') : '';
+    var editable = !!(el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+    var sel = String(getSelection ? getSelection() : '').slice(0, 300);
+    ipcRenderer.sendToHost('orchard-context', { x: e.clientX, y: e.clientY, sel: sel, link: link, src: src, isEditable: editable, canCopy: !!sel, canPaste: editable, canCut: editable && !!sel });
+  } catch (x) {}
+}, true);
 if (window.top === window && /^https?:$/.test(location.protocol)) {
   const origin = location.origin;
   const vis = (el) => el && el.offsetParent !== null && !el.disabled && el.type !== 'hidden';

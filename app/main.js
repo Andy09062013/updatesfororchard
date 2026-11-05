@@ -22,10 +22,11 @@ try { profiles = JSON.parse(fs.readFileSync(profilesFile, 'utf8')); } catch { pr
 if (!Array.isArray(profiles) || !profiles.length) profiles = [{ id: 'default', name: 'Me', color: COLORS[0] }];
 else if (profiles[0].id === 'default' && profiles[0].color === '#a46bff') { profiles[0].color = COLORS[0]; }
 function saveProfiles() { try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(profilesFile, JSON.stringify(profiles)); } catch {} }
-const getProfile = (id) => profiles.find(p => p.id === id);
+const GUEST = { id: 'guest', name: 'Guest', color: '#9aa0b4', guest: true };
+const getProfile = (id) => id === 'guest' ? GUEST : profiles.find(p => p.id === id);
 // default profile keeps the old file + default session so v1.1 data carries over
 const storeFileFor = (id) => path.join(dataDir, id === 'default' ? 'aura-data.json' : `aura-data-${id}.json`);
-const partitionFor = (id) => (id === 'default' ? '' : `persist:profile-${id}`);
+const partitionFor = (id) => (id === 'default' ? '' : id === 'guest' ? 'guest-incognito' : `persist:profile-${id}`);
 const sessionFor = (id) => (id === 'default' ? session.defaultSession : session.fromPartition(partitionFor(id)));
 
 const stores = {};
@@ -37,10 +38,13 @@ function defaultStore() {
   ], history: [], settings: { engine: 'google', adblock: true } };
 }
 function storeFor(id) {
-  if (!stores[id]) { try { stores[id] = JSON.parse(fs.readFileSync(storeFileFor(id), 'utf8')); } catch { stores[id] = defaultStore(); } }
+  if (!stores[id]) {
+    if (id === 'guest') { stores[id] = defaultStore(); stores[id].settings.savePasswords = false; }
+    else { try { stores[id] = JSON.parse(fs.readFileSync(storeFileFor(id), 'utf8')); } catch { stores[id] = defaultStore(); } }
+  }
   return stores[id];
 }
-function saveStore(id) { try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(storeFileFor(id), JSON.stringify(stores[id])); } catch {} }
+function saveStore(id) { if (id === 'guest') return; try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(storeFileFor(id), JSON.stringify(stores[id])); } catch {} }
 
 // ---------- adblock ----------
 const AD_HOSTS = new Set(require(path.join(__dirname, 'blocklist.js')));
@@ -113,7 +117,7 @@ function setupSession(id) {
 
 // ---------- windows ----------
 const openFile = path.join(dataDir, 'open-windows.json');
-function rememberOpen() { try { fs.writeFileSync(openFile, JSON.stringify([...winProfile.values()])); } catch {} }
+function rememberOpen() { try { fs.writeFileSync(openFile, JSON.stringify([...winProfile.values()].filter(x => x !== 'guest'))); } catch {} }
 const winProfile = new Map(); // window webContents id -> profile id
 let firstWin = null;
 const initialTabs = new Map(); // window webContents id -> url for torn-off tabs
@@ -137,7 +141,13 @@ function createWindow(profileId, opts = {}) {
   rememberOpen();
   // closing one of several windows forgets it, closing the last one keeps the list so it all reopens
   win.on('close', () => { if (BrowserWindow.getAllWindows().length > 1) { winProfile.delete(wcId); rememberOpen(); } });
-  win.on('closed', () => winProfile.delete(wcId));
+  win.on('closed', () => {
+    winProfile.delete(wcId);
+    if (p.id === 'guest' && ![...winProfile.values()].includes('guest')) {
+      delete stores['guest']; setUp.delete('guest');
+      try { const s = session.fromPartition('guest-incognito'); s.clearStorageData(); s.clearCache(); } catch {}
+    }
+  });
   win.loadFile(path.join(__dirname, 'index.html'));
   // only count it as leaving when focus really left Orchard (clicking into a page can fire a fake blur on Windows)
   win.on('blur', () => setTimeout(() => {
@@ -311,6 +321,7 @@ ipcMain.handle('profile-open', (e, id) => {
   return true;
 });
 ipcMain.handle('profile-new-window', (e) => { createWindow(profileOf(e)); return true; });
+ipcMain.handle('open-guest', () => { createWindow('guest'); return true; });
 ipcMain.handle('profile-add', (e, name, color) => {
   const id = 'p' + Date.now().toString(36);
   const p = { id, name: String(name || 'Person ' + (profiles.length + 1)).slice(0, 24), color: color || COLORS[profiles.length % COLORS.length] };
@@ -799,10 +810,10 @@ async function extCatalog() {
   const r = await net.fetch(UPDATE_BASE + 'extensions/catalog.json?t=' + Date.now(), { cache: 'no-store' });
   if (!r.ok) throw new Error('store answered ' + r.status);
   const j = await r.json();
-  return (j.extensions || []).filter(x => x && okExtId(x.id) && typeof x.file === 'string' && /^[A-Za-z0-9_.-]+\.html$/.test(x.file)).map(x => ({
+  return (j.extensions || []).filter(x => x && okExtId(x.id) && typeof x.file === 'string' && /^[A-Za-z0-9_.-]+\.(html|js)$/.test(x.file)).map(x => ({
     id: x.id, name: String(x.name || x.id).slice(0, 60), category: x.category === 'educational' ? 'educational' : 'game',
     description: String(x.description || '').slice(0, 300), icon: String(x.icon || '🧩').slice(0, 4), version: String(x.version || '1.0.0').slice(0, 20),
-    size: +x.size || 0, file: x.file, sha256: String(x.sha256 || '')
+    size: +x.size || 0, file: x.file, sha256: String(x.sha256 || ''), inject: !!x.inject
   }));
 }
 ipcMain.handle('ext-catalog', async () => { try { return { items: await extCatalog() }; } catch (e) { return { error: String(e.message || e) }; } });
@@ -819,7 +830,7 @@ ipcMain.handle('ext-install', async (e, id) => {
     fs.mkdirSync(extDir, { recursive: true });
     fs.writeFileSync(path.join(extDir, id + '.html'), buf);
     const list = readExt().filter(i => i.id !== id);
-    list.push({ id, name: x.name, category: x.category, description: x.description, icon: x.icon, version: x.version, size: buf.length, installed: Date.now() });
+    list.push({ id, name: x.name, category: x.category, description: x.description, icon: x.icon, version: x.version, size: buf.length, installed: Date.now(), inject: !!x.inject, file: x.file });
     writeExt(list);
     return { ok: true };
   } catch (ex) { return { error: String(ex.message || ex) }; }
@@ -830,10 +841,19 @@ ipcMain.handle('ext-remove', (e, id) => {
   writeExt(readExt().filter(i => i.id !== id));
   return true;
 });
+function extFile(id) {
+  const it = readExt().find(x => x.id === id);
+  const name = it && /^[A-Za-z0-9_.-]+$/.test(it.file || '') ? it.file : id + '.html';
+  return path.join(extDir, name);
+}
 ipcMain.handle('ext-url', (e, id) => {
   if (!okExtId(id)) return null;
-  const f = path.join(extDir, id + '.html');
+  const f = extFile(id);
   return fs.existsSync(f) ? pathToFileURL(f).href : null;
+});
+ipcMain.handle('ext-code', (e, id) => {
+  if (!okExtId(id)) return null;
+  try { return fs.readFileSync(extFile(id), 'utf8'); } catch { return null; }
 });
 
 // ---------- Windows: apple icon on the Start menu + desktop shortcuts ----------
@@ -1019,7 +1039,8 @@ ipcMain.on('pw-captured', (e, d) => {
   sendTo(e.sender.hostWebContents, 'pw-offer', { origin, user, pass, update: !!existing });
 });
 ipcMain.handle('pw-store', (e, d) => {
-  const id = profileOf(e), c = pwLoad(id);
+  const id = profileOf(e); if (id === 'guest') return false;
+  const c = pwLoad(id);
   const origin = String(d.origin || ''), user = String(d.user || ''), pass = String(d.pass || '');
   if (!origin || !pass) return false;
   const ex = c.list.find(it => it.origin === origin && it.user === user);
