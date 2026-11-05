@@ -43,6 +43,7 @@ function makeWebview(t, url) {
   wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
   wv.addEventListener('page-favicon-updated', (e) => { t.icon = e.favicons[0]; renderTab(t); });
   const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); } renderTab(t); saveSession(); };
+  wv.addEventListener('context-menu', (e) => showPageMenu(t, e.params));
   wv.addEventListener('did-navigate', nav);
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
   wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
@@ -177,7 +178,7 @@ function saveSession(now) {
   clearTimeout(sessT);
   const doSave = () => {
     store.session = {
-      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title, locked: !!t.locked })),
+      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title, locked: !!t.locked, notes: (t.notes || []).map(n => ({ x: n.x, y: n.y, text: n.text, c: n.c })) })),
       active: Math.max(0, tabs.filter(t => t.url && !isNewtab(t.url)).indexOf(active))
     };
     save();
@@ -193,6 +194,7 @@ function restoreSession() {
     const t = createTab(x.url, true, i !== s.active);
     if (x.title) t.title = x.title;
     if (x.locked) t.locked = true;
+    if (Array.isArray(x.notes) && x.notes.length) t.notes = x.notes.map(n => ({ id: 'n' + Math.random().toString(36).slice(2), x: +n.x || 20, y: +n.y || 20, text: String(n.text || ''), c: +n.c || 0 }));
     renderTab(t);
   });
   restoring = false;
@@ -313,6 +315,7 @@ function layoutViews() {
   });
   const ring = $('paneRing');
   if (n > 1) { Object.assign(ring.style, rectStyle(CELLS[n][vis.indexOf(active)], n)); ring.hidden = false; } else ring.hidden = true;
+  renderNotes();
 }
 function activate(t) {
   const prevVis = visibleSet();
@@ -848,6 +851,9 @@ function renderSettings() {
     + hd('TAB LOCK')
     + `<div class="set">Tab lock password <span style="display:flex;gap:6px">${S.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>`
     + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Right click a tab and pick Lock tab. It locks again when u switch tabs or leave Orchard.</div>`
+    + hd('PASSWORDS')
+    + `<div class="set">Offer to save passwords ${sw(S.savePasswords !== false, 'spw')}</div>`
+    + `<div class="set">Saved passwords <span class="pbtn" id="pwMng">Manage</span></div>`
     + hd('DOWNLOADS')
     + `<div class="set">Ask where to save each file ${sw(!!S.askDownload, 'askDl')}</div>`
     + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Off: files go straight into ur Downloads folder, like Chrome.</div>`
@@ -872,6 +878,8 @@ function renderSettings() {
   $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
   toggle('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
   toggle('dkp2', () => !!store.settings.darkPages, (v) => { store.settings.darkPages = v; save(); applySaver(); });
+  toggle('spw', () => store.settings.savePasswords !== false, (v) => { store.settings.savePasswords = v; save(); });
+  if ($('pwMng')) $('pwMng').onclick = () => openPanel('passwords');
   toggle('askDl', () => !!store.settings.askDownload, (v) => { store.settings.askDownload = v; save(); });
   toggle('cvT2', () => store.settings.cheapVideo !== false, (v) => { store.settings.cheapVideo = v; save(); syncThrottle(); });
   toggle('slowT2', () => store.settings.slowApps !== false, (v) => { store.settings.slowApps = v; save(); syncThrottle(); });
@@ -1159,6 +1167,129 @@ window.aura.on('cal-due', (ev) => {
 });
 window.aura.on('note-click', (a) => { if (String(a).startsWith('cal:')) openCalendar(String(a).slice(4)); });
 
+// ---- sticky notes: taped to a tab, right-click a note to crumple it ----
+let noteDrag = null;
+function renderNotes() {
+  const layer = $('noteLayer');
+  const show = active && visibleSet().length === 1 && !(active.locked && !active.unlocked && lockReady());
+  layer.innerHTML = '';
+  if (!show || !active.notes || !active.notes.length) return;
+  const b = layer.getBoundingClientRect();
+  active.notes.forEach(n => layer.appendChild(buildNote(active, n, b)));
+}
+function buildNote(tab, n, b) {
+  const d = document.createElement('div');
+  d.className = 'snote' + (n.c ? ' c' + n.c : '');
+  d.style.left = Math.max(2, Math.min(n.x, b.width - 60)) + 'px';
+  d.style.top = Math.max(2, Math.min(n.y, b.height - 40)) + 'px';
+  d.innerHTML = '<div class="tape"></div><div class="shandle"></div><textarea placeholder="write something…" spellcheck="false"></textarea>';
+  const ta = d.querySelector('textarea');
+  ta.value = n.text;
+  ta.oninput = () => { n.text = ta.value; saveSession(); };
+  d.querySelector('.shandle').addEventListener('pointerdown', (e) => {
+    e.preventDefault(); noteDrag = { d, n, dx: e.clientX - d.offsetLeft, dy: e.clientY - d.offsetTop };
+    d.classList.add('drag'); try { d.setPointerCapture(e.pointerId); } catch {} d.style.zIndex = 5;
+  });
+  d.addEventListener('pointermove', (e) => {
+    if (!noteDrag || noteDrag.d !== d) return;
+    const lb = $('noteLayer').getBoundingClientRect();
+    n.x = Math.max(2, Math.min(e.clientX - noteDrag.dx, lb.width - 60));
+    n.y = Math.max(2, Math.min(e.clientY - noteDrag.dy, lb.height - 40));
+    d.style.left = n.x + 'px'; d.style.top = n.y + 'px';
+  });
+  const end = () => { if (noteDrag && noteDrag.d === d) { noteDrag = null; d.classList.remove('drag'); saveSession(); } };
+  d.addEventListener('pointerup', end); d.addEventListener('pointercancel', end);
+  d.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showMenu(e, [['&#128168; Crumple', () => crumpleNote(tab, n, d)], ['Change colour', () => { n.c = (n.c + 1) % 4; saveSession(); renderNotes(); }]]); });
+  return d;
+}
+function addNote(tab, x, y) {
+  tab.notes = tab.notes || [];
+  if (tab.notes.length >= 40) { toast('thats a lot of notes on one tab 😭'); return; }
+  const n = { id: 'n' + Math.random().toString(36).slice(2), x: x - 14, y: y - 8, text: '', c: tab.notes.length % 4 };
+  tab.notes.push(n); saveSession(); renderNotes();
+  setTimeout(() => { const el = [...$('noteLayer').children].pop(); if (el) el.querySelector('textarea').focus(); }, 30);
+}
+function crumpleNote(tab, n, el) {
+  el.classList.add('crumpling');
+  tab.notes = (tab.notes || []).filter(x => x !== n); saveSession();
+  setTimeout(() => { el.remove(); }, 450);
+}
+window.addEventListener('resize', () => { if ($('noteLayer').children.length) renderNotes(); });
+
+// ---- page right-click menu (also where "add sticky note" lives) ----
+function showPageMenu(t, pr) {
+  if (!t || !t.wv) return;
+  if (t.locked && !t.unlocked && lockReady()) return;
+  if (t !== active && visibleSet().length === 1) activate(t);
+  const p = { x: pr.x, y: pr.y, sel: (pr.selectionText || '').slice(0, 300), link: pr.linkURL || '', src: pr.mediaType === 'image' ? (pr.srcURL || '') : '', isEditable: !!pr.isEditable, canCopy: !!(pr.editFlags && pr.editFlags.canCopy), canPaste: !!(pr.editFlags && pr.editFlags.canPaste), canCut: !!(pr.editFlags && pr.editFlags.canCut) };
+  const b = t.wv.getBoundingClientRect();
+  const ev = { clientX: b.left + p.x, clientY: b.top + p.y, preventDefault() {} };
+  const wv = t.wv, items = [];
+  items.push(['&#128221; Add sticky note here', () => addNote(t, p.x, p.y)]);
+  items.push(null);
+  if (p.sel) {
+    items.push(['Copy', () => wv.copy()]);
+    const q = p.sel.trim().slice(0, 40);
+    items.push(['Search “' + esc(q) + (p.sel.length > 40 ? '…' : '') + '”', () => createTab(ENGINES[store.settings.engine || 'google'] + encodeURIComponent(p.sel))]);
+    items.push(['Ask AI about this', () => { toggleAi(true); setTimeout(() => askAboutPage('explain'), 300); }]);
+  }
+  if (p.link) { items.push(['Open link in new tab', () => createTab(p.link, true)]); items.push(['Copy link', () => navigator.clipboard.writeText(p.link).catch(() => {})]); }
+  if (p.src) { items.push(['Open image in new tab', () => createTab(p.src, true)]); items.push(['Search image with Lens', () => startLens()]); }
+  if (p.isEditable) { items.push(null); if (p.canCut) items.push(['Cut', () => wv.cut()]); if (p.canCopy) items.push(['Copy', () => wv.copy()]); if (p.canPaste) items.push(['Paste', () => wv.paste()]); items.push(['Select all', () => wv.selectAll()]); }
+  items.push(null);
+  items.push(['Back', () => { if (wv.canGoBack()) wv.goBack(); }, !wv.canGoBack()]);
+  items.push(['Reload', () => wv.reload()]);
+  showMenu(ev, items);
+}
+
+// ---- password manager: offer to save a login after u submit it ----
+let pwOffer = null;
+window.aura.on('pw-offer', (d) => {
+  if (store.settings.savePasswords === false) return;
+  pwOffer = d;
+  const bar = $('pwbar');
+  const host = (() => { try { return new URL(d.origin).hostname.replace(/^www\./, ''); } catch { return d.origin; } })();
+  bar.innerHTML = `<h4>&#128273; ${d.update ? 'Update password?' : 'Save password?'}</h4>
+    <div class="site">${esc(host)}</div>
+    ${d.user ? `<div class="fld"><b>User</b><span>${esc(d.user)}</span></div>` : ''}
+    <div class="fld"><b>Pass</b><span id="pwDot">${'•'.repeat(Math.min(12, d.pass.length))}</span><span class="eye" id="pwEye">&#128065;</span></div>
+    <div class="pwrow"><span class="pbtn" id="pwNever">Never</span><span class="pbtn" id="pwNo">Not now</span><span class="pbtn ok" id="pwYes">${d.update ? 'Update' : 'Save'}</span></div>`;
+  bar.hidden = false;
+  const r = $('star').getBoundingClientRect();
+  bar.style.left = Math.max(12, Math.min(r.left - 150, innerWidth - 332)) + 'px';
+  bar.style.top = (r.bottom + 8) + 'px';
+  let shown = false;
+  $('pwEye').onclick = () => { shown = !shown; $('pwDot').textContent = shown ? d.pass : '•'.repeat(Math.min(12, d.pass.length)); };
+  $('pwYes').onclick = async () => { await window.aura.pwStore(d); toast('password saved 🔐'); closePwBar(); };
+  $('pwNo').onclick = closePwBar;
+  $('pwNever').onclick = async () => { await window.aura.pwNever(d.origin); toast('wont ask for this site'); closePwBar(); };
+  clearTimeout(window._pwT); window._pwT = setTimeout(closePwBar, 25000);
+});
+function closePwBar() { $('pwbar').hidden = true; pwOffer = null; }
+document.addEventListener('mousedown', (e) => { if (!$('pwbar').hidden && !e.target.closest('#pwbar') && !e.target.closest('#url')) closePwBar(); });
+
+async function renderPasswords() {
+  $('ptitle').innerHTML = '&#128273; Saved passwords';
+  const list = $('plist');
+  const items = await window.aura.pwList();
+  if (!items.length) { list.innerHTML = '<div class="set" style="color:var(--dim)">nothing saved yet. log into a site and Orchard will offer to save it.</div>'; return; }
+  list.innerHTML = '';
+  items.sort((a, b) => b.updated - a.updated).forEach(it => {
+    const host = (() => { try { return new URL(it.origin).hostname.replace(/^www\./, ''); } catch { return it.origin; } })();
+    const r = document.createElement('div'); r.className = 'row';
+    r.innerHTML = `<img src="${fav(it.origin)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small></small></div><span class="pbtn mini" data-a="show">Show</span><span class="pbtn mini" data-a="copy">Copy</span><span class="del" data-a="del">&#10005;</span>`;
+    r.querySelector('.rt div').textContent = host;
+    r.querySelector('small').textContent = it.user || '(no username)';
+    r.onclick = async (e) => {
+      const a = e.target.dataset.a;
+      if (a === 'del') { await window.aura.pwDelete(it.origin, it.user); renderPasswords(); }
+      else if (a === 'copy') { const p = await window.aura.pwReveal(it.origin, it.user); if (p) { navigator.clipboard.writeText(p).catch(() => {}); toast('password copied'); } }
+      else if (a === 'show') { const p = await window.aura.pwReveal(it.origin, it.user); const s = e.target; if (p) { s.textContent = s.textContent === 'Show' ? p : 'Show'; } }
+    };
+    list.appendChild(r);
+  });
+}
+
 // ---- main menu: every feature in one place ----
 const FEATURES = [
   ['BATTERY (THE CORE OF ORCHARD)'],
@@ -1176,7 +1307,8 @@ const FEATURES = [
   ['&#128172;', 'Google Chat', 'ur school Google Chat in the side panel', 'Alt+C', () => openGoogleChat()],
   ['&#127822;', 'Orchard Chat', 'the built-in chat, friends join by email', '', () => openChat()],
   ['&#10022;', 'Ask AI', 'Gemini, ChatGPT or Claude on the side', 'Alt+G', () => toggleAi(true)],
-  ['&#9989;', 'Answer the questions', 'sends the questions on this page to the AI', '', () => askAboutPage('answer')],
+  ['&#9889;', 'Answer quickly', 'answers the questions on this page, short', '', () => askAboutPage('answer')],
+  ['&#9989;', 'Answer only', 'just the answers, nothing else', '', () => askAboutPage('answeronly')],
   ['&#128269;', 'Google Lens', 'drag over anything to search it', 'Lens icon', () => startLens()],
   ['&#128065;', 'Hide elements', 'click ads, popups, anything to hide it on that site', 'Alt+H', () => startHidePicker()],
   ['TOOLS'],
@@ -1359,6 +1491,8 @@ function openPanel(kind) {
     renderHides();
   } else if (kind === 'menu') {
     renderMenu();
+  } else if (kind === 'passwords') {
+    renderPasswords();
   } else if (kind === 'settings') {
     renderSettings();
   } else if (kind === 'theme') {
@@ -1773,12 +1907,14 @@ async function askAboutPage(mode) {
   } catch {}
   const sel = info.sel.trim();
   let prompt;
-  if (mode === 'answer') {
-    prompt = `Answer the questions ${sel ? 'below' : 'on this page'}. For each one, give the answer and a short explanation of why, so I understand it.\nTitle: ${active.title}\nURL: ${active.url}\n\n${sel ? 'Questions:\n' + sel.slice(0, 8000) : 'Page text:\n' + info.text}`;
-  } else if (mode === 'explain' || (!mode && sel)) {
-    prompt = `Explain this from "${active.title}" (${active.url}):\n\n${(sel || info.text).slice(0, 4000)}`;
-  } else {
-    prompt = `Summarize this page and tell me the key points.\nTitle: ${active.title}\nURL: ${active.url}\n\nPage text:\n${info.text}`;
+  if (mode === 'answeronly') {
+    prompt = `Answer the questions ${sel ? 'below' : 'on this page'}. Give ONLY the answers, numbered, nothing else. No working, no explanations, no extra words.\nTitle: ${active.title}\nURL: ${active.url}\n\n${sel ? 'Questions:\n' + sel.slice(0, 8000) : 'Page text:\n' + info.text}`;
+  } else if (mode === 'answer') {
+    prompt = `Answer the questions ${sel ? 'below' : 'on this page'} quickly. For each one, give the answer and a one-line reason, nothing more. Keep it short.\nTitle: ${active.title}\nURL: ${active.url}\n\n${sel ? 'Questions:\n' + sel.slice(0, 8000) : 'Page text:\n' + info.text}`;
+  } else if (mode === 'explain' || mode === 'summary' || (!mode && sel)) {
+    prompt = sel
+      ? `Explain this to me simply, like I'm a student:\n\n"${sel.slice(0, 4000)}"\n\n(from "${active.title}", ${active.url})`
+      : `Explain this page/question to me simply, like I'm a student, so I actually get it.\nTitle: ${active.title}\nURL: ${active.url}\n\nPage text:\n${info.text}`;
   }
   if (aiWhich === 'chat' || aiWhich === 'mail' || aiWhich === 'gchat') { aiWhich = store.settings.ai && !['chat','mail','gchat'].includes(store.settings.ai) ? store.settings.ai : 'gemini'; if (aiOpen) loadAi(aiWhich); }
   if (!aiOpen) toggleAi(true);
@@ -1897,9 +2033,10 @@ $('askMore').onclick = async (e) => {
   let hasSel = false;
   try { hasSel = !!(active && active.wv && active.ready && (await active.wv.executeJavaScript('String(getSelection()).trim().length')) > 0); } catch {}
   showMenu(e, [
-    ['&#9989; Answer the questions' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answer')],
-    ['&#128221; Summarize this page', () => askAboutPage('summary')],
-    hasSel ? ['&#128161; Explain what I highlighted', () => askAboutPage('explain')] : null
+    ['&#9889; Answer quickly' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answer')],
+    ['&#9989; Answer only (just the answers)' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answeronly')],
+    ['&#128161; Explain this page/question', () => askAboutPage('summary')],
+    hasSel ? ['&#128161; Explain the highlighted bit', () => askAboutPage('explain')] : null
   ]);
 };
 $('aiPick').onchange = (e) => { if (!['chat', 'mail', 'gchat'].includes(e.target.value)) { store.settings.ai = e.target.value; save(); } aiWcId = null; loadAi(e.target.value); };

@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('aura', {
   },
   throttle: (w) => ipcRenderer.send('throttle-set', w),
   videoMode: (w) => ipcRenderer.send('video-mode', w),
+  pwStore: (d) => ipcRenderer.invoke('pw-store', d),
+  pwNever: (o) => ipcRenderer.invoke('pw-never', o),
+  pwList: () => ipcRenderer.invoke('pw-list'),
+  pwReveal: (o, u) => ipcRenderer.invoke('pw-reveal', o, u),
+  pwDelete: (o, u) => ipcRenderer.invoke('pw-delete', o, u),
   throttleStatus: () => ipcRenderer.invoke('throttle-status'),
   notify: (n) => ipcRenderer.send('native-note', n),
   nativeNote: (n) => ipcRenderer.send('chat-native-note', n),
@@ -57,7 +62,7 @@ contextBridge.exposeInMainWorld('aura', {
   bgImport: () => ipcRenderer.invoke('bg-import'),
   bgDelete: (u) => ipcRenderer.send('bg-delete', u),
   on: (ch, fn) => {
-    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open', 'cal-due', 'note-click', 'throttle-status'];
+    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open', 'cal-due', 'note-click', 'throttle-status', 'pw-offer', 'page-menu'];
     if (ok.includes(ch)) ipcRenderer.on(ch, (e, d) => fn(d));
   }
 });

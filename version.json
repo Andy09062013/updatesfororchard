@@ -1,6 +1,6 @@
 {
-  "version": "2.4.1",
-  "notes": "Downloads go straight to ur Downloads folder like Chrome, no Save As popup",
+  "version": "2.5.0",
+  "notes": "Password manager with a save popup + autofill, sticky notes u right-click to place on a tab, and a proper page right-click menu. Ask AI now has Answer quickly, Answer only and Explain this page",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -25,11 +25,11 @@
     },
     {
       "path": "index.html",
-      "sha256": "b6067f9355106dbbd1c6fc0e41cfddbf65016c11160610aa198b4385f351a0c7"
+      "sha256": "8ea56667589fc8ac884371ac9439df4e14653bdbfce7fe89f3b7a451ab808a1a"
     },
     {
       "path": "main.js",
-      "sha256": "2bbd89727cb5ffbe320c8cac0a889f779bfaccaa241c986503913094fe74cdf1"
+      "sha256": "98366271ec0a9345e93c54a5031288871966476ce790453c6de9839761f2b6bc"
     },
     {
       "path": "newtab.html",
@@ -37,15 +37,19 @@
     },
     {
       "path": "package.json",
-      "sha256": "cc44f5e56dfff09a4a981797320aa1d0cdf33e49cdcbd36fcdad17530ca51f7e"
+      "sha256": "c48bc02d1a60770cd78f81513108d35facd8589cfd8c8f959c4a232bb2a87394"
     },
     {
       "path": "preload.js",
-      "sha256": "f1ed55d6f47b31e4c1fbd4edea42cdee16d15b57cd088c6b2036161bc99cbf1d"
+      "sha256": "8bb55c7389bc40baeac5c3ed4a59a94981392978352577fbec6bd437bed4115d"
+    },
+    {
+      "path": "pw-preload.js",
+      "sha256": "a9ef6bb3fdc1055696e90cf396b78164f2d3da29ca4c927a77968c7d9a44144a"
     },
     {
       "path": "renderer.js",
-      "sha256": "fc5e5baf4ceb94cc00466e8797249ab7c87ad9215ad32eb3584324a034440dfb"
+      "sha256": "ce70444c048e76c195e698792037a0d4224fd70e03c02c8e5aa5a73c2f3f9023"
     },
     {
       "path": "throttle.ps1",

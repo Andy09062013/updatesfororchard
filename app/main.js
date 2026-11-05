@@ -75,9 +75,9 @@ function setupSession(id) {
   const profId = id;
   const ses = sessionFor(id);
   try {
-    const vp = path.join(__dirname, 'video-preload.js');
-    if (typeof ses.registerPreloadScript === 'function') ses.registerPreloadScript({ type: 'frame', id: 'orchard-video', filePath: vp });
-    else ses.setPreloads([...ses.getPreloads(), vp]);
+    const vp = path.join(__dirname, 'video-preload.js'), pw = path.join(__dirname, 'pw-preload.js');
+    if (typeof ses.registerPreloadScript === 'function') { ses.registerPreloadScript({ type: 'frame', id: 'orchard-video', filePath: vp }); ses.registerPreloadScript({ type: 'frame', id: 'orchard-pw', filePath: pw }); }
+    else ses.setPreloads([...ses.getPreloads(), vp, pw]);
   } catch {}
   ses.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, cb) => {
     if (storeFor(id).settings.adblock) {
@@ -977,5 +977,58 @@ function thrShutdown() {
 app.on('will-quit', (e) => {
   if (thr && !thrQuitting) { e.preventDefault(); thrQuitting = true; thrShutdown().then(() => app.quit()); }
 });
+
+// ---------- password manager (encrypted with Windows' own safeStorage) ----------
+const pwFileFor = (id) => path.join(dataDir, `passwords-${id}.json`);
+const pwCache = {};
+function pwLoad(id) {
+  if (pwCache[id]) return pwCache[id];
+  let list = [];
+  try {
+    const raw = JSON.parse(fs.readFileSync(pwFileFor(id), 'utf8'));
+    list = (raw.items || []).map(it => {
+      let pass = it.pass || '';
+      if (it.enc && safeStorage.isEncryptionAvailable()) { try { pass = safeStorage.decryptString(Buffer.from(it.enc, 'base64')); } catch { pass = ''; } }
+      return { origin: it.origin, user: it.user || '', pass, updated: it.updated || 0 };
+    });
+  } catch {}
+  pwCache[id] = { list, never: new Set((() => { try { return JSON.parse(fs.readFileSync(pwFileFor(id), 'utf8')).never || []; } catch { return []; } })()) };
+  return pwCache[id];
+}
+function pwSave(id) {
+  const c = pwCache[id]; if (!c) return;
+  const enc = safeStorage.isEncryptionAvailable();
+  const items = c.list.map(it => { const o = { origin: it.origin, user: it.user, updated: it.updated }; if (enc) o.enc = safeStorage.encryptString(it.pass).toString('base64'); else o.pass = it.pass; return o; });
+  try { fs.writeFileSync(pwFileFor(id), JSON.stringify({ items, never: [...c.never] })); } catch {}
+}
+const pwKey = (origin, user) => origin + '\u0000' + user;
+// autofill: a page asks for logins saved for its origin
+ipcMain.handle('pw-fill', (e, origin) => {
+  const c = pwLoad(profileOf(e));
+  origin = String(origin || '');
+  return c.list.filter(it => it.origin === origin).sort((a, b) => b.updated - a.updated).map(it => ({ user: it.user, pass: it.pass }));
+});
+// a page submitted a login: offer to save it, unless it's unchanged or on the never list
+ipcMain.on('pw-captured', (e, d) => {
+  const id = profileOf(e), c = pwLoad(id);
+  const origin = String(d && d.origin || ''), user = String(d && d.user || ''), pass = String(d && d.pass || '');
+  if (!origin || !pass || !/^https?:/.test(origin)) return;
+  if (c.never.has(origin)) return;
+  const existing = c.list.find(it => it.origin === origin && it.user === user);
+  if (existing && existing.pass === pass) return;
+  sendTo(e.sender.hostWebContents, 'pw-offer', { origin, user, pass, update: !!existing });
+});
+ipcMain.handle('pw-store', (e, d) => {
+  const id = profileOf(e), c = pwLoad(id);
+  const origin = String(d.origin || ''), user = String(d.user || ''), pass = String(d.pass || '');
+  if (!origin || !pass) return false;
+  const ex = c.list.find(it => it.origin === origin && it.user === user);
+  if (ex) { ex.pass = pass; ex.updated = Date.now(); } else c.list.push({ origin, user, pass, updated: Date.now() });
+  pwSave(id); return true;
+});
+ipcMain.handle('pw-never', (e, origin) => { const id = profileOf(e), c = pwLoad(id); c.never.add(String(origin || '')); pwSave(id); return true; });
+ipcMain.handle('pw-list', (e) => { const c = pwLoad(profileOf(e)); return c.list.map(it => ({ origin: it.origin, user: it.user, len: it.pass.length, updated: it.updated })); });
+ipcMain.handle('pw-reveal', (e, origin, user) => { const c = pwLoad(profileOf(e)); const it = c.list.find(x => x.origin === origin && x.user === user); return it ? it.pass : null; });
+ipcMain.handle('pw-delete', (e, origin, user) => { const id = profileOf(e), c = pwLoad(id); c.list = c.list.filter(it => !(it.origin === origin && it.user === user)); pwSave(id); return true; });
 
 app.on('window-all-closed', () => app.quit());
