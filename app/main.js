@@ -43,13 +43,13 @@ function storeFor(id) {
 function saveStore(id) { try { fs.mkdirSync(dataDir, { recursive: true }); fs.writeFileSync(storeFileFor(id), JSON.stringify(stores[id])); } catch {} }
 
 // ---------- adblock ----------
-const AD_HOSTS = [
-  'doubleclick.net', 'googlesyndication.com', 'googleadservices.com', 'adservice.google.com',
-  'adnxs.com', 'ads.yahoo.com', 'taboola.com', 'outbrain.com', 'criteo.com', 'criteo.net',
-  'amazon-adsystem.com', 'scorecardresearch.com', 'zedo.com', 'popads.net', 'propellerads.com',
-  'adsrvr.org', 'moatads.com', 'pubmatic.com', 'rubiconproject.com', 'openx.net', 'adcolony.com',
-  'quantserve.com', 'smartadserver.com', 'yieldmo.com', 'media.net', 'exoclick.com'
-];
+const AD_HOSTS = new Set(require(path.join(__dirname, 'blocklist.js')));
+// block a host if it, or any domain it sits under, is on the list (ads.example.com matches example.com)
+function isAdHost(h) {
+  let i = -1;
+  do { if (AD_HOSTS.has(h.slice(i + 1))) return true; i = h.indexOf('.', i + 1); } while (i !== -1);
+  return false;
+}
 const blockedCount = {};
 const hostOf = (wc) => { try { return wc && (wc.hostWebContents || wc); } catch { return null; } };
 const sendTo = (wc, ch, d) => { if (wc && !wc.isDestroyed()) wc.send(ch, d); };
@@ -61,11 +61,16 @@ function setupSession(id) {
   if (setUp.has(id)) return;
   setUp.add(id);
   const ses = sessionFor(id);
+  try {
+    const vp = path.join(__dirname, 'video-preload.js');
+    if (typeof ses.registerPreloadScript === 'function') ses.registerPreloadScript({ type: 'frame', id: 'orchard-video', filePath: vp });
+    else ses.setPreloads([...ses.getPreloads(), vp]);
+  } catch {}
   ses.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, cb) => {
     if (storeFor(id).settings.adblock) {
       try {
         const h = new URL(details.url).hostname;
-        if (AD_HOSTS.some(a => h === a || h.endsWith('.' + a))) {
+        if (isAdHost(h)) {
           blockedCount[id] = (blockedCount[id] || 0) + 1;
           sendTo(hostOf(details.webContents), 'blocked', blockedCount[id]);
           return cb({ cancel: true });
@@ -928,6 +933,9 @@ function thrTick() {
   const own = [process.pid, ...app.getAppMetrics().map(x => x.pid)];
   thrSend({ op: 'apply', level: thrWant.level, exclude: thrWant.exclude, own });
 }
+let videoMode = { on: true, level: 0 };
+ipcMain.on('orchard-video-mode', (e) => { e.returnValue = videoMode; });
+ipcMain.on('video-mode', (e, w) => { videoMode = { on: !!(w && w.on), level: Math.max(0, Math.min(2, +(w && w.level) || 0)) }; });
 ipcMain.on('throttle-set', (e, w) => {
   const before = { on: thrOn(), level: thrWant.level, ex: thrWant.exclude.join('|') };
   const user = (Array.isArray(w && w.exclude) ? w.exclude : []).map(x => String(x).toLowerCase().slice(0, 80)).slice(0, 200);

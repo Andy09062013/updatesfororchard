@@ -1,11 +1,15 @@
 {
-  "version": "2.3.0",
-  "notes": "Orchard now slows down other apps in the background when ur on battery (Windows Efficiency mode), the app in front stays full speed",
+  "version": "2.4.0",
+  "notes": "Cheaper videos on battery (H.264 + YouTube quality cap) and a much bigger ad and tracker blocker",
   "minElectron": "45.0.0",
   "files": [
     {
       "path": "apple-logo.png",
       "sha256": "b031b3db6fd2a45e2811b222e103586662f5acdea19bed37ef5422201cbcbfee"
+    },
+    {
+      "path": "blocklist.js",
+      "sha256": "f1ef116721c03ddd355b8d69773a01a3b0709bb2a655e8eb549223602ef24ebb"
     },
     {
       "path": "boot.js",
@@ -25,7 +29,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "861476648b26b8d0d09fb63df190b0978cff7331efa911a897a636d9ff4b0c14"
+      "sha256": "1bbca8d3ed32582c996dae7b4d2c6ef44b1fb6f26e7ff54a06533262e692d548"
     },
     {
       "path": "newtab.html",
@@ -33,19 +37,23 @@
     },
     {
       "path": "package.json",
-      "sha256": "b32b1d8a111509b399a3403dff53b586c35e0c03d982efe42fcb1f597c67ebb9"
+      "sha256": "9b1a1cd9b647cd1482336d54961dee465d65f47624a6e109053d3d3ef2f88b1a"
     },
     {
       "path": "preload.js",
-      "sha256": "0535440f311d9035c020d9a18e5acffcc73f5274f2eeb992d732a6e7ae12be05"
+      "sha256": "f1ed55d6f47b31e4c1fbd4edea42cdee16d15b57cd088c6b2036161bc99cbf1d"
     },
     {
       "path": "renderer.js",
-      "sha256": "d1ae3c004696e0371586d450dd205782d8e991a6f06ae5b2b1d6e0be08ec7953"
+      "sha256": "d697eccf541141e59c89cf3c7774f05f48b0221e1f4e8d1d2ed4bc2a89faed9b"
     },
     {
       "path": "throttle.ps1",
       "sha256": "8b1001cf487eaa4520e0835d1b26ca3749781699c456cbcc6f606a49d1fc171e"
+    },
+    {
+      "path": "video-preload.js",
+      "sha256": "37958494befeeb840d042b2020b35553f4dc9322490c5fb357eb2ec9c3ffd741"
     }
   ]
 }

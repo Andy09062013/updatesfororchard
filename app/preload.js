@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('aura', {
     unread: () => ipcRenderer.invoke('mail-unread')
   },
   throttle: (w) => ipcRenderer.send('throttle-set', w),
+  videoMode: (w) => ipcRenderer.send('video-mode', w),
   throttleStatus: () => ipcRenderer.invoke('throttle-status'),
   notify: (n) => ipcRenderer.send('native-note', n),
   nativeNote: (n) => ipcRenderer.send('chat-native-note', n),
