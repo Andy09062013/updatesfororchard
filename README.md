@@ -1,3 +1,17 @@
+# Orchard
+
+**The battery saving browser.**
+
+## Get Orchard
+
+1. Download **[OrchardSetup.exe](https://github.com/Andy09062013/updatesfororchard/raw/main/OrchardSetup.exe)** (about 7 MB).
+2. Run it. If Windows says "Windows protected your PC", click **More info** then **Run anyway**.
+3. It downloads the rest (about 150 MB), installs Orchard and opens it. Orchard keeps itself updated after that.
+
+To uninstall: Windows Settings > Apps > Orchard > Uninstall.
+
+---
+
 # Orchard updates
 
 This repo is where Orchard Browser gets its updates from. Every copy of Orchard
@@ -21,3 +35,11 @@ you don't trust.
 Updates only replace Orchard's own code. A new Chromium engine still needs a
 fresh download of the full Orchard zip; raise `minElectron` in `version.json`
 when an update needs that, and older copies will say so instead of updating.
+
+## The installer
+
+`OrchardSetup.exe` downloads the Chromium engine from Electron's official GitHub
+release (checked against the SHA-256 in `installer.json`) and Orchard's files from
+`app/` (checked against `version.json`), installs to `%LOCALAPPDATA%\Programs\Orchard`,
+puts the apple icon on Orchard.exe and adds an uninstaller. Its source is in `installer/`
+(build with `GOOS=windows GOARCH=amd64 go build` after making the icon resource with rsrc).
