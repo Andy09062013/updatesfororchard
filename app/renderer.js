@@ -42,7 +42,7 @@ function makeWebview(t, url) {
   wv.addEventListener('did-stop-loading', () => { t.loading = false; renderTab(t); if (t === active) { progress(100); updateNav(); } });
   wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
   wv.addEventListener('page-favicon-updated', (e) => { t.icon = e.favicons[0]; renderTab(t); });
-  const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); checkGbar(); } renderTab(t); saveSession(); };
+  const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); } renderTab(t); saveSession(); };
   wv.addEventListener('did-navigate', nav);
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
   wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
@@ -247,6 +247,7 @@ function applySaver() {
   if (lvl >= 2 && lastLvl < 2 && lastLvl !== -1) { tabs.forEach(t => { if (!isShown(t)) sleepTab(t); }); toast('Ultra saver on 🥶 background tabs asleep, pages calmed down'); }
   else if (lvl === 1 && lastLvl === 0) toast('unplugged, Saver mode on 🍃');
   lastLvl = lvl;
+  if (typeof placeChat === 'function') placeChat();
   if (battLevel !== null && !charging) {
     if (battLevel <= 0.1 && !warned10) { warned10 = true; toast('10% battery bro, Ultra saver is on 🪫'); }
     else if (battLevel <= 0.2 && !warned20) { warned20 = true; if (store.settings.saver === 'auto' || !store.settings.saver) toast('20% battery, switched to Ultra saver 🪫'); }
@@ -301,7 +302,6 @@ function activate(t) {
   t.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   closeFind();
   updateNav();
-  checkGbar();
   if (isNewtab(t.url) && !(t.locked && !t.unlocked)) setTimeout(() => $('url').focus(), 50);
   saveSession();
 }
@@ -537,6 +537,59 @@ function renderHides() {
   if ($('hideClr')) $('hideClr').onclick = () => { delete store.hideRules[h]; save(); tabs.filter(x => hostOf(x.url) === h).forEach(x => { applyHides(x); if (x.wv && x.ready) x.wv.reload(); }); renderHides(); };
 }
 
+// ---- Orchard Chat: one persistent webview + notifications bottom right ----
+let chatWv = null, chatWcId = null, chatUnread = 0;
+function ensureChat() {
+  if (chatWv) return;
+  chatWv = document.createElement('webview');
+  if (store.partition) chatWv.setAttribute('partition', store.partition);
+  chatWv.setAttribute('allowpopups', '');
+  chatWv.setAttribute('src', AIS.chat);
+  chatWv.addEventListener('dom-ready', () => { try { chatWcId = chatWv.getWebContentsId(); } catch {} });
+  $('chatHold').appendChild(chatWv);
+}
+function placeChat() {
+  const hold = $('chatHold'), on = aiOpen && aiWhich === 'chat';
+  hold.classList.toggle('show', on);
+  if (on) { const r = $('sbody').getBoundingClientRect(); Object.assign(hold.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); setTimeout(() => chatWv && chatWv.focus(), 80); }
+  else Object.assign(hold.style, { left: '-20px', top: '-20px', width: '2px', height: '2px' });
+  if (chatWcId != null) window.aura.freeze(chatWcId, !on && (store.settings.chatNotify === false || saverLevel() >= 2));
+}
+try { new ResizeObserver(() => { if (aiOpen && aiWhich === 'chat') placeChat(); }).observe($('sbody')); } catch {}
+window.addEventListener('resize', () => placeChat());
+const NOTE_COLORS = ['#d8392a', '#e8862a', '#6cab3c', '#c0447a', '#d9a521', '#8a5a3c'];
+function showNote(n) {
+  const box = $('notes');
+  while (box.children.length >= 4) box.lastElementChild.remove();
+  const d = document.createElement('div'); d.className = 'note';
+  let hsh = 0; for (const ch of String(n.chat)) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
+  d.innerHTML = '<div class="nav"></div><div class="nb"><div class="nt"><span class="ntt"></span><small>now</small></div><div class="nm"></div></div><span class="nx" title="Dismiss">&#10005;</span>';
+  const av = d.querySelector('.nav'); av.style.background = NOTE_COLORS[Math.abs(hsh) % NOTE_COLORS.length]; av.textContent = (n.group ? n.title : n.from || n.title || '?').trim().charAt(0).toUpperCase() || '?';
+  d.querySelector('.ntt').textContent = n.title || 'Orchard Chat';
+  d.querySelector('.nm').textContent = (n.group ? (n.from || 'Someone') + ': ' : '') + (n.text || 'sent a message');
+  const kill = () => { d.style.transition = 'opacity .2s'; d.style.opacity = 0; setTimeout(() => d.remove(), 200); };
+  d.onclick = (e) => { kill(); if (!e.target.classList.contains('nx')) openChatTo(n.chat); };
+  box.prepend(d);
+  setTimeout(kill, 8000);
+}
+function openChatTo(id) {
+  if (!(aiOpen && aiWhich === 'chat')) openChat();
+  if (id) setTimeout(() => window.aura.chatOpen(id), 250);
+}
+function chatBadge(n) { chatUnread = n; const b = $('chatBadge'); b.hidden = !n; b.textContent = n > 99 ? '99+' : n; }
+window.aura.on('chat-event', (ev) => {
+  if (!ev || typeof ev !== 'object') return;
+  if (ev.t === 'unread') chatBadge(Math.max(0, +ev.n || 0));
+  if (ev.t === 'notify') {
+    if (store.settings.chatNotify === false) return;
+    const looking = aiOpen && aiWhich === 'chat' && ev.open && document.hasFocus();
+    if (looking) return;
+    if (document.hasFocus()) showNote(ev); else window.aura.nativeNote(ev);
+  }
+});
+window.aura.on('chat-open', (id) => openChatTo(id));
+setTimeout(() => { if (store.settings.chatNotify !== false) { ensureChat(); placeChat(); } }, 3000);
+
 // ---- Orchard Mail (Gmail via Google's official sign-in in Chrome) ----
 const M = window.aura.mail;
 let mailView = 'list', mailQ = 'in:inbox', mailMsgs = [], mailNext = null, mailCur = null, mailCfg = null, mailBusy = false;
@@ -683,16 +736,6 @@ async function mailPoll() { try { const r = await M.unread(); mailBadge(r.count 
 setTimeout(mailPoll, 4000);
 setInterval(() => { if (saverLevel() < 2) mailPoll(); }, 5 * 60 * 1000);
 
-// ---- google sign-in bar: offer Chrome / Orchard Mail on Google's login page ----
-let gbarDismissed = '';
-function checkGbar() {
-  const t = active, show = !!t && /^https:\/\/accounts\.google\.com\//.test(t.url || '') && gbarDismissed !== t.url;
-  $('gbar').hidden = !show;
-  $('gbarMail').hidden = !/mail\.google|gmail/i.test(decodeURIComponent(t && t.url || ''));
-}
-$('gbarChrome').onclick = () => { if (!active) return; let u = active.url; try { const c = new URL(u).searchParams.get('continue'); if (c && /^https:\/\//.test(c)) u = c; } catch {} ext(u); toast('opened in ur normal browser'); };
-$('gbarMail').onclick = () => { $('gbar').hidden = true; openMail(); };
-$('gbarX').onclick = () => { gbarDismissed = active && active.url; $('gbar').hidden = true; };
 
 // ---- main menu: every feature in one place ----
 const FEATURES = [
@@ -897,6 +940,7 @@ function openPanel(kind) {
     list.innerHTML = `
       <div class="set">Search engine <select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${store.settings.engine === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
       <div class="set"><span>Orchard <b id="verTxt">v…</b></span><span class="pbtn" id="updChk">Check for updates</span></div>
+      <div class="set">Chat notifications <span class="pbtn" id="cnT">${store.settings.chatNotify === false ? 'OFF' : 'ON'}</span></div>
       <div class="set">Search suggestions <span class="pbtn" id="sgT">${store.settings.suggest === false ? 'OFF' : 'ON'}</span></div>
       <div class="set">New tab background <span class="pbtn" id="thm">&#127912; Change</span></div>
       <div class="set">Reopen tabs on startup <span class="pbtn" id="rst">${store.settings.restore === false ? 'OFF' : 'ON'}</span></div>
@@ -909,6 +953,7 @@ function openPanel(kind) {
       <div class="set" style="color:var(--dim);font-size:12px;line-height:1.7;display:block">Shortcuts: Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+F find · Alt+G Gemini · Alt+C chat · Ctrl+J downloads · Ctrl+N new window · Ctrl +/-/0 zoom · F11 fullscreen · F12 devtools</div>`;
     $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
     $('thm').onclick = () => openPanel('theme');
+    $('cnT').onclick = () => { store.settings.chatNotify = store.settings.chatNotify === false; save(); $('cnT').textContent = store.settings.chatNotify === false ? 'OFF' : 'ON'; if (store.settings.chatNotify !== false) ensureChat(); placeChat(); };
     $('sgT').onclick = () => { store.settings.suggest = store.settings.suggest === false; save(); $('sgT').textContent = store.settings.suggest === false ? 'OFF' : 'ON'; };
     window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version; });
     $('updChk').onclick = async () => {
@@ -1175,7 +1220,7 @@ function applyProfile(p) {
   store.profile = p;
   document.documentElement.style.setProperty('--acc', p.color);
   $('avatar').textContent = (p.name || '?')[0].toUpperCase();
-  $('avatar').title = 'Profile: ' + p.name;
+  $('avatar').title = 'Profile: ' + p.name + (p.email ? '\n' + p.email : '\nnot signed in to Google');
   document.title = 'Orchard - ' + p.name;
 }
 async function renderProfiles(editing) {
@@ -1186,7 +1231,7 @@ async function renderProfiles(editing) {
   ps.forEach(p => {
     const r = document.createElement('div');
     r.className = 'row' + (p.id === me.id ? ' cur' : '');
-    r.innerHTML = `<div class="av" style="background:${esc(p.color)}">${esc((p.name || '?')[0].toUpperCase())}</div><div class="rt"><div>${esc(p.name)}</div><small>${p.id === me.id ? 'this window' : 'click to open'}</small></div><span class="del" data-a="edit" title="Edit">&#9998;</span>${p.id !== 'default' ? '<span class="del" data-a="del" title="Delete">&#128465;</span>' : ''}`;
+    r.innerHTML = `<div class="av" style="background:${esc(p.color)}">${esc((p.name || '?')[0].toUpperCase())}</div><div class="rt"><div>${esc(p.name)}</div><small>${p.email ? esc(p.email) + ' · ' : ''}${p.id === me.id ? 'this window' : 'click to open'}</small></div><span class="del" data-a="edit" title="Edit">&#9998;</span>${p.id !== 'default' ? '<span class="del" data-a="del" title="Delete">&#128465;</span>' : ''}`;
     r.onclick = async (e) => {
       const a = e.target.dataset.a;
       if (a === 'edit') return profileForm(p);
@@ -1241,8 +1286,9 @@ function sideWidth(w) {
 function loadAi(which) {
   aiWhich = which; $('aiPick').value = which; setTimeout(markSideBtns);
   $('askPage').hidden = which === 'chat' || which === 'mail';
-  if (which === 'mail') { $('mailPane').hidden = false; if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } mailShow(); return; }
+  if (which === 'mail') { $('mailPane').hidden = false; if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } placeChat(); mailShow(); return; }
   $('mailPane').hidden = true;
+  if (which === 'chat') { if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } ensureChat(); placeChat(); return; }
   if (aiWv) aiWv.remove();
   aiWv = document.createElement('webview');
   if (store.partition) aiWv.setAttribute('partition', store.partition);
@@ -1261,10 +1307,11 @@ function toggleAi(force) {
   $('side').classList.toggle('show', aiOpen);
   markSideBtns();
   sideWidth(store.settings.sideW || 420);
-  if (aiOpen && aiWhich === 'mail') loadAi('mail');
+  if (aiOpen && (aiWhich === 'mail' || aiWhich === 'chat')) loadAi(aiWhich);
   else if (aiOpen && !aiWv) loadAi(store.settings.ai && store.settings.ai !== 'mail' ? store.settings.ai : 'gemini');
   // freeze the ai panel while it's closed so it doesnt eat battery
   if (aiWcId != null) window.aura.freeze(aiWcId, !aiOpen);
+  placeChat();
   if (aiOpen) setTimeout(() => aiWv && aiWv.focus(), 100);
 }
 async function askAboutPage() {
@@ -1358,8 +1405,8 @@ $('avatar').onclick = () => openPanel('profiles');
 $('aiBtn').onclick = () => { if (aiOpen && (aiWhich === 'chat' || aiWhich === 'mail')) { aiWcId = null; loadAi(store.settings.ai && store.settings.ai !== 'chat' ? store.settings.ai : 'gemini'); } else toggleAi(); };
 const openChat = () => {
   if (aiOpen && aiWhich === 'chat') { toggleAi(false); return; }
-  if (!aiOpen) toggleAi(true);
-  if (aiWhich !== 'chat') { aiWcId = null; loadAi('chat'); }
+  aiWhich = 'chat';
+  if (!aiOpen) toggleAi(true); else loadAi('chat');
 };
 $('chatBtn').onclick = openChat;
 const openMail = () => {

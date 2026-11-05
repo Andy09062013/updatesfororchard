@@ -1,6 +1,6 @@
 {
-  "version": "1.9.2",
-  "notes": "Removed tab locking",
+  "version": "1.9.3",
+  "notes": "Chat notifications bottom right (Windows notifications when Orchard is in the background), profiles show ur Google account, removed the Google sign in bar",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -21,11 +21,11 @@
     },
     {
       "path": "index.html",
-      "sha256": "97021336405266f7ef0ef3a3714973c3f0628c75d181f843ca1e686099b2eeea"
+      "sha256": "9dfb6493caf3b2afd05c2c8d2b74c31a754d403bccb5d98b2fae7f70dd105eb6"
     },
     {
       "path": "main.js",
-      "sha256": "c5a1cd3b5e3107dfc2a0c7584a4fcbb86782024f5ee752b3329cca5e4c1a4c3c"
+      "sha256": "222ba5453d0e78862b150de26f036841807cd7c01a85904bbee9be6ee0c7d2a9"
     },
     {
       "path": "newtab.html",
@@ -33,15 +33,15 @@
     },
     {
       "path": "package.json",
-      "sha256": "4f9cb7be180ef1f3038dc9be86cbe9b59daa8541c8557ec48a18d3f66ec4ef54"
+      "sha256": "f3e01160826e8e5ba5ca1626b42fd9bd5a9d70ed9f69fa065d5d98facdc4e404"
     },
     {
       "path": "preload.js",
-      "sha256": "860ec192570012bb6df7dffc1485da2f1afec4ebba1dca7b5a3b713500426f12"
+      "sha256": "bd6d44f66ac390bb3e36b1de0b0ad861565a90e9e60948bc0784121d5a3bc008"
     },
     {
       "path": "renderer.js",
-      "sha256": "4b8e5434603e55209d118599caf462a2b7626716e2f7f4713abd13523713242b"
+      "sha256": "5e7bcc5ad84d59fd90a053894e577e086f56e9a49e3e1e05eeaae1b86efa30d8"
     }
   ]
 }

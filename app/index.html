@@ -176,7 +176,6 @@ body.dragging webview{pointer-events:none}
 #mailBadge{position:absolute;right:1px;top:1px;min-width:16px;height:16px;border-radius:8px;background:var(--acc);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 4px}
 #mailBadge[hidden]{display:none}
 #mailBtn.on{background:#ffffff1c}
-#gbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:8;display:flex;gap:8px;align-items:center;background:#201513;border:1px solid var(--acc);border-radius:12px;padding:8px 12px;box-shadow:0 10px 30px #000a;white-space:nowrap;max-width:calc(100% - var(--sw,0px) - 24px);overflow:hidden}
 #mailPane{position:absolute;inset:0;background:var(--bar);display:flex;flex-direction:column;overflow:hidden;z-index:2}
 #mailPane[hidden]{display:none}
 .mtop{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #3a2622}
@@ -211,6 +210,22 @@ body.dragging webview{pointer-events:none}
 .msetup input{background:#150e0d;border:1px solid #3a2622;border-radius:9px;color:var(--txt);padding:9px 11px;outline:0;font:12px Consolas,monospace;width:100%}
 .msetup a{color:var(--acc2);cursor:pointer;text-decoration:underline}
 .mmore{text-align:center;padding:12px}
+#chatBadge{position:absolute;right:1px;top:1px;min-width:16px;height:16px;border-radius:8px;background:var(--leaf);color:#0b0b0b;font-size:10px;font-weight:800;display:grid;place-items:center;padding:0 4px}
+#chatHold{position:fixed;left:-20px;top:-20px;width:2px;height:2px;opacity:0;pointer-events:none;z-index:6;overflow:hidden}
+#chatHold.show{opacity:1;pointer-events:auto}
+#chatHold webview{position:absolute;inset:0;width:100%;height:100%;visibility:visible}
+#notes{position:fixed;right:16px;bottom:16px;z-index:70;display:flex;flex-direction:column-reverse;gap:10px;width:min(340px,calc(100vw - 32px));pointer-events:none}
+.note{pointer-events:auto;display:flex;gap:11px;align-items:flex-start;background:#201513;border:1px solid #3a2622;border-left:3px solid var(--leaf);border-radius:13px;padding:11px 12px;box-shadow:0 14px 40px #000b;cursor:pointer;animation:noteIn .25s ease-out}
+.note:hover{border-color:var(--leaf)}
+.note .nav{width:36px;height:36px;border-radius:50%;flex:none;display:grid;place-items:center;font-weight:800;color:#fff}
+.note .nb{flex:1;min-width:0}
+.note .nt{font-weight:700;font-size:13px;display:flex;gap:6px;align-items:baseline}
+.note .nt small{color:var(--dim);font-weight:400;font-size:11px;margin-left:auto;flex:none}
+.note .nm{font-size:13px;color:#e8dcd6;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.note .nx{color:var(--dim);padding:0 4px;font-size:14px}
+.note .nx:hover{color:var(--txt)}
+@keyframes noteIn{from{transform:translateX(30px);opacity:0}}
+body.saver .note{animation:none}
 #zoom{font-size:11px;color:var(--dim);display:none}
 </style>
 </head>
@@ -243,7 +258,7 @@ body.dragging webview{pointer-events:none}
   <div class="btn" id="setBtn" title="Settings">&#9881;</div>
   <span class="sep"></span>
   <div class="btn" id="mailBtn" title="Orchard Mail, ur Gmail (Alt+M)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/></svg><span id="mailBadge" hidden></span></div>
-  <div class="btn" id="chatBtn" title="Orchard Chat (Alt+C)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg></div>
+  <div class="btn" id="chatBtn" title="Orchard Chat (Alt+C)"><span id="chatBadge" hidden></span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg></div>
   <div class="btn" id="aiBtn" title="Ask Gemini (Alt+G)"><span class="gem">&#10022;</span></div>
   <div id="avatar" title="Profiles"></div>
   <span id="updPill" class="pill" hidden title="Click to restart into the new version">&#11014; Update ready</span>
@@ -258,13 +273,14 @@ body.dragging webview{pointer-events:none}
       <span class="pbtn" id="askPage" title="Send this page to the AI">Ask about this page</span><span class="pbtn" id="sideX" title="Close">&#10005;</span></div>
     <div id="sbody"><div id="mailPane" hidden></div></div>
   </div>
-  <div id="gbar" hidden><span>&#128274; Google doesn't let u sign in inside custom browsers.</span><span class="pbtn ok" id="gbarChrome">Open in Chrome</span><span class="pbtn" id="gbarMail">Use Orchard Mail for Gmail</span><span class="pbtn" id="gbarX">&#10005;</span></div>
   <div id="paneRing" hidden></div>
   <div id="lens"><img id="lensImg"><div id="lensSel"></div>
     <div id="lensBar"><span>Drag over anything to search it with Google Lens</span><span class="pbtn" id="lensAll">Ask Google about this page</span><span class="pbtn" id="lensX">Cancel</span></div></div>
   <div id="find"><input id="findIn" placeholder="Find in page"><span id="findRes" style="color:var(--dim);font-size:11px"></span><span class="pbtn" id="findX">&#10005;</span></div>
 </div>
 <div id="toast"></div>
+<div id="notes"></div>
+<div id="chatHold"></div>
 <div id="omni" hidden></div>
 <script src="renderer.js"></script>
 </body>

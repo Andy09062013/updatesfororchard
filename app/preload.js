@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('aura', {
     send: (d) => ipcRenderer.invoke('mail-send', d),
     unread: () => ipcRenderer.invoke('mail-unread')
   },
+  nativeNote: (n) => ipcRenderer.send('chat-native-note', n),
+  chatOpen: (id) => ipcRenderer.send('chat-open-id', id),
   openExternal: (u) => ipcRenderer.send('open-external', u),
   suggest: (engine, q) => ipcRenderer.invoke('suggest', engine, q),
   emulate: (id, o) => ipcRenderer.send('emulate', id, o),
@@ -44,7 +46,7 @@ contextBridge.exposeInMainWorld('aura', {
   bgImport: () => ipcRenderer.invoke('bg-import'),
   bgDelete: (u) => ipcRenderer.send('bg-delete', u),
   on: (ch, fn) => {
-    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync'];
+    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open'];
     if (ok.includes(ch)) ipcRenderer.on(ch, (e, d) => fn(d));
   }
 });

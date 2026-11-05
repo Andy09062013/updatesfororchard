@@ -168,6 +168,14 @@ app.on('web-contents-created', (e, contents) => {
       sendTo(contents.hostWebContents, 'open-tab', { url, bg: disposition === 'background-tab' });
       return { action: 'deny' };
     });
+    // Orchard Chat talks to the browser through specially marked console lines (chat artifact only)
+    contents.on('console-message', (ev, level, message) => {
+      const msg = (ev && typeof ev.message === 'string') ? ev.message : message;
+      if (typeof msg !== 'string' || !msg.startsWith('%ORCHARD%')) return;
+      let url = ''; try { url = contents.getURL(); } catch {}
+      if (!url.startsWith(CHAT_URL)) return;
+      try { const d = JSON.parse(msg.slice(9)); if (d && (d.t === 'notify' || d.t === 'unread')) { chatContents.add(contents); sendTo(contents.hostWebContents, 'chat-event', { t: d.t, n: d.n, chat: String(d.chat || '').slice(0, 80), title: String(d.title || '').slice(0, 80), from: String(d.from || '').slice(0, 60), text: String(d.text || '').slice(0, 200), group: !!d.group, open: !!d.open }); } } catch {}
+    });
     // orchard://tool/<name> links on the new tab page open browser features
     contents.on('will-navigate', (e, url) => {
       if (url.startsWith('orchard://')) { e.preventDefault(); sendTo(contents.hostWebContents, 'tool', url.replace('orchard://tool/', '').replace(/\/$/, '')); }
@@ -185,7 +193,9 @@ app.on('web-contents-created', (e, contents) => {
 
 ipcMain.handle('store-get', (e) => {
   const id = profileOf(e);
-  return { ...storeFor(id), profile: getProfile(id), partition: partitionFor(id), blocked: blockedCount[id] || 0 };
+  const pr = getProfile(id);
+  const email = (typeof ms === 'function' && ms(id).refresh && ms(id).email) || '';
+  return { ...storeFor(id), profile: pr ? { ...pr, email } : pr, partition: partitionFor(id), blocked: blockedCount[id] || 0 };
 });
 ipcMain.on('store-set', (e, data) => {
   const id = profileOf(e);
@@ -214,6 +224,29 @@ ipcMain.on('win', (e, a) => {
   else if (a === 'focus') { if (win.isMinimized()) win.restore(); win.focus(); }
 });
 
+// ---------- Orchard Chat bridge ----------
+const CHAT_URL = process.env.ORCHARD_CHAT_URL || 'https://claude.ai/artifact/28878hcboZzAuyHNtgbMAQ';
+const chatContents = new Set();
+const { Notification } = require('electron');
+ipcMain.on('chat-native-note', (e, n) => {
+  try {
+    if (!Notification.isSupported()) return;
+    const w = BrowserWindow.fromWebContents(e.sender);
+    const note = new Notification({ title: String(n.title || 'Orchard Chat').slice(0, 80), body: ((n.group && n.from) ? n.from + ': ' : '') + String(n.text || '').slice(0, 200), icon: path.join(__dirname, 'icon.png'), silent: false });
+    note.on('click', () => { if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send('chat-open', String(n.chat || '')); } });
+    note.show();
+  } catch {}
+});
+ipcMain.on('chat-open-id', async (e, id) => {
+  id = String(id || '').replace(/[^A-Za-z0-9_.~:@+-]/g, '');
+  for (const c of chatContents) {
+    if (c.isDestroyed() || c.hostWebContents !== e.sender) continue;
+    for (const f of c.mainFrame.framesInSubtree) {
+      try { if (await f.executeJavaScript(`typeof window.__orchardOpen === 'function' ? (window.__orchardOpen(${JSON.stringify(id)}), true) : false`)) return; } catch {}
+    }
+  }
+});
+
 // ---------- tab lock password hashing ----------
 ipcMain.handle('hash-pw', (e, pw, salt) => require('crypto').scryptSync(String(pw), 'orchard:' + String(salt), 32).toString('hex'));
 
@@ -240,7 +273,7 @@ ipcMain.handle('tear-tab', (e, d) => {
 });
 
 // profiles api
-ipcMain.handle('profiles-list', () => profiles);
+ipcMain.handle('profiles-list', () => profiles.map(p => ({ ...p, email: (typeof ms === 'function' && ms(p.id).refresh && ms(p.id).email) || '' })));
 ipcMain.handle('profile-open', (e, id) => {
   if (!getProfile(id)) return false;
   try { fs.writeFileSync(path.join(dataDir, 'last-profile'), id); } catch {}
@@ -263,7 +296,7 @@ ipcMain.handle('profile-edit', (e, id, name, color) => {
   if (name) p.name = String(name).slice(0, 24);
   if (color) p.color = color;
   saveProfiles();
-  for (const [wcId, pid] of winProfile) if (pid === id) sendTo(webContents.fromId(wcId), 'profile-changed', p);
+  for (const [wcId, pid] of winProfile) if (pid === id) sendTo(webContents.fromId(wcId), 'profile-changed', { ...p, email: (ms(id).refresh && ms(id).email) || '' });
   return true;
 });
 ipcMain.handle('profile-delete', async (e, id) => {
@@ -639,6 +672,9 @@ ipcMain.handle('mail-signin', async (e) => {
         const prof = await gmail(id, 'profile');
         s.email = prof.emailAddress || '';
         mailSave(id);
+        const pp = getProfile(id);
+        if (pp && s.email && (/^(Me|Person \d+)$/.test(pp.name))) { pp.name = s.email.split('@')[0].slice(0, 24); saveProfiles(); }
+        if (pp) for (const [wcId, pid] of winProfile) if (pid === id) sendTo(webContents.fromId(wcId), 'profile-changed', { ...pp, email: s.email });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Signed in to Orchard Mail', 'Ur all set. Close this tab and go back to Orchard.'));
         const w = BrowserWindow.fromWebContents(e.sender); if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
         done({ ok: true, email: s.email });
@@ -662,7 +698,9 @@ ipcMain.handle('mail-signin', async (e) => {
 ipcMain.handle('mail-signout', async (e) => {
   const id = profileOf(e), s = ms(id);
   if (s.refresh) net.fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(s.refresh), { method: 'POST' }).catch(() => {});
-  s.refresh = null; s.access = null; s.email = ''; mailSave(id); return true;
+  s.refresh = null; s.access = null; s.email = ''; mailSave(id);
+  const pp = getProfile(id); if (pp) for (const [wcId, pid] of winProfile) if (pid === id) sendTo(webContents.fromId(wcId), 'profile-changed', { ...pp, email: '' });
+  return true;
 });
 ipcMain.handle('mail-list', async (e, q, pageToken) => {
   const id = profileOf(e);
