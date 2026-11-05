@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>New Tab</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{height:100vh;background:radial-gradient(ellipse at 18% 12%,#5a1712 0%,transparent 55%),radial-gradient(ellipse at 88% 92%,#21451a 0%,transparent 50%),#120c0b;color:#f6ece8;font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+#clock{font-size:84px;font-weight:200;letter-spacing:2px;text-shadow:0 2px 20px #0008}
+#greet{text-shadow:0 1px 8px #000a}
+#greet{color:#c9b3ab;margin:4px 0 34px;font-size:16px}
+h1{display:flex;align-items:center;gap:14px;font-size:44px;font-weight:900;letter-spacing:8px;color:#ffb83d;margin-bottom:6px;text-shadow:0 2px 18px #0006}
+h1 img{width:54px;height:54px;filter:drop-shadow(0 4px 10px #0008)}
+form{width:min(620px,88vw)}
+input{width:100%;padding:16px 24px;border-radius:30px;border:1px solid #3a2622;background:#1b1211cc;color:#fff;font-size:17px;outline:0;backdrop-filter:blur(10px);transition:.2s}
+input:focus{border-color:#e8432e;box-shadow:0 0 0 4px #e8432e33,0 10px 40px #e8432e22}
+#tools{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:22px;width:min(720px,92vw)}
+#tools a{flex-direction:row;gap:7px;padding:8px 14px;border-radius:20px;background:#1b1211cc;border:1px solid #3a2622;color:#f6ece8;font-size:13px;backdrop-filter:blur(8px)}
+#tools a:hover{border-color:#e8432e;transform:translateY(-2px)}
+#tools i{font-style:normal}
+#tag{color:#9ccf7f;font-size:13px;letter-spacing:.18em;text-transform:uppercase;margin:-2px 0 8px;text-shadow:0 1px 8px #000a}
+#eco{display:flex;flex-direction:row;gap:10px;align-items:center;margin:0 0 18px;padding:8px 16px;border-radius:22px;background:#6cc35a1c;border:1px solid #6cc35a55;color:#e8f5e0;font-size:13px;backdrop-filter:blur(8px)}
+#eco:hover{border-color:#6cc35a;transform:none;background:#6cc35a2a}
+#eco b{color:#8fe07a}
+#eco.ultra{background:#ffb83d1f;border-color:#ffb83d66}
+#eco.ultra b{color:#ffcf6a}
+#links{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:14px;justify-content:center;width:min(720px,90vw);margin-top:26px}
+a{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:14px;color:#cfcfe6;text-decoration:none;font-size:12px;transition:.15s}
+a:hover{background:#ffffff12;transform:translateY(-3px)}
+a .ic{width:46px;height:46px;border-radius:50%;background:#241816;display:grid;place-items:center}
+a img{width:24px;height:24px}
+a span{max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<h1><img src="apple-logo.png" alt="">ORCHARD</h1>
+<div id="tag">the battery saving browser</div>
+<div id="clock"></div>
+<div id="greet"></div>
+<a id="eco" href="orchard://tool/battery"></a>
+<form id="f"><input id="q" placeholder="search something or paste a link" autocomplete="off"></form>
+<div id="tools">
+  <a href="orchard://tool/chat"><i>&#128172;</i>Chat</a>
+  <a href="orchard://tool/ai"><i>&#10022;</i>Ask AI</a>
+  <a href="orchard://tool/lens"><i>&#128269;</i>Lens</a>
+  <a href="orchard://tool/battery"><i>&#128267;</i>Battery</a>
+  <a href="orchard://tool/speed"><i>&#128246;</i>Speed test</a>
+  <a href="orchard://tool/theme"><i>&#127912;</i>Background</a>
+  <a href="orchard://tool/menu"><i>&#9776;</i>All features</a>
+</div>
+<div id="links"></div>
+<script>
+let cfg = { e: 'https://www.google.com/search?q=', bm: [] };
+try { cfg = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch {}
+const PRE = {
+  aura: 'radial-gradient(ellipse at 18% 12%,#5a1712 0%,transparent 55%),radial-gradient(ellipse at 88% 92%,#21451a 0%,transparent 50%),#120c0b',
+  sunset: 'linear-gradient(160deg,#2b0f3a 0%,#7a1f4b 45%,#e0603a 100%)',
+  ocean: 'linear-gradient(160deg,#021b2e 0%,#04476b 55%,#0aa1a8 100%)',
+  forest: 'linear-gradient(160deg,#07140c 0%,#11402a 60%,#3d7a3a 100%)',
+  candy: 'linear-gradient(135deg,#ff7eb3 0%,#a46bff 50%,#4fd1ff 100%)',
+  orchard: 'linear-gradient(170deg,#7fb34a 0%,#3d6b2a 45%,#1d2e14 100%)',
+  honeycrisp: 'linear-gradient(160deg,#ffcf5a 0%,#f2752e 50%,#b8211a 100%)',
+  midnight: 'linear-gradient(180deg,#000 0%,#0b0b12 60%,#16163a 100%)',
+  lava: 'radial-gradient(ellipse at 50% 120%,#ff4d00 0%,#7a0b0b 45%,#120404 80%)',
+  mint: 'linear-gradient(135deg,#0f2027 0%,#2c5364 50%,#6dffb0 130%)',
+  black: '#000000'
+};
+window.addEventListener('hashchange', () => location.reload());
+const bg = cfg.bg || { type: 'preset', value: 'aura' };
+const hexOk = (c) => /^#[0-9a-f]{6}$/i.test(c);
+if (bg.type === 'preset' && PRE[bg.value]) document.body.style.background = PRE[bg.value];
+else if (bg.type === 'color' && hexOk(bg.value)) document.body.style.background = bg.value;
+else if (bg.type === 'gradient' && Array.isArray(bg.value) && bg.value.every(hexOk)) document.body.style.background = 'linear-gradient(135deg,' + bg.value[0] + ',' + bg.value[1] + ')';
+else if (bg.type === 'image' && /^file:\/\//.test(bg.value)) {
+  const dim = Math.max(0, Math.min(80, bg.dim == null ? 35 : +bg.dim)) / 100;
+  document.body.style.background = 'linear-gradient(rgba(0,0,0,' + dim + '),rgba(0,0,0,' + dim + ')),url("' + bg.value.replace(/["\\]/g, '') + '") center/cover no-repeat #000';
+}
+function tick() {
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const h = d.getHours();
+  document.getElementById('greet').textContent = h < 5 ? 'go to sleep bro' : h < 12 ? 'good morning' : h < 18 ? 'good afternoon' : 'good evening';
+}
+tick(); setInterval(tick, 1000);
+const eco = cfg.eco || null, ecoEl = document.getElementById('eco');
+if (eco) {
+  const mode = ['Eco', 'Saver', 'Ultra saver'][eco.lvl] || 'Eco';
+  const parts = [];
+  parts.push('&#127811; <b>' + mode + '</b>');
+  if (eco.pct != null) parts.push((eco.chg ? '&#9889; ' : '&#128267; ') + eco.pct + '%');
+  parts.push(eco.rest + ' tab' + (eco.rest === 1 ? '' : 's') + ' resting');
+  parts.push(eco.ads + ' ads blocked');
+  ecoEl.innerHTML = parts.join(' &middot; ');
+  if (eco.lvl >= 2) ecoEl.classList.add('ultra');
+} else ecoEl.remove();
+document.getElementById('f').onsubmit = (e) => {
+  e.preventDefault();
+  const q = document.getElementById('q').value.trim();
+  if (!q) return;
+  if (/^https?:\/\//i.test(q)) location.href = q;
+  else if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(q)) location.href = 'https://' + q;
+  else location.href = cfg.e + encodeURIComponent(q);
+};
+const L = document.getElementById('links');
+(cfg.bm || []).forEach(b => {
+  const a = document.createElement('a');
+  a.href = b.u;
+  let host = ''; try { host = new URL(b.u).hostname; } catch {}
+  a.innerHTML = '<div class="ic"><img src="https://www.google.com/s2/favicons?sz=64&domain=' + host + '"></div><span></span>';
+  a.querySelector('span').textContent = b.t;
+  const img = a.querySelector('img');
+  img.onerror = () => { img.replaceWith(Object.assign(document.createElement('b'), { textContent: (b.t || '?')[0].toUpperCase() })); };
+  L.appendChild(a);
+});
+const qEl = document.getElementById('q');
+qEl.addEventListener('keydown', (e) => {
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); location.href = 'orchard://tool/omnibox/' + encodeURIComponent(qEl.value + e.key); }
+});
+qEl.addEventListener('paste', (e) => { const t = (e.clipboardData && e.clipboardData.getData('text')) || ''; if (t) { e.preventDefault(); location.href = 'orchard://tool/omnibox/' + encodeURIComponent(qEl.value + t); } });
+</script>
+</body>
+</html>

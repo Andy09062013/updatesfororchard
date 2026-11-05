@@ -1,0 +1,47 @@
+{
+  "version": "1.8.2",
+  "notes": "Address bar dropdown: history, past searches, bookmarks and live search suggestions as u type",
+  "minElectron": "45.0.0",
+  "files": [
+    {
+      "path": "apple-logo.png",
+      "sha256": "b031b3db6fd2a45e2811b222e103586662f5acdea19bed37ef5422201cbcbfee"
+    },
+    {
+      "path": "boot.js",
+      "sha256": "9da6f9d188af809aae3af929fc349eb4ace15898a7c9b1598cecf124f82ed1d7"
+    },
+    {
+      "path": "icon.ico",
+      "sha256": "27cff1c7d671e67697f78a0298dde6cba0ff9f364237d5135a535e63c6c64c27"
+    },
+    {
+      "path": "icon.png",
+      "sha256": "f2700873bf4850f0d39ea4b00450493a54cb3dad7d4903ef771ffd21ec42127a"
+    },
+    {
+      "path": "index.html",
+      "sha256": "3a17c83a75cb10d27fb30fb103400aac881c1052e37cc6a653e192fc21d45b95"
+    },
+    {
+      "path": "main.js",
+      "sha256": "4922cc1ff532462eb6ebef397ac5c6909d29ea0ed14ac85a744c5e5179fab149"
+    },
+    {
+      "path": "newtab.html",
+      "sha256": "7fbb5d5bde9ecafb11b9df00548f965096eaee6f71c8446eccc7e5ba099f0f97"
+    },
+    {
+      "path": "package.json",
+      "sha256": "26830971cb570a421dc123bfa8d04c6860a756fa2556213c66df6a74a087f968"
+    },
+    {
+      "path": "preload.js",
+      "sha256": "ad0490deb75950e6aec205207b2d33e13e87cefad1844bb2ab7006cd2d6bee01"
+    },
+    {
+      "path": "renderer.js",
+      "sha256": "6f6e3246692c3e441a9dffd6c5e761e7ac4aa5e787c3594b465d62d78123bce4"
+    }
+  ]
+}

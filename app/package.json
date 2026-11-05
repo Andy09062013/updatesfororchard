@@ -1,0 +1,13 @@
+{
+  "name": "orchard-browser",
+  "productName": "Orchard",
+  "version": "1.8.2",
+  "description": "Orchard - an apple themed browser",
+  "main": "boot.js",
+  "author": "you",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack-win": "electron-packager . AuraBrowser --platform=win32 --arch=x64 --out=dist --overwrite --prune=true"
+  }
+}

@@ -1,0 +1,228 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: https:; img-src * data: file:">
+<title>Orchard</title>
+<style>
+:root{--bg:#120c0b;--bar:#1b1211;--tab:#241816;--tabA:#30201d;--txt:#f6ece8;--dim:#a8918a;--acc:#e8432e;--acc2:#ffb83d;--leaf:#6cc35a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:13px "Segoe UI",system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
+#top{display:flex;align-items:flex-end;background:var(--bar);height:40px;-webkit-app-region:drag;padding-left:8px}
+#logo{display:flex;align-items:center;gap:6px;font-weight:800;letter-spacing:1px;padding:0 10px 9px 2px;font-size:15px;color:var(--acc2)}
+#logo img{width:20px;height:20px}
+#tabs{display:flex;flex:1;overflow-x:auto;gap:2px;height:34px;align-items:flex-end}
+#tabs::-webkit-scrollbar{height:0}
+.tab{-webkit-app-region:no-drag;display:flex;align-items:center;gap:7px;min-width:60px;max-width:220px;flex:0 1 220px;height:32px;padding:0 8px 0 10px;background:var(--tab);border-radius:9px 9px 0 0;cursor:default;color:var(--dim);position:relative;transition:background .15s}
+.tab:hover{background:#2b1c19}
+.tab.dragging{z-index:5;box-shadow:0 6px 18px #0008;transition:none;cursor:grabbing}
+body.tearing .tab.dragging{opacity:.35}
+body.tearing{cursor:copy}
+.tab.active{background:var(--tabA);color:var(--txt)}
+.tab.active::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.tab img,.tab .spin{width:16px;height:16px;flex:none}
+.spin{border:2px solid #444;border-top-color:var(--acc2);border-radius:50%;animation:s .7s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+.tab .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tab .x{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:14px;opacity:.6}
+.tab .x:hover{background:#ffffff22;opacity:1}
+#newtab{-webkit-app-region:no-drag;width:28px;height:28px;margin:0 4px 3px;flex:none;border-radius:8px;display:grid;place-items:center;font-size:20px;color:var(--dim);cursor:pointer}
+#newtab:hover{background:#ffffff14;color:var(--txt)}
+#winbtns{display:flex;-webkit-app-region:no-drag;align-self:flex-start}
+#winbtns div{width:46px;height:34px;display:grid;place-items:center;color:var(--dim);font-size:14px}
+#winbtns div:hover{background:#ffffff14;color:var(--txt)}
+#winbtns #cl:hover{background:#e81123;color:#fff}
+#nav{display:flex;align-items:center;gap:4px;background:var(--tabA);padding:6px 8px}
+.btn{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--txt);cursor:pointer;font-size:16px;flex:none;position:relative}
+.btn:hover{background:#ffffff16}
+.btn.off{opacity:.3;pointer-events:none}
+#urlwrap{flex:1;display:flex;align-items:center;background:#150e0d;border:1px solid #3a2622;border-radius:20px;height:34px;padding:0 12px;gap:8px;transition:border .15s}
+#urlwrap:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px #e8432e33}
+#lock{font-size:12px;color:var(--dim)}
+#url{flex:1;background:none;border:0;outline:0;color:var(--txt);font-size:14px;user-select:text}
+#star{cursor:pointer;color:var(--dim);font-size:17px}
+#star.on{color:#ffcc33}
+#shield{font-size:11px;color:#6dff9e;padding:2px 8px;border-radius:10px;background:#6dff9e18;cursor:pointer;white-space:nowrap}
+#shield.off{color:var(--dim);background:#ffffff10}
+#bm{display:flex;gap:4px;background:var(--tabA);padding:0 8px 6px;overflow-x:auto;border-bottom:1px solid #00000066}
+#bm:empty{display:none}
+#bm::-webkit-scrollbar{height:0}
+.bmi{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;color:var(--txt);cursor:pointer;white-space:nowrap;font-size:12px}
+.bmi:hover{background:#ffffff14}
+.bmi img{width:14px;height:14px}
+#progress{height:2px;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;transition:width .3s,opacity .4s}
+#views{flex:1;position:relative;background:#fff}
+webview{position:absolute;top:0;left:0;bottom:0;width:calc(100% - var(--sw,0px));height:100%;visibility:hidden}
+webview.active{visibility:visible}
+#panel{position:absolute;right:calc(var(--sw,0px) + 8px);top:4px;width:340px;max-height:75vh;background:#201513;border:1px solid #3a2622;border-radius:12px;box-shadow:0 20px 50px #000a;display:none;flex-direction:column;z-index:10;overflow:hidden}
+#panel.show{display:flex}
+#panel h3{padding:14px 16px 8px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+#panel .list{overflow-y:auto;padding:0 6px 8px}
+.row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer}
+.row:hover{background:#ffffff10}
+.row .rt{flex:1;overflow:hidden}
+.row .rt div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rt small{color:var(--dim)}
+.row .del{opacity:.5;padding:2px 6px;border-radius:5px}
+.row .del:hover{background:#ff4d6d33;opacity:1}
+.set{display:flex;justify-content:space-between;align-items:center;padding:10px 12px}
+.set select{max-width:62%;min-width:0}
+select,.pbtn{background:#150e0d;color:var(--txt);border:1px solid #3a2622;border-radius:7px;padding:5px 8px;font:inherit;cursor:pointer}
+.pbtn:hover{border-color:var(--acc)}
+#find{position:absolute;right:calc(var(--sw,0px) + 12px);top:8px;background:#201513;border:1px solid #3a2622;border-radius:10px;padding:6px;display:none;gap:6px;align-items:center;z-index:9}
+#find.show{display:flex}
+#find input{background:#150e0d;border:1px solid #3a2622;border-radius:6px;color:var(--txt);padding:5px 8px;outline:0;width:200px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(80px);background:#241816;border:1px solid var(--acc);padding:10px 16px;border-radius:10px;transition:transform .3s;z-index:20}
+#toast.show{transform:translateX(-50%) translateY(0)}
+.pill{font-size:11px;color:var(--dim);padding:2px 8px;border-radius:10px;background:#ffffff10;cursor:pointer;white-space:nowrap}
+#batt{font-size:12px;padding:4px 11px;color:var(--txt);background:#6cc35a17;border:1px solid #6cc35a44}
+#batt .leaf{font-size:13px}
+#batt b{color:var(--leaf);font-weight:700}
+#batt .rest{color:var(--dim)}
+#batt.on{background:#6cc35a2e;border-color:var(--leaf)}
+#batt.ultra{background:#ffb83d26;border-color:var(--acc2)}
+#batt.ultra b{color:var(--acc2)}
+body.ultra .tab:not(.active){filter:grayscale(.5)}
+.tab.sleep:not(.active){opacity:.55}
+body.saver *,body.saver *::before,body.saver *::after{animation-duration:0s!important;transition:none!important}
+body.saver .spin{border-top-color:#444}
+#avatar{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#0b0b12;cursor:pointer;margin-left:4px;flex:none;background:var(--acc);box-shadow:0 0 0 2px #ffffff22}
+#avatar:hover{box-shadow:0 0 0 3px #ffffff55}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#0b0b12;flex:none}
+.row.cur{background:#ffffff0c}
+.colors{display:flex;gap:6px;flex-wrap:wrap}
+.colors span{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.colors span.sel{border-color:#fff}
+.pin{background:#150e0d;border:1px solid #3a2622;border-radius:7px;color:var(--txt);padding:6px 9px;outline:0;font:inherit;width:100%}
+.gem{background:linear-gradient(135deg,#ffb83d,#e8432e 60%,#c0447a);-webkit-background-clip:text;color:transparent;font-size:18px;font-weight:900}
+#aiBtn.on,#chatBtn.on{background:#ffffff1c}
+#side{position:absolute;top:0;right:0;bottom:0;width:var(--sw,0px);background:var(--bar);border-left:1px solid #3a2622;display:none;flex-direction:column;z-index:5}
+#side.show{display:flex}
+#sgrip{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:2}
+#shead{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #3a2622}
+#shead select{flex:1;min-width:0}
+#shead .pbtn{white-space:nowrap;font-size:12px}
+#sbody{flex:1;position:relative;background:#131314}
+#sbody webview{visibility:visible;width:100%}
+body.dragging webview{pointer-events:none}
+#dlBadge{position:absolute;right:3px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--acc2);display:none}
+#dlBtn.busy #dlBadge{display:block;animation:pulse 1s infinite}
+#dlBtn.done #dlBadge{display:block;background:#6dff9e}
+@keyframes pulse{50%{opacity:.3}}
+.bar{height:5px;border-radius:3px;background:#ffffff14;overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0}
+.mini{font-size:11px;padding:3px 7px}
+.big{font-size:46px;font-weight:200;text-align:center;padding:6px 0 0}
+.big small{font-size:14px;color:var(--dim)}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:10px 12px}
+.stats div{background:#150e0d;border-radius:9px;padding:9px;text-align:center}
+.stats b{display:block;font-size:17px;margin-top:2px}
+.stats span{font-size:11px;color:var(--dim)}
+.e-low{color:#6dff9e}.e-med{color:#ffcc33}.e-high{color:#ff5e5e}
+#lens{position:absolute;inset:0;right:var(--sw,0px);z-index:15;display:none;cursor:crosshair;background:#000}
+#lens.show{display:block}
+#lens img{position:absolute;inset:0;width:100%;height:100%;opacity:.55;pointer-events:none}
+#lensSel{position:absolute;border:2px solid #fff;border-radius:10px;box-shadow:0 0 0 9999px #00000055;display:none;pointer-events:none;background-repeat:no-repeat}
+#lensBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;background:#201513;border:1px solid #3a2622;border-radius:12px;padding:8px 12px;cursor:default;white-space:nowrap;box-shadow:0 10px 30px #0008}
+#paneRing{position:absolute;border:2px solid var(--acc);border-radius:4px;pointer-events:none;z-index:4}
+.tab.insplit{padding-left:15px}
+.tab.insplit::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--acc2)}
+.lockpane{position:absolute;top:0;left:0;bottom:0;width:calc(100% - var(--sw,0px));background:radial-gradient(ellipse at 50% 30%,#3a1714,var(--bg));display:grid;place-items:center;z-index:3}
+.lockcard{display:flex;flex-direction:column;align-items:center;gap:8px;background:#201513;border:1px solid #3a2622;border-radius:16px;padding:26px 30px;width:min(320px,90%)}
+.lockcard small{color:var(--dim)}
+.lockcard input{width:100%;background:#150e0d;border:1px solid #3a2622;border-radius:9px;color:var(--txt);padding:9px 12px;outline:0;text-align:center;font:inherit}
+.lockcard input:focus{border-color:var(--acc)}
+.lockerr{color:#ff6b6b;font-size:12px;min-height:15px}
+#ctx{position:fixed;z-index:50;min-width:210px;background:#201513;border:1px solid #3a2622;border-radius:10px;padding:5px;box-shadow:0 14px 40px #000a}
+#ctx .ci{padding:8px 12px;border-radius:7px;cursor:pointer}
+#ctx .ci:hover{background:#ffffff12}
+#ctx .ci.dis{opacity:.4;cursor:default}
+#ctx hr{border:0;border-top:1px solid #3a2622;margin:4px 6px}
+.modalbg{position:fixed;inset:0;background:#0009;display:grid;place-items:center;z-index:60}
+.modal{background:#201513;border:1px solid #3a2622;border-radius:14px;padding:18px;width:min(360px,92vw);display:flex;flex-direction:column;gap:10px}
+.modal h3{font-size:16px}
+.modal p{color:var(--dim);font-size:12px;line-height:1.5}
+.modal label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)}
+.modal input{background:#150e0d;border:1px solid #3a2622;border-radius:8px;color:var(--txt);padding:8px 10px;outline:0;font:inherit}
+.modal input:focus{border-color:var(--acc)}
+.mrow{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.pbtn.ok{background:var(--acc);border-color:var(--acc);color:#fff}
+#nav .sep{width:1px;height:20px;background:#3a2622;margin:0 3px;flex:none}
+#menuBtn{background:#ffffff0d}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px 10px 12px}
+.mi{display:flex;flex-direction:column;gap:3px;padding:10px 11px;border-radius:10px;background:#150e0d;border:1px solid #3a2622;cursor:pointer;min-width:0}
+.mi:hover{border-color:var(--acc);background:#241816}
+.mi b{font-size:13px;display:flex;align-items:center;gap:7px}
+.mi b i{font-style:normal;font-size:16px}
+.mi small{color:var(--dim);font-size:11px;line-height:1.35}
+.mi kbd{align-self:flex-start;font:11px Consolas,monospace;color:var(--acc2);background:#ffb83d14;border-radius:5px;padding:1px 6px;margin-top:2px}
+.mhead{padding:2px 14px 6px;font-size:11px;color:var(--dim);letter-spacing:.06em}
+#updPill{color:#fff;background:var(--leaf);font-weight:600;margin-left:4px}
+#updPill:hover{filter:brightness(1.1)}
+#hideBtn:hover,#hideBtn.on{color:var(--acc)!important}
+#omni{position:fixed;z-index:40;background:#201513;border:1px solid #3a2622;border-radius:14px;padding:6px;box-shadow:0 18px 50px #000b;max-height:70vh;overflow-y:auto}
+#omni .oi{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:9px;cursor:pointer;white-space:nowrap;overflow:hidden}
+#omni .oi.sel{background:#e8432e26}
+#omni .oic{width:18px;flex:none;text-align:center;font-size:14px;color:var(--dim)}
+#omni .oic img{width:16px;height:16px;vertical-align:middle}
+#omni .ot{flex:none;max-width:60%;overflow:hidden;text-overflow:ellipsis}
+#omni .os{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--dim);font-size:12px}
+#omni .ox{opacity:0;padding:2px 6px;border-radius:5px;color:var(--dim)}
+#omni .oi.sel .ox,#omni .oi:hover .ox{opacity:.7}
+#omni .ox:hover{background:#ffffff18;opacity:1}
+#zoom{font-size:11px;color:var(--dim);display:none}
+</style>
+</head>
+<body>
+<div id="top">
+  <div id="logo"><img src="apple-logo.png" alt="">ORCHARD</div>
+  <div id="tabs"><div id="newtab" title="New tab (Ctrl+T)">+</div></div>
+  <div id="winbtns"><div id="mn">&#8212;</div><div id="mx">&#9744;</div><div id="cl">&#10005;</div></div>
+</div>
+<div id="nav">
+  <div class="btn" id="back" title="Back (Alt+Left)">&#8592;</div>
+  <div class="btn" id="fwd" title="Forward (Alt+Right)">&#8594;</div>
+  <div class="btn" id="reload" title="Reload (Ctrl+R)">&#8635;</div>
+  <div class="btn" id="home" title="Home">&#8962;</div>
+  <div id="urlwrap">
+    <span id="lock">&#128269;</span>
+    <input id="url" spellcheck="false" placeholder="Search or type a URL">
+    <span id="zoom"></span>
+    <span id="hideBtn" title="Hide elements on this site (Alt+H)" style="cursor:pointer;display:grid;place-items:center;color:var(--dim)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 12s3.6-7 10-7c2 0 3.7.6 5.1 1.6M22 12s-3.6 7-10 7c-2 0-3.7-.6-5.1-1.6"/><path d="M9.9 14.1a3 3 0 0 1 4.2-4.2"/><path d="M3 3l18 18"/></svg></span>
+    <span id="lensBtn" title="Search with Google Lens / ask Google about this page" style="cursor:pointer;display:grid;place-items:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round"><path d="M3 9V6a3 3 0 0 1 3-3h3" stroke="#4285f4"/><path d="M15 3h3a3 3 0 0 1 3 3v3" stroke="#ea4335"/><path d="M21 15v3a3 3 0 0 1-3 3h-3" stroke="#fbbc04"/><path d="M9 21H6a3 3 0 0 1-3-3v-3" stroke="#34a853"/><circle cx="12" cy="12" r="3.3" stroke="#4285f4"/></svg></span>
+    <span id="star" title="Bookmark (Ctrl+D)">&#9734;</span>
+  </div>
+  <span class="sep"></span>
+  <span id="batt" class="pill" title="Battery">&#127811;</span>
+  <span id="shield" title="Ad blocker">&#128737; 0 blocked</span>
+  <span class="sep"></span>
+  <div class="btn" id="speedBtn" title="WiFi speed test"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 9a15 15 0 0 1 20 0"/><path d="M5.5 12.5a10 10 0 0 1 13 0"/><path d="M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor"/></svg></div>
+  <div class="btn" id="dlBtn" title="Downloads (Ctrl+J)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 15v4h16v-4"/></svg><span id="dlBadge"></span></div>
+  <div class="btn" id="histBtn" title="History (Ctrl+H)">&#128339;</div>
+  <div class="btn" id="setBtn" title="Settings">&#9881;</div>
+  <span class="sep"></span>
+  <div class="btn" id="chatBtn" title="Orchard Chat (Alt+C)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg></div>
+  <div class="btn" id="aiBtn" title="Ask Gemini (Alt+G)"><span class="gem">&#10022;</span></div>
+  <div id="avatar" title="Profiles"></div>
+  <span id="updPill" class="pill" hidden title="Click to restart into the new version">&#11014; Update ready</span>
+  <div class="btn" id="menuBtn" title="Menu: every feature in one place (Alt+F)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+</div>
+<div id="bm"></div>
+<div id="progress"></div>
+<div id="views">
+  <div id="panel"><h3><span id="ptitle"></span><span class="pbtn" id="pclose">&#10005;</span></h3><div class="list" id="plist"></div></div>
+  <div id="side"><div id="sgrip"></div>
+    <div id="shead"><span class="gem">&#10022;</span><select id="aiPick"><option value="gemini">Gemini</option><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="chat">Orchard Chat</option></select>
+      <span class="pbtn" id="askPage" title="Send this page to the AI">Ask about this page</span><span class="pbtn" id="sideX" title="Close">&#10005;</span></div>
+    <div id="sbody"></div>
+  </div>
+  <div id="paneRing" hidden></div>
+  <div id="lens"><img id="lensImg"><div id="lensSel"></div>
+    <div id="lensBar"><span>Drag over anything to search it with Google Lens</span><span class="pbtn" id="lensAll">Ask Google about this page</span><span class="pbtn" id="lensX">Cancel</span></div></div>
+  <div id="find"><input id="findIn" placeholder="Find in page"><span id="findRes" style="color:var(--dim);font-size:11px"></span><span class="pbtn" id="findX">&#10005;</span></div>
+</div>
+<div id="toast"></div>
+<div id="omni" hidden></div>
+<script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,1387 @@
+const $ = (id) => document.getElementById(id);
+const NEWTAB = new URL('newtab.html', location.href).href;
+const ENGINES = {
+  google: 'https://www.google.com/search?q=',
+  duckduckgo: 'https://duckduckgo.com/?q=',
+  bing: 'https://www.bing.com/search?q=',
+  brave: 'https://search.brave.com/search?q='
+};
+let store = { bookmarks: [], history: [], settings: { engine: 'google', adblock: true } };
+let tabs = [], active = null, idc = 0, closed = [];
+
+const isNewtab = (u) => !u || (u.startsWith('file:') && u.includes('newtab.html'));
+const save = () => window.aura.setStore(store);
+const fav = (u) => { try { return 'https://www.google.com/s2/favicons?sz=32&domain=' + new URL(u).hostname; } catch { return ''; } };
+
+function toUrl(q) {
+  q = q.trim();
+  if (!q) return null;
+  if (/^(https?|file|about|chrome):/i.test(q)) return q;
+  if (/^localhost(:\d+)?(\/.*)?$/i.test(q) || /^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(q) && !q.includes(' ')) return 'https://' + q;
+  return ENGINES[store.settings.engine || 'google'] + encodeURIComponent(q);
+}
+function newtabSrc() {
+  const bm = store.bookmarks.slice(0, 12).map(b => ({ t: b.title, u: b.url }));
+  const eco = { lvl: saverLevel(), pct: battLevel === null ? null : Math.round(battLevel * 100), chg: !!(charging && !onBattery), rest: restingCount(), ads: blocked };
+  return NEWTAB + '#' + encodeURIComponent(JSON.stringify({ e: ENGINES[store.settings.engine || 'google'], bm, bg: store.settings.bg || { type: 'preset', value: 'aura' }, eco }));
+}
+
+function makeWebview(t, url) {
+  const wv = document.createElement('webview');
+  wv.setAttribute('allowpopups', '');
+  if (store.partition) wv.setAttribute('partition', store.partition);
+  if (saverActive()) wv.setAttribute('webpreferences', 'autoplayPolicy=document-user-activation-required, backgroundThrottling=true');
+  else wv.setAttribute('webpreferences', 'backgroundThrottling=true');
+  wv.setAttribute('src', url);
+  $('views').appendChild(wv);
+  wv.addEventListener('focus', () => { if (t !== active && isShown(t)) activate(t); });
+  t.wv = wv; t.ready = false; t.loading = true; t.frozen = false; t.sleeping = false;
+
+  wv.addEventListener('dom-ready', () => { t.ready = true; try { t.wcId = wv.getWebContentsId(); } catch {} emulateFor(t); t.hideKey = null; applyHides(t); if (t === active) updateNav(); else if (!isShown(t)) scheduleFreeze(t); });
+  wv.addEventListener('did-start-loading', () => { t.loading = true; renderTab(t); if (t === active) progress(30); });
+  wv.addEventListener('did-stop-loading', () => { t.loading = false; renderTab(t); if (t === active) { progress(100); updateNav(); } });
+  wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
+  wv.addEventListener('page-favicon-updated', (e) => { t.icon = e.favicons[0]; renderTab(t); });
+  const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) updateNav(); renderTab(t); saveSession(); };
+  wv.addEventListener('did-navigate', nav);
+  wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
+  wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
+  wv.addEventListener('media-started-playing', () => { t.audio = true; renderTab(t); });
+  wv.addEventListener('media-paused', () => { t.audio = false; renderTab(t); if (t !== active) scheduleFreeze(t); });
+  wv.addEventListener('did-fail-load', (e) => {
+    if (e.errorCode === -3 || !e.isMainFrame) return;
+    wv.executeJavaScript(`document.body.innerHTML='<div style="font-family:Segoe UI;text-align:center;margin-top:18vh;color:#444"><h1 style=font-size:60px>&#128565;</h1><h2>Bro this page aint loading</h2><p>${String(e.errorDescription).replace(/[<>'"`]/g,'')}</p></div>'`).catch(()=>{});
+  });
+}
+
+function createTab(url, bg, asleep) {
+  const id = ++idc;
+  const el = document.createElement('div');
+  el.className = 'tab';
+  $('tabs').insertBefore(el, $('newtab'));
+  const t = { id, el, title: 'New Tab', url: url || '', lastActive: Date.now() };
+  tabs.push(t);
+  if (asleep && url) { t.sleeping = true; t.title = url; }
+  else makeWebview(t, url || newtabSrc());
+  renderTab(t);
+  saveSession();
+  el.addEventListener('mousedown', (e) => { if (e.button === 1) { e.preventDefault(); closeTab(t); } });
+  el.addEventListener('click', (e) => { if (dragJustEnded) return; if (e.target.classList.contains('x')) closeTab(t); else activate(t); });
+  el.addEventListener('pointerdown', (e) => startTabDrag(e, t));
+  el.addEventListener('contextmenu', (e) => tabMenu(e, t));
+  if (!bg) activate(t);
+  return t;
+}
+
+// ---- tab dragging: reorder, tear off into a new window, or drop into another window ----
+let drag = null, dragJustEnded = false;
+function startTabDrag(e, t) {
+  if (e.button !== 0 || e.target.classList.contains('x')) return;
+  drag = { t, x0: e.clientX, y0: e.clientY, off: e.clientX - t.el.getBoundingClientRect().left, on: false, out: false, pid: e.pointerId };
+  try { t.el.setPointerCapture(e.pointerId); } catch {}
+}
+document.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.pid) return;
+  const d = drag;
+  if (!d.on) {
+    if (Math.abs(e.clientX - d.x0) < 6 && Math.abs(e.clientY - d.y0) < 6) return;
+    d.on = true; d.t.el.classList.add('dragging'); activate(d.t);
+  }
+  const strip = $('tabs').getBoundingClientRect();
+  d.out = e.clientY < strip.top - 40 || e.clientY > strip.bottom + 50 || e.clientX < -20 || e.clientX > innerWidth + 20;
+  document.body.classList.toggle('tearing', d.out);
+  if (d.out) { d.t.el.style.transform = ''; return; }
+  // follow the pointer, and swap with neighbours as we pass their middle
+  const els = [...$('tabs').querySelectorAll('.tab')];
+  const me = d.t.el;
+  const base = me.getBoundingClientRect().left - (parseFloat(me.dataset.dx) || 0);
+  const dx = e.clientX - d.off - base;
+  me.style.transform = `translateX(${dx}px)`; me.dataset.dx = dx;
+  const mid = e.clientX - d.off + me.offsetWidth / 2;
+  for (const o of els) {
+    if (o === me) continue;
+    const r = o.getBoundingClientRect();
+    const om = r.left + r.width / 2;
+    const idxMe = els.indexOf(me), idxO = els.indexOf(o);
+    if ((idxO > idxMe && mid > om) || (idxO < idxMe && mid < om)) {
+      const before = me.getBoundingClientRect().left;
+      if (idxO > idxMe) o.after(me); else o.before(me);
+      const shift = me.getBoundingClientRect().left - before;
+      me.dataset.dx = dx - shift; me.style.transform = `translateX(${dx - shift}px)`;
+      syncTabOrder();
+      break;
+    }
+  }
+});
+function syncTabOrder() {
+  const order = [...$('tabs').querySelectorAll('.tab')];
+  tabs.sort((a, b) => order.indexOf(a.el) - order.indexOf(b.el));
+  saveSession();
+}
+async function endTabDrag(e) {
+  if (!drag || (e && e.pointerId !== drag.pid)) return;
+  const d = drag; drag = null;
+  document.body.classList.remove('tearing');
+  d.t.el.classList.remove('dragging'); d.t.el.style.transform = ''; d.t.el.dataset.dx = 0;
+  if (!d.on) return;
+  dragJustEnded = true; setTimeout(() => dragJustEnded = false, 50);
+  if (!d.out || !e) return;
+  const t = d.t;
+  const url = t.url && !isNewtab(t.url) ? t.url : '';
+  const res = await window.aura.tearTab({ url, title: t.title, x: e.screenX, y: e.screenY, onlyTab: tabs.length === 1 });
+  if (!res) return;
+  if (tabs.length === 1) { if (res === 'moved') window.aura.win('close'); return; }
+  closeTab(t, true);
+}
+document.addEventListener('pointerup', endTabDrag);
+document.addEventListener('pointercancel', () => endTabDrag(null));
+
+function renderTab(t) {
+  let icon;
+  const masked = t.locked && !t.unlocked && lockReady();
+  if (masked) icon = '<span style="width:16px;text-align:center">&#128274;</span>';
+  else if (t.sleeping) icon = '<span style="width:16px;text-align:center" title="sleeping, saving battery">&#128164;</span>';
+  else if (t.loading && !t.frozen) icon = '<span class="spin"></span>';
+  else if (t.icon || !isNewtab(t.url)) icon = `<img src="${t.icon || fav(t.url)}" onerror="this.style.visibility='hidden'">`;
+  else icon = '<img src="apple-logo.png" alt="">';
+  const title = masked ? 'Locked tab' : isNewtab(t.url) ? 'New Tab' : (t.title || t.url);
+  t.el.innerHTML = icon + '<span class="t"></span>' + (t.locked && !masked ? '<span title="locked tab, unlocked for now" style="font-size:11px">&#128275;</span>' : '') + (t.audio ? '<span title="playing audio">&#128266;</span>' : '') + '<span class="x">&#10005;</span>';
+  t.el.querySelector('.t').textContent = title;
+  t.el.title = title + (t.sleeping ? ' (sleeping)' : t.frozen ? ' (frozen)' : '');
+  t.el.classList.toggle('sleep', !!(t.sleeping || t.frozen));
+}
+
+// ---- session restore ----
+let sessT, restoring = false;
+function saveSession(now) {
+  if (restoring) return;
+  clearTimeout(sessT);
+  const doSave = () => {
+    store.session = {
+      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title, locked: !!t.locked })),
+      active: Math.max(0, tabs.filter(t => t.url && !isNewtab(t.url)).indexOf(active))
+    };
+    save();
+  };
+  if (now) doSave(); else sessT = setTimeout(doSave, 800);
+}
+window.addEventListener('beforeunload', () => saveSession(true));
+function restoreSession() {
+  const s = store.session;
+  if (store.settings.restore === false || !s || !s.tabs || !s.tabs.length) return false;
+  restoring = true;
+  s.tabs.forEach((x, i) => {
+    const t = createTab(x.url, true, i !== s.active);
+    if (x.title) t.title = x.title;
+    if (x.locked) t.locked = true;
+    renderTab(t);
+  });
+  restoring = false;
+  activate(tabs[Math.min(s.active || 0, tabs.length - 1)]);
+  return true;
+}
+
+// ---- battery stuff ----
+let onBattery = false, battLevel = null, charging = true;
+// battery is the core of Orchard: 0 = normal (still frugal), 1 = saver, 2 = ultra
+function saverLevel() {
+  const m = (store.settings && store.settings.saver) || 'auto';
+  if (m === 'off') return 0;
+  if (m === 'on') return 1;
+  if (m === 'ultra') return 2;
+  const unplugged = onBattery || (battLevel !== null && !charging);
+  if (!unplugged) return 0;
+  return battLevel !== null && battLevel <= 0.2 ? 2 : 1;
+}
+function saverActive() { return saverLevel() > 0; }
+function emulateFor(t) {
+  if (!t || !t.ready || t.wcId == null || t.frozen) return;
+  const lvl = saverLevel();
+  window.aura.emulate(t.wcId, { reducedMotion: lvl >= 1, dark: lvl >= 2 || !!store.settings.darkPages });
+}
+function freeze(t, f) {
+  if (!t.wv || !t.ready || t.wcId == null || t.frozen === f) return;
+  window.aura.freeze(t.wcId, f); t.frozen = f; renderTab(t); if (!f) emulateFor(t); updateSaverUI();
+}
+function audible(t) { try { return t.audio || (t.ready && t.wv.isCurrentlyAudible()); } catch { return false; } }
+function scheduleFreeze(t) {
+  clearTimeout(t.freezeT);
+  if (store.settings.freeze === false) return;
+  const lvl = saverLevel();
+  t.freezeT = setTimeout(() => { if (!isShown(t) && !audible(t)) freeze(t, true); }, lvl >= 2 ? 1000 : lvl === 1 ? 3000 : 15000);
+}
+function sleepTab(t) {
+  if (isShown(t) || t.sleeping || audible(t) || !t.wv) return;
+  clearTimeout(t.freezeT);
+  t.wv.remove(); t.wv = null; t.ready = false; t.frozen = false; t.sleeping = true; t.loading = false;
+  renderTab(t); updateSaverUI();
+}
+function wake(t) {
+  if (!t.sleeping) return;
+  makeWebview(t, t.url || newtabSrc());
+}
+function sleepCheck() {
+  const base = store.settings.sleepMins || 5, lvl = saverLevel();
+  const mins = lvl >= 2 ? 1 : lvl === 1 ? Math.min(2, base) : base;
+  if (!store.settings.sleepMins && store.settings.sleepMins === 0) return;
+  tabs.forEach(t => { if (!isShown(t) && Date.now() - t.lastActive > mins * 60000) sleepTab(t); });
+}
+setInterval(sleepCheck, 20000);
+
+let lastLvl = -1, warned20 = false, warned10 = false;
+function restingCount() { return tabs.filter(t => t.sleeping || t.frozen).length; }
+function updateSaverUI() {
+  const lvl = saverLevel(), on = lvl > 0;
+  document.body.classList.toggle('saver', on);
+  document.body.classList.toggle('ultra', lvl >= 2);
+  const b = $('batt');
+  const pct = battLevel === null ? '' : Math.round(battLevel * 100) + '%';
+  const plugged = charging && !onBattery;
+  b.innerHTML = '<span class="leaf">&#127811;</span> ' + (plugged ? '&#9889;' : '') + pct + ' <b>' + (lvl >= 2 ? 'Ultra' : lvl ? 'Saver' : 'Eco') + '</b>' + (restingCount() ? ' <span class="rest">' + restingCount() + ' &#128164;</span>' : '');
+  b.classList.toggle('on', on); b.classList.toggle('ultra', lvl >= 2);
+  b.title = 'Battery: ' + (pct || '?') + (plugged ? ' (charging)' : '') + '\nMode: ' + ['Eco (normal, still frugal)', 'Saver', 'Ultra saver'][lvl] + '\n' + restingCount() + ' tab(s) frozen or asleep, using no power\n' + blocked + ' ads blocked\nclick for battery usage';
+}
+function applySaver() {
+  const lvl = saverLevel();
+  updateSaverUI();
+  tabs.forEach(t => { if (!isShown(t) && t.ready) scheduleFreeze(t); emulateFor(t); });
+  if (lvl >= 2 && lastLvl < 2 && lastLvl !== -1) { tabs.forEach(t => { if (!isShown(t)) sleepTab(t); }); toast('Ultra saver on 🥶 background tabs asleep, pages calmed down'); }
+  else if (lvl === 1 && lastLvl === 0) toast('unplugged, Saver mode on 🍃');
+  lastLvl = lvl;
+  if (battLevel !== null && !charging) {
+    if (battLevel <= 0.1 && !warned10) { warned10 = true; toast('10% battery bro, Ultra saver is on 🪫'); }
+    else if (battLevel <= 0.2 && !warned20) { warned20 = true; if (store.settings.saver === 'auto' || !store.settings.saver) toast('20% battery, switched to Ultra saver 🪫'); }
+  } else { warned20 = warned10 = false; }
+  sleepCheck();
+}
+
+// ---- split screen (up to 4) + tab lock aware layout ----
+let split = [];
+const CELLS = {
+  1: [[0, 0, 1, 1]],
+  2: [[0, 0, .5, 1], [.5, 0, .5, 1]],
+  3: [[0, 0, .5, 1], [.5, 0, .5, .5], [.5, .5, .5, .5]],
+  4: [[0, 0, .5, .5], [.5, 0, .5, .5], [0, .5, .5, .5], [.5, .5, .5, .5]]
+};
+function visibleSet() { return active && split.includes(active) ? split : (active ? [active] : []); }
+const isShown = (t) => visibleSet().includes(t);
+function rectStyle(cell, n) {
+  const [x, y, w, h] = cell, g = n > 1 ? 2 : 0;
+  return { left: `calc((100% - var(--sw,0px)) * ${x} + ${x ? g : 0}px)`, top: `calc(${y * 100}% + ${y ? g : 0}px)`,
+    width: `calc((100% - var(--sw,0px)) * ${w} - ${x ? g : 0}px)`, height: `calc(${h * 100}% - ${y ? g : 0}px)`, bottom: 'auto' };
+}
+function layoutViews() {
+  const vis = visibleSet(), n = vis.length;
+  tabs.forEach(t => {
+    const i = vis.indexOf(t), shown = i >= 0;
+    const locked = shown && t.locked && !t.unlocked && !!store.settings.lockHash;
+    if (shown && t.sleeping) wake(t);
+    if (shown && t.frozen) freeze(t, false);
+    if (shown) clearTimeout(t.freezeT);
+    const st = shown ? rectStyle(CELLS[n][i], n) : null;
+    if (t.wv) {
+      t.wv.classList.toggle('active', shown && !locked);
+      if (st && n > 1) Object.assign(t.wv.style, st); else t.wv.removeAttribute('style');
+    }
+    if (locked) showLock(t, st && n > 1 ? st : null); else hideLock(t);
+    t.el.classList.toggle('insplit', split.length > 1 && split.includes(t));
+  });
+  const ring = $('paneRing');
+  if (n > 1) { Object.assign(ring.style, rectStyle(CELLS[n][vis.indexOf(active)], n)); ring.hidden = false; } else ring.hidden = true;
+}
+function activate(t) {
+  const prevVis = visibleSet();
+  if (active && active !== t) { active.el.classList.remove('active'); active.lastActive = Date.now(); }
+  active = t;
+  t.lastActive = Date.now();
+  const vis = visibleSet();
+  prevVis.forEach(p => { if (!vis.includes(p) && tabs.includes(p)) { p.lastActive = Date.now(); scheduleFreeze(p); if (p.locked) { p.unlocked = false; renderTab(p); } } });
+  layoutViews();
+  t.el.classList.add('active');
+  renderTab(t);
+  t.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  closeFind();
+  updateNav();
+  if (isNewtab(t.url) && !(t.locked && !t.unlocked)) setTimeout(() => $('url').focus(), 50);
+  saveSession();
+}
+function splitWith(t) {
+  if (t === active) return;
+  if (!split.includes(active)) split = [active];
+  if (split.includes(t)) return;
+  if (split.length >= 4) { toast('split screen fits 4 tabs max bro 🫩'); return; }
+  split.push(t);
+  layoutViews(); updateNav(); toast('split screen on, click a side to use it');
+}
+function unsplit(t) {
+  split = t ? split.filter(x => x !== t) : [];
+  if (split.length < 2) split = [];
+  if (t && t === active && split.length) activate(split[0]); else layoutViews();
+}
+
+// ---- tab lock ----
+function lockReady() { return !!store.settings.lockHash; }
+function showLock(t, st) {
+  if (!t.lockEl) {
+    const d = document.createElement('div');
+    d.className = 'lockpane';
+    d.innerHTML = '<div class="lockcard"><div style="font-size:40px">&#128274;</div><b>This tab is locked</b><small>enter your tab password</small><input type="password" placeholder="Password"><div class="lockerr"></div><span class="pbtn">Unlock</span></div>';
+    const inp = d.querySelector('input'), err = d.querySelector('.lockerr');
+    let fails = 0, wait = 0;
+    const tryIt = async () => {
+      if (Date.now() < wait) { err.textContent = 'too many tries, wait a sec'; return; }
+      if (await checkPw(inp.value)) { t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); if (t.wv) t.wv.focus(); }
+      else { fails++; err.textContent = 'wrong password 💔'; inp.select(); if (fails >= 5) { wait = Date.now() + 15000; fails = 0; } }
+    };
+    d.querySelector('.pbtn').onclick = tryIt;
+    inp.onkeydown = (e) => { if (e.key === 'Enter') tryIt(); };
+    d.onmousedown = () => { if (t !== active) activate(t); };
+    $('views').appendChild(d);
+    t.lockEl = d;
+  }
+  t.lockEl.removeAttribute('style');
+  if (st) Object.assign(t.lockEl.style, st);
+  t.lockEl.hidden = false;
+  if (t === active) setTimeout(() => { const i = t.lockEl && t.lockEl.querySelector('input'); if (i && !t.lockEl.hidden) i.focus(); }, 30);
+}
+function hideLock(t) { if (t.lockEl) t.lockEl.hidden = true; }
+async function checkPw(pw) { return !!pw && lockReady() && (await window.aura.hashPw(pw, store.settings.lockSalt)) === store.settings.lockHash; }
+async function setPw(pw) {
+  const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  store.settings.lockSalt = salt;
+  store.settings.lockHash = await window.aura.hashPw(pw, salt);
+  save();
+}
+function relockAll() {
+  tabs.forEach(t => { if (t.locked && t.unlocked) { t.unlocked = false; renderTab(t); } });
+  layoutViews(); updateNav();
+}
+async function toggleLock(t) {
+  if (t.locked) {
+    if (!t.unlocked && !(await askPw('Unlock this tab for good', 'Enter your tab password to remove the lock.'))) return;
+    t.locked = false; t.unlocked = false; toast('lock removed');
+  } else {
+    if (!lockReady()) { const ok = await pwSetupModal(); if (!ok) return; }
+    t.locked = true; t.unlocked = t === active || isShown(t); toast('tab locked 🔒 it locks when u leave it');
+  }
+  renderTab(t); layoutViews(); saveSession(true);
+}
+async function askPw(title, sub) {
+  const v = await modal(title, sub, [{ id: 'p', label: 'Password', type: 'password' }], 'Unlock');
+  if (!v) return false;
+  if (await checkPw(v.p)) return true;
+  toast('wrong password 💔'); return false;
+}
+async function pwSetupModal(change) {
+  const fields = (change ? [{ id: 'old', label: 'Current password', type: 'password' }] : []).concat([{ id: 'a', label: 'New password', type: 'password' }, { id: 'b', label: 'Type it again', type: 'password' }]);
+  const v = await modal(change ? 'Change tab password' : 'Set a tab password', 'Locked tabs need this to open.', fields, 'Save');
+  if (!v) return false;
+  if (change && !(await checkPw(v.old))) { toast('current password is wrong 💔'); return false; }
+  if (!v.a || v.a.length < 4) { toast('make it at least 4 characters'); return false; }
+  if (v.a !== v.b) { toast('passwords dont match'); return false; }
+  await setPw(v.a); toast('password saved 🔥'); return true;
+}
+function modal(title, sub, fields, okText) {
+  return new Promise((res) => {
+    const bg = document.createElement('div'); bg.className = 'modalbg';
+    bg.innerHTML = `<div class="modal"><h3></h3><p></p>${fields.map(f => `<label>${esc(f.label)}<input id="mf_${f.id}" type="${f.type || 'text'}" autocomplete="off"></label>`).join('')}<div class="mrow"><span class="pbtn" data-a="no">Cancel</span><span class="pbtn ok" data-a="ok">${esc(okText)}</span></div></div>`;
+    bg.querySelector('h3').textContent = title; bg.querySelector('p').textContent = sub;
+    const done = (ok) => { const v = {}; fields.forEach(f => v[f.id] = bg.querySelector('#mf_' + f.id).value); bg.remove(); res(ok ? v : null); };
+    bg.onclick = (e) => { if (e.target === bg || e.target.dataset.a === 'no') done(false); else if (e.target.dataset.a === 'ok') done(true); };
+    bg.onkeydown = (e) => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+    document.body.appendChild(bg);
+    const first = bg.querySelector('input'); if (first) first.focus();
+  });
+}
+
+// ---- hide elements (pick anything on a page and hide it for that site) ----
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+function hideRulesFor(u) { const h = hostOf(u); return h ? ((store.hideRules || {})[h] || []) : []; }
+function cssFor(rules) { return rules.length ? rules.map(s => s + '{display:none!important}').join('\n') : ''; }
+async function applyHides(t) {
+  if (!t.wv || !t.ready) return;
+  try { if (t.hideKey) await t.wv.removeInsertedCSS(t.hideKey); } catch {}
+  t.hideKey = null;
+  if (store.settings.hidesPaused) return;
+  const css = cssFor(hideRulesFor(t.url));
+  if (css) { try { t.hideKey = await t.wv.insertCSS(css); } catch {} }
+}
+const PICKER = `new Promise((done) => {
+  if (window.__orchardPick) { done(null); return; }
+  window.__orchardPick = true;
+  const box = document.createElement('div'), tag = document.createElement('div'), bar = document.createElement('div');
+  const Z = 2147483647;
+  box.style.cssText = 'position:fixed;pointer-events:none;z-index:' + Z + ';background:rgba(232,67,46,.25);outline:2px solid #e8432e;border-radius:3px;transition:all .05s';
+  tag.style.cssText = 'position:fixed;pointer-events:none;z-index:' + Z + ';background:#1b1211;color:#ffb83d;font:12px/1.4 Consolas,monospace;padding:3px 7px;border-radius:5px;max-width:60vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
+  bar.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:' + Z + ';background:#1b1211;color:#f6ece8;font:13px Segoe UI,system-ui,sans-serif;padding:8px 14px;border-radius:10px;border:1px solid #e8432e;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none';
+  bar.textContent = 'Click something to hide it  ·  ↑ bigger  ↓ smaller  ·  Esc to stop';
+  document.documentElement.append(box, tag, bar);
+  let cur = null, trail = [];
+  const okId = (id) => id && !/\\d{3,}|[:.]/.test(id) && id.length < 40;
+  const okCls = (c) => c && !/\\d{3,}|^(is-|has-|js-)|hover|active|focus|selected|open/.test(c) && c.length < 40;
+  const esc = (s) => (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+  function part(el) {
+    if (okId(el.id)) return '#' + esc(el.id);
+    let s = el.tagName.toLowerCase();
+    const cls = [...el.classList].filter(okCls).slice(0, 2);
+    if (cls.length) s += cls.map(c => '.' + esc(c)).join('');
+    const p = el.parentElement;
+    if (p) { const same = [...p.children].filter(x => x.tagName === el.tagName); if (same.length > 1 && !cls.length) s += ':nth-of-type(' + (same.indexOf(el) + 1) + ')'; }
+    return s;
+  }
+  function selector(el) {
+    let parts = [], node = el;
+    for (let i = 0; node && node.nodeType === 1 && node !== document.documentElement && i < 6; i++) {
+      parts.unshift(part(node));
+      const s = parts.join(' > ');
+      try { if (parts[0][0] === '#' || document.querySelectorAll(s).length === 1) return s; } catch {}
+      node = node.parentElement;
+    }
+    return parts.join(' > ');
+  }
+  function show(el) {
+    cur = el; if (!el) return;
+    const r = el.getBoundingClientRect();
+    Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    tag.textContent = selector(el) + '  ' + Math.round(r.width) + '×' + Math.round(r.height);
+    tag.style.left = Math.max(4, Math.min(r.left, innerWidth - 300)) + 'px';
+    tag.style.top = (r.top > 26 ? r.top - 24 : r.bottom + 4) + 'px';
+  }
+  const ours = (el) => el === box || el === tag || el === bar;
+  const move = (e) => { const el = document.elementFromPoint(e.clientX, e.clientY); if (el && !ours(el) && el !== cur) { trail = []; show(el); } };
+  const block = (e) => { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); };
+  const finish = (val) => { removeEventListener('mousemove', move, true); ['mousedown', 'mouseup', 'click', 'pointerdown', 'pointerup', 'auxclick', 'contextmenu'].forEach(t => removeEventListener(t, block, true)); removeEventListener('click', pick, true); removeEventListener('keydown', key, true); box.remove(); tag.remove(); bar.remove(); window.__orchardPick = false; done(val); };
+  const pick = (e) => { block(e); if (cur && cur !== document.body && cur !== document.documentElement) { const s = selector(cur); cur.style.setProperty('display', 'none', 'important'); finish(s); } };
+  const key = (e) => {
+    if (e.key === 'Escape') { block(e); finish(null); }
+    else if (e.key === 'ArrowUp' && cur && cur.parentElement && cur.parentElement !== document.documentElement) { block(e); trail.push(cur); show(cur.parentElement); }
+    else if (e.key === 'ArrowDown' && trail.length) { block(e); show(trail.pop()); }
+    else if (e.key === 'Enter' && cur) { pick(e); }
+  };
+  addEventListener('mousemove', move, true);
+  ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'auxclick', 'contextmenu'].forEach(t => addEventListener(t, block, true));
+  addEventListener('click', pick, true);
+  addEventListener('keydown', key, true);
+})`;
+let picking = false;
+async function startHidePicker() {
+  const t = active;
+  if (!t || !t.wv || !t.ready || isNewtab(t.url) || !/^https?:/.test(t.url)) { toast('open a website first, then pick stuff to hide 🫩'); return; }
+  if (t.locked && !t.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
+  if (picking) return;
+  picking = true; $('hideBtn').classList.add('on');
+  $('panel').classList.remove('show');
+  t.wv.focus();
+  let n = 0;
+  try {
+    // keep picking until Esc, one element per click
+    while (true) {
+      const sel = await t.wv.executeJavaScript(PICKER, true);
+      if (!sel) break;
+      const h = hostOf(t.url);
+      store.hideRules = store.hideRules || {};
+      const list = store.hideRules[h] = store.hideRules[h] || [];
+      if (!list.includes(sel)) list.push(sel);
+      save(); n++;
+      await applyHides(t);
+    }
+  } catch {}
+  picking = false; $('hideBtn').classList.remove('on');
+  if (n) toast('hid ' + n + ' thing' + (n > 1 ? 's' : '') + ' on ' + hostOf(t.url) + ' 🔥 manage them with the eye button');
+}
+function renderHides() {
+  const list = $('plist'), t = active, h = t ? hostOf(t.url) : '';
+  $('ptitle').textContent = 'Hidden elements';
+  const rules = hideRulesFor(t && t.url);
+  const all = Object.entries(store.hideRules || {}).filter(([, v]) => v.length);
+  list.innerHTML = `<div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">Pick anything on a website (ads, popups, sidebars, comments) and Orchard hides it every time u visit that site.</div>
+    <div class="set"><span class="pbtn ok" id="hidePick">&#128065; Pick elements to hide</span><span class="pbtn" id="hidePause">${store.settings.hidesPaused ? 'Hiding paused' : 'Hiding on'}</span></div>
+    <div class="mhead">${h ? 'ON ' + esc(h.toUpperCase()) : 'THIS PAGE'}</div>`;
+  if (!rules.length) list.insertAdjacentHTML('beforeend', '<div class="set" style="color:var(--dim);font-size:12px">nothing hidden on this site yet</div>');
+  rules.forEach((s, i) => {
+    const r = document.createElement('div'); r.className = 'row';
+    r.innerHTML = '<div class="rt"><div style="font:12px Consolas,monospace"></div></div><span class="pbtn mini">Show again</span>';
+    r.querySelector('.rt div').textContent = s;
+    r.querySelector('.pbtn').onclick = async () => { rules.splice(i, 1); save(); tabs.filter(x => hostOf(x.url) === h).forEach(x => { applyHides(x); if (x.wv && x.ready) x.wv.reload(); }); renderHides(); };
+    list.appendChild(r);
+  });
+  if (rules.length) {
+    const c = document.createElement('div'); c.className = 'set';
+    c.innerHTML = '<span style="color:var(--dim);font-size:12px">' + rules.length + ' hidden here</span><span class="pbtn" id="hideClr">Show everything on this site</span>';
+    list.appendChild(c);
+  }
+  const others = all.filter(([k]) => k !== h);
+  if (others.length) {
+    list.insertAdjacentHTML('beforeend', '<div class="mhead">OTHER SITES</div>');
+    others.forEach(([k, v]) => {
+      const r = document.createElement('div'); r.className = 'row';
+      r.innerHTML = `<img src="${fav('https://' + k)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small>${v.length} hidden</small></div><span class="pbtn mini">Clear</span>`;
+      r.querySelector('.rt div').textContent = k;
+      r.querySelector('.pbtn').onclick = () => { delete store.hideRules[k]; save(); renderHides(); };
+      list.appendChild(r);
+    });
+  }
+  $('hidePick').onclick = startHidePicker;
+  $('hidePause').onclick = () => { store.settings.hidesPaused = !store.settings.hidesPaused; save(); tabs.forEach(applyHides); if (store.settings.hidesPaused) tabs.forEach(x => { if (x.wv && x.ready && hideRulesFor(x.url).length) x.wv.reload(); }); renderHides(); };
+  if ($('hideClr')) $('hideClr').onclick = () => { delete store.hideRules[h]; save(); tabs.filter(x => hostOf(x.url) === h).forEach(x => { applyHides(x); if (x.wv && x.ready) x.wv.reload(); }); renderHides(); };
+}
+
+// ---- main menu: every feature in one place ----
+const FEATURES = [
+  ['BATTERY (THE CORE OF ORCHARD)'],
+  ['&#127811;', 'Battery saver', 'see what drains it, pick Eco, Saver or Ultra', 'Battery pill', () => openPanel('battery')],
+  ['&#128164;', 'Rest all tabs', 'put every background tab to sleep now', '', () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); }],
+  ['TABS & WINDOWS'],
+  ['&#10133;', 'New tab', 'opens the start page', 'Ctrl+T', () => createTab()],
+  ['&#128468;', 'New window', 'same profile, fresh window', 'Ctrl+N', () => window.aura.newWindow()],
+  ['&#9707;', 'Split screen', 'right click a tab, pick split. up to 4', 'Right click tab', () => { const o = tabs.find(t => t !== active); if (o) splitWith(o); else toast('open another tab first, then right click it'); }],
+  ['&#128274;', 'Lock a tab', 'password protect a tab. locks when u leave', 'Right click tab', () => active && toggleLock(active)],
+  ['&#8634;', 'Reopen closed tab', 'brings back the last tab u closed', 'Ctrl+Shift+T', () => { const u = closed.pop(); if (u) createTab(u); else toast('no closed tabs'); }],
+  ['&#128433;', 'Drag tabs', 'drag to reorder, drag out for a new window', 'Drag', () => toast('grab a tab and drag it out of the window')],
+  ['SMART STUFF'],
+  ['&#128172;', 'Orchard Chat', 'chat with friends by email, groups, files', 'Alt+C', () => openChat()],
+  ['&#10022;', 'Ask AI', 'Gemini, ChatGPT or Claude on the side', 'Alt+G', () => toggleAi(true)],
+  ['&#128269;', 'Google Lens', 'drag over anything to search it', 'Lens icon', () => startLens()],
+  ['&#128065;', 'Hide elements', 'click ads, popups, anything to hide it on that site', 'Alt+H', () => startHidePicker()],
+  ['TOOLS'],
+  ['&#128246;', 'WiFi speed test', 'ping, download and upload', 'WiFi icon', () => openPanel('speed')],
+  ['&#11015;', 'Downloads', 'progress, open, show in folder', 'Ctrl+J', () => openPanel('downloads')],
+  ['&#128339;', 'History', 'everything u visited', 'Ctrl+H', () => openPanel('history')],
+  ['&#128270;', 'Find in page', 'search words on this page', 'Ctrl+F', () => openFind()],
+  ['YOU'],
+  ['&#128100;', 'Profiles', 'separate logins and bookmarks', 'Avatar', () => openPanel('profiles')],
+  ['&#127912;', 'Backgrounds', 'colors, gradients, ur own pics', 'Settings', () => openPanel('theme')],
+  ['&#11088;', 'Bookmark page', 'adds it to the bar', 'Ctrl+D', () => toggleBookmark()],
+  ['&#9881;', 'Settings', 'search engine, adblock, passwords', '', () => openPanel('settings')]
+];
+function renderMenu() {
+  $('ptitle').textContent = 'Everything in Orchard';
+  const list = $('plist'); list.innerHTML = '';
+  let grid = null;
+  FEATURES.forEach(f => {
+    if (f.length === 1) { list.appendChild(Object.assign(document.createElement('div'), { className: 'mhead', textContent: f[0] })); grid = document.createElement('div'); grid.className = 'mgrid'; list.appendChild(grid); return; }
+    const d = document.createElement('div'); d.className = 'mi';
+    d.innerHTML = `<b><i>${f[0]}</i><span></span></b><small></small>${f[3] ? '<kbd></kbd>' : ''}`;
+    d.querySelector('b span').textContent = f[1]; d.querySelector('small').textContent = f[2];
+    if (f[3]) d.querySelector('kbd').textContent = f[3];
+    d.onclick = () => { $('panel').classList.remove('show'); f[4](); };
+    grid.appendChild(d);
+  });
+}
+
+// ---- tab right click menu ----
+function tabMenu(e, t) {
+  e.preventDefault();
+  closeMenu();
+  const m = document.createElement('div'); m.id = 'ctx';
+  const items = [
+    ['Reload', () => t.wv && t.wv.reload()],
+    ['Duplicate', () => createTab(t.url && !isNewtab(t.url) ? t.url : undefined)],
+    null,
+    t === active ? null : [split.includes(t) && split.includes(active) ? 'Already in split' : 'Split screen with this tab', () => splitWith(t), split.includes(t) && split.includes(active)],
+    split.includes(t) ? ['Remove from split', () => unsplit(t)] : null,
+    split.length ? ['Exit split screen', () => unsplit()] : null,
+    null,
+    [t.locked ? '&#128275; Remove lock' : '&#128274; Lock tab', () => toggleLock(t)],
+    t.locked && t.unlocked ? ['Lock now', () => { t.unlocked = false; renderTab(t); layoutViews(); updateNav(); }] : null,
+    null,
+    ['Close tab', () => closeTab(t)]
+  ];
+  let lastSep = true;
+  items.forEach(it => {
+    if (it === null) { if (!lastSep) { m.appendChild(Object.assign(document.createElement('hr'))); lastSep = true; } return; }
+    if (!it) return;
+    const d = document.createElement('div'); d.className = 'ci' + (it[2] ? ' dis' : ''); d.innerHTML = it[0];
+    d.onclick = () => { closeMenu(); if (!it[2]) it[1](); };
+    m.appendChild(d); lastSep = false;
+  });
+  if (m.lastChild && m.lastChild.tagName === 'HR') m.lastChild.remove();
+  document.body.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.min(e.clientX, innerWidth - w - 6) + 'px';
+  m.style.top = Math.min(e.clientY, innerHeight - h - 6) + 'px';
+}
+function closeMenu() { const m = $('ctx'); if (m) m.remove(); }
+document.addEventListener('mousedown', (e) => { if (!e.target.closest('#ctx')) closeMenu(); });
+window.addEventListener('blur', closeMenu);
+
+function closeTab(t, moved) {
+  const i = tabs.indexOf(t);
+  if (!isNewtab(t.url) && !moved) closed.push(t.url);
+  clearTimeout(t.freezeT);
+  if (t.wv) t.wv.remove();
+  if (t.lockEl) t.lockEl.remove();
+  t.el.remove();
+  if (split.includes(t)) { split = split.filter(x => x !== t); if (split.length < 2) split = []; }
+  tabs.splice(i, 1);
+  saveSession();
+  if (!tabs.length) { active = null; createTab(); return; }
+  if (active === t) { active = null; activate(tabs[Math.min(i, tabs.length - 1)]); }
+}
+
+function updateNav() {
+  if (!active) return;
+  const t = active, u = t.url;
+  const masked = t.locked && !t.unlocked && lockReady();
+  if (document.activeElement !== $('url')) $('url').value = isNewtab(u) || masked ? '' : u;
+  $('lock').innerHTML = isNewtab(u) ? '&#128269;' : (u.startsWith('https') ? '&#128274;' : '&#9888;');
+  let back = false, fwd = false;
+  try { if (t.ready) { back = t.wv.canGoBack(); fwd = t.wv.canGoForward(); } } catch {}
+  $('back').classList.toggle('off', !back);
+  $('fwd').classList.toggle('off', !fwd);
+  $('star').classList.toggle('on', store.bookmarks.some(b => b.url === u));
+  $('star').innerHTML = $('star').classList.contains('on') ? '&#9733;' : '&#9734;';
+  try { const z = t.ready ? t.wv.getZoomFactor() : 1; $('zoom').style.display = z !== 1 ? 'inline' : 'none'; $('zoom').textContent = Math.round(z * 100) + '%'; } catch {}
+}
+
+function progress(p) {
+  const el = $('progress');
+  el.style.opacity = 1; el.style.width = p + '%';
+  if (p >= 100) setTimeout(() => { el.style.opacity = 0; setTimeout(() => el.style.width = 0, 400); }, 200);
+}
+
+function go(q) {
+  const u = toUrl(q);
+  if (!u || !active) return;
+  if (active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
+  active.wv.loadURL(u).catch(() => {});
+  active.wv.focus();
+}
+
+function addHistory(t) {
+  const h = store.history;
+  if (h[0] && h[0].url === t.url) h[0].title = t.title;
+  else h.unshift({ title: t.title, url: t.url, time: Date.now() });
+  if (h.length > 5000) h.length = 5000;
+  save();
+}
+
+function renderBookmarks() {
+  const bm = $('bm'); bm.innerHTML = '';
+  store.bookmarks.forEach(b => {
+    const d = document.createElement('div');
+    d.className = 'bmi';
+    d.innerHTML = `<img src="${fav(b.url)}" onerror="this.style.display='none'"><span></span>`;
+    d.querySelector('span').textContent = b.title;
+    d.title = b.url;
+    d.onclick = (e) => e.ctrlKey ? createTab(b.url, true) : active.wv.loadURL(b.url);
+    d.onauxclick = (e) => { if (e.button === 1) createTab(b.url, true); };
+    bm.appendChild(d);
+  });
+}
+
+function toggleBookmark() {
+  if (!active || isNewtab(active.url)) return;
+  const i = store.bookmarks.findIndex(b => b.url === active.url);
+  if (i >= 0) { store.bookmarks.splice(i, 1); toast('Bookmark removed 💔'); }
+  else { store.bookmarks.push({ title: (active.title || active.url).slice(0, 40), url: active.url }); toast('Bookmarked 🔥'); }
+  save(); renderBookmarks(); updateNav();
+}
+
+// panel
+function openPanel(kind) {
+  const p = $('panel'), list = $('plist');
+  if (p.classList.contains('show') && p.dataset.kind === kind) { p.classList.remove('show'); return; }
+  p.dataset.kind = kind; p.classList.add('show'); list.innerHTML = '';
+  if (kind === 'history') {
+    $('ptitle').textContent = 'History';
+    if (!store.history.length) list.innerHTML = '<div class="set" style="color:var(--dim)">nothing here yet</div>';
+    store.history.slice(0, 300).forEach((h, i) => {
+      const r = document.createElement('div'); r.className = 'row';
+      r.innerHTML = `<img src="${fav(h.url)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small></small></div><span class="del">&#10005;</span>`;
+      r.querySelector('.rt div').textContent = h.title || h.url;
+      r.querySelector('small').textContent = new Date(h.time).toLocaleString() + ' · ' + h.url;
+      r.onclick = (e) => {
+        if (e.target.classList.contains('del')) { store.history.splice(i, 1); save(); r.remove(); return; }
+        active.wv.loadURL(h.url); p.classList.remove('show');
+      };
+      list.appendChild(r);
+    });
+  } else if (kind === 'profiles') {
+    renderProfiles();
+  } else if (kind === 'hides') {
+    renderHides();
+  } else if (kind === 'menu') {
+    renderMenu();
+  } else if (kind === 'theme') {
+    renderTheme();
+  } else if (kind === 'downloads') {
+    renderDownloads();
+  } else if (kind === 'speed') {
+    renderSpeed();
+  } else if (kind === 'battery') {
+    renderBattery();
+    clearInterval(meterT);
+    meterT = setInterval(() => { if (panelIs('battery')) renderBattery(); else clearInterval(meterT); }, 2000);
+  } else {
+    $('ptitle').textContent = 'Settings';
+    list.innerHTML = `
+      <div class="set">Search engine <select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${store.settings.engine === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+      <div class="set"><span>Orchard <b id="verTxt">v…</b></span><span class="pbtn" id="updChk">Check for updates</span></div>
+      <div class="set">Search suggestions <span class="pbtn" id="sgT">${store.settings.suggest === false ? 'OFF' : 'ON'}</span></div>
+      <div class="set">Tab lock password <span style="display:flex;gap:6px">${store.settings.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>
+      <div class="set">New tab background <span class="pbtn" id="thm">&#127912; Change</span></div>
+      <div class="set">Reopen tabs on startup <span class="pbtn" id="rst">${store.settings.restore === false ? 'OFF' : 'ON'}</span></div>
+      <div class="set">Battery saver <select id="svr">${SAVER_OPTS}</select></div>
+      <div class="set">Sleep unused tabs after <select id="slp">${[[2,'2 min'],[5,'5 min'],[10,'10 min'],[30,'30 min'],[0,'never']].map(([v,l]) => `<option value="${v}" ${(store.settings.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="set">Freeze background tabs <span class="pbtn" id="frz">${store.settings.freeze === false ? 'OFF' : 'ON'}</span></div>
+      <div class="set">Sleep all other tabs now <span class="pbtn" id="slpNow">&#128164; Sleep</span></div>
+      <div class="set">Ad blocker <span class="pbtn" id="adT">${store.settings.adblock ? 'ON' : 'OFF'}</span></div>
+      <div class="set">Clear history, cookies, cache <span class="pbtn" id="clr">Clear</span></div>
+      <div class="set" style="color:var(--dim);font-size:12px;line-height:1.7;display:block">Shortcuts: Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+F find · Alt+G Gemini · Alt+C chat · Ctrl+J downloads · Ctrl+N new window · Ctrl +/-/0 zoom · F11 fullscreen · F12 devtools</div>`;
+    $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
+    $('thm').onclick = () => openPanel('theme');
+    $('sgT').onclick = () => { store.settings.suggest = store.settings.suggest === false; save(); $('sgT').textContent = store.settings.suggest === false ? 'OFF' : 'ON'; };
+    window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version; });
+    $('updChk').onclick = async () => {
+      $('updChk').textContent = 'Checking…';
+      const r = await window.aura.checkUpdate();
+      const msg = { latest: 'ur on the newest version 🔥', ready: 'update ' + r.version + ' ready, restart to get it', busy: 'already checking', full: 'v' + r.version + ' needs a fresh download of the full zip', error: 'couldnt check: ' + r.error };
+      $('updChk').textContent = 'Check for updates';
+      toast(msg[r.status] || 'hmm');
+      if (r.status === 'ready') showUpdate(r);
+    };
+    const reopen = () => { $('panel').classList.remove('show'); openPanel('settings'); };
+    if ($('pwSet')) $('pwSet').onclick = async () => { if (await pwSetupModal()) reopen(); };
+    if ($('pwChg')) $('pwChg').onclick = async () => { if (await pwSetupModal(true)) reopen(); };
+    if ($('pwRst')) $('pwRst').onclick = async () => {
+      const v = await modal('Reset tab password', 'Know it? Type it to remove it. Forgot it? Type FORGOT and every locked tab gets closed, then the password is removed.', [{ id: 'p', label: 'Password or FORGOT', type: 'password' }], 'Reset');
+      if (!v) return;
+      if (v.p === 'FORGOT') { tabs.filter(t => t.locked).forEach(t => closeTab(t, true)); }
+      else if (!(await checkPw(v.p))) { toast('wrong password 💔'); return; }
+      else tabs.forEach(t => { t.locked = false; t.unlocked = false; renderTab(t); });
+      delete store.settings.lockHash; delete store.settings.lockSalt; save(); saveSession(true); layoutViews();
+      toast('password reset'); reopen();
+    };
+    $('rst').onclick = () => { store.settings.restore = store.settings.restore === false; save(); $('rst').textContent = store.settings.restore === false ? 'OFF' : 'ON'; };
+    $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
+    $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
+    $('frz').onclick = () => { store.settings.freeze = store.settings.freeze === false; save(); $('frz').textContent = store.settings.freeze === false ? 'OFF' : 'ON'; if (store.settings.freeze === false) tabs.forEach(t => freeze(t, false)); else applySaver(); };
+    $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (t !== active && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) put to sleep 💤'); };
+    $('adT').onclick = () => { toggleAdblock(); $('adT').textContent = store.settings.adblock ? 'ON' : 'OFF'; };
+    $('clr').onclick = async () => { await window.aura.clearData(); store.history = []; toast('Everything wiped 🥶'); };
+  }
+}
+
+// ---- downloads ----
+const dls = new Map();
+const fmtB = (b) => b > 1e9 ? (b / 1e9).toFixed(2) + ' GB' : b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b > 1e3 ? (b / 1e3).toFixed(0) + ' KB' : b + ' B';
+function updateDlBtn() {
+  const list = [...dls.values()];
+  const busy = list.some(d => d.state === 'progressing');
+  $('dlBtn').classList.toggle('busy', busy);
+  if (busy) $('dlBtn').classList.remove('done');
+}
+function renderDownloads() {
+  const list = $('plist');
+  $('ptitle').textContent = 'Downloads';
+  $('dlBtn').classList.remove('done');
+  const items = [...dls.values()].sort((a, b) => b.id - a.id);
+  if (!items.length) { list.innerHTML = '<div class="set" style="color:var(--dim)">no downloads yet</div>'; return; }
+  list.innerHTML = '';
+  items.forEach(d => {
+    const r = document.createElement('div'); r.className = 'row'; r.style.alignItems = 'flex-start';
+    const pct = d.total ? Math.round(d.received / d.total * 100) : 0;
+    const status = d.state === 'completed' ? fmtB(d.total || d.received) + ' · done'
+      : d.state === 'cancelled' ? 'cancelled' : d.state === 'interrupted' ? 'failed' : d.paused ? 'paused · ' + pct + '%'
+      : fmtB(d.received) + (d.total ? ' / ' + fmtB(d.total) : '') + (d.speed ? ' · ' + fmtB(d.speed) + '/s' : '');
+    r.innerHTML = `<span style="font-size:20px">${d.state === 'completed' ? '&#128196;' : d.state === 'progressing' ? '&#11015;' : '&#9888;'}</span>
+      <div class="rt"><div></div><small>${esc(status)}</small>${d.state === 'progressing' ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}</div>
+      <div style="display:flex;gap:4px;flex-direction:column">${d.state === 'completed' ? '<span class="pbtn mini" data-a="open">Open</span><span class="pbtn mini" data-a="show">Folder</span>' : d.state === 'progressing' ? `<span class="pbtn mini" data-a="${d.paused ? 'resume' : 'pause'}">${d.paused ? 'Resume' : 'Pause'}</span><span class="pbtn mini" data-a="cancel">Cancel</span>` : ''}</div>`;
+    r.querySelector('.rt div').textContent = d.name;
+    r.onclick = (e) => {
+      const a = e.target.dataset.a;
+      if (a === 'open') window.aura.openFile(d.path);
+      else if (a === 'show') window.aura.showFile(d.path);
+      else if (a) window.aura.dlAction(d.id, a);
+    };
+    list.appendChild(r);
+  });
+}
+window.aura.on('dl', (d) => {
+  const prev = dls.get(d.id);
+  if (prev && d.state === 'progressing') d.speed = Math.max(0, (d.received - prev.received) / Math.max(0.05, (d.time - prev.time) / 1000));
+  dls.set(d.id, d);
+  updateDlBtn();
+  if (d.state === 'completed') $('dlBtn').classList.add('done');
+  if (panelIs('downloads')) renderDownloads();
+});
+const panelIs = (k) => $('panel').classList.contains('show') && $('panel').dataset.kind === k;
+
+// ---- wifi speed test ----
+let speed = { running: false, res: null, live: null };
+function renderSpeed() {
+  const list = $('plist');
+  $('ptitle').textContent = 'WiFi speed test';
+  const s = speed, L = s.live || {}, R = s.res || {};
+  const num = s.running ? (L.mbps != null ? L.mbps : null) : (R.down != null ? R.down : null);
+  const label = s.running ? (L.phase === 'ping' ? 'checking ping...' : L.phase === 'upload' ? 'upload' : 'download') : (R.down != null ? 'download' : 'hit start');
+  const f = (v, d = 1) => v == null || isNaN(v) ? '--' : v.toFixed(d);
+  list.innerHTML = `<div class="big">${num == null ? '&mdash;' : f(num)} <small>Mbps</small></div>
+    <div style="text-align:center;color:var(--dim);font-size:12px">${label}</div>
+    ${s.running ? `<div style="padding:8px 14px"><div class="bar"><i style="width:${Math.round((L.progress || 0) * 100)}%"></i></div></div>` : ''}
+    <div class="stats"><div><span>Ping</span><b>${f(s.running ? s.ping : R.ping, 0)}</b><span>ms</span></div><div><span>Download</span><b>${f(s.running ? s.down : R.down)}</b><span>Mbps</span></div><div><span>Upload</span><b>${f(s.running ? s.up : R.up)}</b><span>Mbps</span></div></div>
+    ${R.jitter != null && !s.running ? `<div class="set" style="color:var(--dim);font-size:12px">Jitter ${f(R.jitter, 0)} ms · ${verdict(R.down)}</div>` : ''}
+    ${s.err ? `<div class="set" style="color:#ff5e5e;font-size:12px">${esc(s.err)}</div>` : ''}
+    <div class="set" style="justify-content:center"><span class="pbtn" id="spGo">${s.running ? 'Stop' : R.down != null ? 'Test again' : 'Start'}</span></div>
+    <div class="set" style="color:var(--dim);font-size:11px;display:block">uses Cloudflare's speed test servers · ~50-150 MB data</div>`;
+  $('spGo').onclick = () => {
+    if (speed.running) { window.aura.speedStop(); return; }
+    speed = { running: true, res: null, live: { phase: 'ping' }, err: null };
+    window.aura.speedStart(); renderSpeed();
+  };
+}
+function verdict(d) { return d == null ? '' : d < 5 ? 'pretty slow 💔' : d < 25 ? 'decent' : d < 100 ? 'fast 🔥' : 'crazy fast 🥶'; }
+window.aura.on('speed', (d) => {
+  if (d.phase === 'ping' && d.ping != null) speed.ping = d.ping;
+  if (d.phase === 'download') speed.down = d.mbps;
+  if (d.phase === 'upload') speed.up = d.mbps;
+  if (d.phase === 'done') { speed.running = false; speed.res = d; toast('Speed: ' + d.down.toFixed(1) + ' down / ' + d.up.toFixed(1) + ' up Mbps'); }
+  if (d.phase === 'error') { speed.running = false; speed.err = 'test failed: ' + d.error; }
+  speed.live = d;
+  if (panelIs('speed')) renderSpeed();
+});
+
+// ---- battery usage meter ----
+const SAVER_LABELS = { auto: 'Auto (Saver unplugged, Ultra under 20%)', on: 'Saver always', ultra: 'Ultra always', off: 'Off (Eco only)' };
+const SAVER_OPTS_FN = () => Object.entries(SAVER_LABELS).map(([k, l]) => `<option value="${k}" ${(store.settings.saver || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('');
+Object.defineProperty(window, 'SAVER_OPTS', { get: SAVER_OPTS_FN });
+let meterT = null;
+async function renderBattery() {
+  const list = $('plist');
+  $('ptitle').textContent = 'Battery usage';
+  const keyed = tabs.map(t => ({ key: t.id, wcId: t.wv && t.ready ? t.wcId : null })).filter(x => x.wcId != null);
+  if (aiWcId != null && aiOpen) keyed.push({ key: 'ai', wcId: aiWcId });
+  let m;
+  try { m = await window.aura.metrics(keyed); } catch { return; }
+  if (!panelIs('battery')) return;
+  const byKey = new Map(m.tabs.map(x => [x.key, x]));
+  const energy = (c) => c < 2 ? ['Low', 'e-low'] : c < 15 ? ['Medium', 'e-med'] : ['High', 'e-high'];
+  const pct = battLevel === null ? '--' : Math.round(battLevel * 100) + '%';
+  let left = '';
+  try { const bt = await navigator.getBattery(); if (!bt.charging && isFinite(bt.dischargingTime) && bt.dischargingTime > 0) left = Math.floor(bt.dischargingTime / 3600) + 'h ' + Math.round(bt.dischargingTime % 3600 / 60) + 'm left'; else if (bt.charging) left = 'charging'; } catch {}
+  const totalCpu = m.total.cpu / m.cores;
+  const [tl, tc] = energy(m.total.cpu);
+  const rows = tabs.map(t => {
+    const x = byKey.get(t.id);
+    return { t, cpu: x ? x.cpu : 0, mem: x ? x.mem : 0, state: t.sleeping ? 'sleeping' : t.frozen ? 'frozen' : '' };
+  });
+  if (byKey.has('ai')) rows.push({ t: { title: (store.settings.ai || 'gemini') + ' panel', id: 'ai', url: AIS[store.settings.ai || 'gemini'] }, cpu: byKey.get('ai').cpu, mem: byKey.get('ai').mem, state: '' });
+  rows.sort((a, b) => b.cpu - a.cpu);
+  list.innerHTML = `<div class="stats"><div><span>Battery</span><b>${pct}</b><span>${esc(left || (onBattery ? 'on battery' : 'plugged in'))}</span></div>
+      <div><span>Orchard CPU</span><b>${totalCpu.toFixed(1)}%</b><span>of your PC</span></div>
+      <div><span>Energy</span><b class="${tc}">${tl}</b><span>${fmtB(m.total.mem * 1024)} RAM</span></div></div>
+    <div class="set">Battery saver <select id="svr2">${SAVER_OPTS}</select></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> (always on): background tabs freeze after 15s, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' min, ads blocked, background timers throttled.', '<b style="color:var(--leaf)">Saver</b>: tabs freeze after 3s and sleep after 2 min, videos never autoplay, websites told to cut animations, Orchard\'s own animations off.', '<b style="color:#ffb83d">Ultra</b>: everything in Saver, plus every background tab sleeps right away and pages go dark (saves power on OLED screens).'][saverLevel()]}</div>
+    <div class="set">Dark pages always <span class="pbtn" id="dkp">${store.settings.darkPages ? 'ON' : 'OFF'}</span></div>
+    <div class="set">Rest all other tabs now <span class="pbtn" id="restNow">&#128164; Rest</span></div>
+    <div style="padding:2px 12px 4px;font-size:11px;color:var(--dim)">PER TAB</div>`;
+  rows.forEach(({ t, cpu, mem, state }) => {
+    const [el, ec] = state ? ['Zero', 'e-low'] : energy(cpu);
+    const r = document.createElement('div'); r.className = 'row';
+    r.innerHTML = `<img src="${fav(t.url)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small>${state ? state + ' · saving battery' : cpu.toFixed(1) + '% CPU · ' + fmtB(mem * 1024)}</small></div><b class="${ec}" style="font-size:12px">${el}</b>${!state && t !== active && t.id !== 'ai' ? '<span class="pbtn mini" data-a="sleep">Sleep</span>' : ''}`;
+    r.querySelector('.rt div').textContent = t.locked && !t.unlocked ? 'Locked tab' : isNewtab(t.url) ? 'New Tab' : (t.title || t.url);
+    r.onclick = (e) => { if (e.target.dataset.a === 'sleep') { sleepTab(t); renderBattery(); } else if (t.id !== 'ai') { activate(t); } };
+    list.appendChild(r);
+  });
+  $('svr2').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); renderBattery(); };
+  $('dkp').onclick = () => { store.settings.darkPages = !store.settings.darkPages; save(); applySaver(); renderBattery(); };
+  $('restNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); renderBattery(); };
+}
+
+// ---- google lens ----
+let lensShot = null, lensDrag = null;
+async function startLens() {
+  if (active && active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
+  if (!active || !active.wv || !active.ready || isNewtab(active.url)) { toast('open a real page first bro 🫩'); return; }
+  $('panel').classList.remove('show'); closeFind();
+  await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
+  const b = active.wv.getBoundingClientRect();
+  lensShot = await window.aura.capture({ x: b.left, y: b.top, width: b.width, height: b.height });
+  if (!lensShot) { toast('couldnt screenshot this page 💔'); return; }
+  $('lensImg').src = lensShot;
+  $('lensSel').style.display = 'none';
+  $('lens').classList.add('show');
+}
+function endLens() { $('lens').classList.remove('show'); lensDrag = null; }
+async function sendLens(rect) {
+  const img = new Image();
+  img.src = lensShot;
+  await img.decode();
+  const box = $('lens').getBoundingClientRect();
+  const sx = img.naturalWidth / box.width, sy = img.naturalHeight / box.height;
+  const c = document.createElement('canvas');
+  const r = rect || { x: 0, y: 0, w: box.width, h: box.height };
+  c.width = Math.max(1, Math.round(r.w * sx)); c.height = Math.max(1, Math.round(r.h * sy));
+  c.getContext('2d').drawImage(img, r.x * sx, r.y * sy, r.w * sx, r.h * sy, 0, 0, c.width, c.height);
+  const data = c.toDataURL('image/png');
+  endLens();
+  const t = createTab('about:blank');
+  t.title = 'Google Lens'; renderTab(t);
+  const go = async () => { await window.aura.lens(t.wcId, data); };
+  if (t.ready && t.wcId != null) go(); else t.wv.addEventListener('dom-ready', () => { if (!t.lensSent) { t.lensSent = true; go(); } });
+  toast('searching with Lens... screenshot also copied, Ctrl+V works too');
+}
+$('lens').addEventListener('mousedown', (e) => {
+  if (e.target.closest('#lensBar')) return;
+  const b = $('lens').getBoundingClientRect();
+  lensDrag = { x0: e.clientX - b.left, y0: e.clientY - b.top };
+});
+$('lens').addEventListener('mousemove', (e) => {
+  if (!lensDrag) return;
+  const b = $('lens').getBoundingClientRect();
+  const x = Math.max(0, Math.min(e.clientX - b.left, b.width)), y = Math.max(0, Math.min(e.clientY - b.top, b.height));
+  const r = { x: Math.min(x, lensDrag.x0), y: Math.min(y, lensDrag.y0), w: Math.abs(x - lensDrag.x0), h: Math.abs(y - lensDrag.y0) };
+  lensDrag.r = r;
+  Object.assign($('lensSel').style, { display: 'block', left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px', backgroundImage: `url(${lensShot})`, backgroundSize: b.width + 'px ' + b.height + 'px', backgroundPosition: -r.x + 'px ' + -r.y + 'px' });
+});
+$('lens').addEventListener('mouseup', () => {
+  if (!lensDrag) return;
+  const r = lensDrag.r; lensDrag = null;
+  if (r && r.w > 12 && r.h > 12) sendLens(r);
+  else $('lensSel').style.display = 'none';
+});
+$('lensAll').onclick = () => sendLens(null);
+$('lensX').onclick = endLens;
+$('lensBtn').onclick = startLens;
+$('hideBtn').onclick = (e) => { if (e.shiftKey || picking) openPanel('hides'); else if (hideRulesFor(active && active.url).length && !e.altKey) openPanel('hides'); else startHidePicker(); };
+
+// ---- backgrounds ----
+const BG_PRESETS = {
+  aura: 'radial-gradient(ellipse at 18% 12%,#5a1712 0%,transparent 55%),radial-gradient(ellipse at 88% 92%,#21451a 0%,transparent 50%),#120c0b',
+  sunset: 'linear-gradient(160deg,#2b0f3a 0%,#7a1f4b 45%,#e0603a 100%)',
+  ocean: 'linear-gradient(160deg,#021b2e 0%,#04476b 55%,#0aa1a8 100%)',
+  forest: 'linear-gradient(160deg,#07140c 0%,#11402a 60%,#3d7a3a 100%)',
+  candy: 'linear-gradient(135deg,#ff7eb3 0%,#a46bff 50%,#4fd1ff 100%)',
+  orchard: 'linear-gradient(170deg,#7fb34a 0%,#3d6b2a 45%,#1d2e14 100%)',
+  honeycrisp: 'linear-gradient(160deg,#ffcf5a 0%,#f2752e 50%,#b8211a 100%)',
+  midnight: 'linear-gradient(180deg,#000 0%,#0b0b12 60%,#16163a 100%)',
+  lava: 'radial-gradient(ellipse at 50% 120%,#ff4d00 0%,#7a0b0b 45%,#120404 80%)',
+  mint: 'linear-gradient(135deg,#0f2027 0%,#2c5364 50%,#6dffb0 130%)',
+  black: '#000000'
+};
+function setBg(bg) {
+  store.settings.bg = bg; save();
+  tabs.forEach(t => { if (t.wv && isNewtab(t.url)) t.wv.loadURL(newtabSrc()).catch(() => {}); });
+  if (panelIs('theme')) renderTheme();
+}
+function renderTheme() {
+  const list = $('plist');
+  $('ptitle').textContent = 'Backgrounds';
+  const cur = store.settings.bg || { type: 'preset', value: 'aura' };
+  const custom = store.customBgs || [];
+  const sw = (style, sel, attrs) => `<span ${attrs} style="width:52px;height:36px;border-radius:9px;cursor:pointer;background:${style};background-size:cover;background-position:center;border:2px solid ${sel ? '#fff' : '#ffffff22'};flex:none;position:relative"></span>`;
+  list.innerHTML = `<div style="padding:4px 12px;font-size:11px;color:var(--dim)">PRESETS</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px">${Object.entries(BG_PRESETS).map(([k, v]) => sw(v, cur.type === 'preset' && cur.value === k, `data-p="${k}" title="${k}"`)).join('')}</div>
+    <div class="set">Solid colour <input type="color" id="bgCol" value="${cur.type === 'color' ? esc(cur.value) : '#1a1030'}" style="width:52px;height:30px;border:0;background:none;cursor:pointer"></div>
+    <div class="set">Gradient <span style="display:flex;gap:6px;align-items:center"><input type="color" id="g1" value="${cur.type === 'gradient' ? esc(cur.value[0]) : '#ffb83d'}" style="width:36px;height:28px;border:0;background:none"><input type="color" id="g2" value="${cur.type === 'gradient' ? esc(cur.value[1]) : '#e8432e'}" style="width:36px;height:28px;border:0;background:none"><span class="pbtn mini" id="gGo">Use</span></span></div>
+    <div style="padding:8px 12px 4px;font-size:11px;color:var(--dim);display:flex;justify-content:space-between;align-items:center">YOUR IMAGES <span class="pbtn mini" id="bgImp">+ Import</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px 10px">${custom.length ? custom.map((u, i) => sw(`url('${esc(u)}')`, cur.type === 'image' && cur.value === u, `data-i="${i}" title="click to use, right click to delete"`)).join('') : '<span style="color:var(--dim);font-size:12px">import ur own pics, png jpg webp gif</span>'}</div>
+    <div class="set">Dim image <input type="range" id="bgDim" min="0" max="80" value="${store.settings.bgDim ?? 35}"></div>`;
+  list.querySelectorAll('[data-p]').forEach(el => el.onclick = () => setBg({ type: 'preset', value: el.dataset.p }));
+  list.querySelectorAll('[data-i]').forEach(el => {
+    const u = custom[+el.dataset.i];
+    el.onclick = () => setBg({ type: 'image', value: u, dim: store.settings.bgDim ?? 35 });
+    el.oncontextmenu = (e) => {
+      e.preventDefault();
+      store.customBgs = custom.filter(x => x !== u);
+      window.aura.bgDelete(u);
+      if (cur.type === 'image' && cur.value === u) setBg({ type: 'preset', value: 'aura' }); else { save(); renderTheme(); }
+    };
+  });
+  $('bgCol').onchange = (e) => setBg({ type: 'color', value: e.target.value });
+  $('gGo').onclick = () => setBg({ type: 'gradient', value: [$('g1').value, $('g2').value] });
+  $('bgDim').onchange = (e) => { store.settings.bgDim = +e.target.value; const b = store.settings.bg; if (b && b.type === 'image') setBg({ ...b, dim: +e.target.value }); else save(); };
+  $('bgImp').onclick = async () => {
+    const urls = await window.aura.bgImport();
+    if (!urls.length) return;
+    store.customBgs = [...urls, ...(store.customBgs || [])].slice(0, 12);
+    setBg({ type: 'image', value: urls[0], dim: store.settings.bgDim ?? 35 });
+    toast('background imported 🔥');
+  };
+}
+
+// ---- profiles ----
+const PCOLORS = ['#e8432e', '#ffb83d', '#6cc35a', '#c0447a', '#f2752e', '#8a5a3c', '#4fa3d1', '#e4e45e'];
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function applyProfile(p) {
+  if (!p) return;
+  store.profile = p;
+  document.documentElement.style.setProperty('--acc', p.color);
+  $('avatar').textContent = (p.name || '?')[0].toUpperCase();
+  $('avatar').title = 'Profile: ' + p.name;
+  document.title = 'Orchard - ' + p.name;
+}
+async function renderProfiles(editing) {
+  const list = $('plist'), me = store.profile || { id: 'default' };
+  const ps = await window.aura.profiles();
+  $('ptitle').textContent = 'Profiles';
+  list.innerHTML = '';
+  ps.forEach(p => {
+    const r = document.createElement('div');
+    r.className = 'row' + (p.id === me.id ? ' cur' : '');
+    r.innerHTML = `<div class="av" style="background:${esc(p.color)}">${esc((p.name || '?')[0].toUpperCase())}</div><div class="rt"><div>${esc(p.name)}</div><small>${p.id === me.id ? 'this window' : 'click to open'}</small></div><span class="del" data-a="edit" title="Edit">&#9998;</span>${p.id !== 'default' ? '<span class="del" data-a="del" title="Delete">&#128465;</span>' : ''}`;
+    r.onclick = async (e) => {
+      const a = e.target.dataset.a;
+      if (a === 'edit') return profileForm(p);
+      if (a === 'del') {
+        if (!confirm('Delete profile "' + p.name + '"? Its bookmarks, history, cookies and logins get wiped for good.')) return;
+        await window.aura.deleteProfile(p.id); toast('Profile deleted 💔'); renderProfiles(); return;
+      }
+      if (p.id !== me.id) { window.aura.openProfile(p.id); $('panel').classList.remove('show'); }
+    };
+    list.appendChild(r);
+  });
+  const add = document.createElement('div');
+  add.className = 'row';
+  add.innerHTML = '<div class="av" style="background:#2e2e48;color:var(--txt)">+</div><div class="rt"><div>Add profile</div><small>separate logins, bookmarks and history</small></div>';
+  add.onclick = () => profileForm(null);
+  list.appendChild(add);
+  const nw = document.createElement('div');
+  nw.className = 'set';
+  nw.innerHTML = '<span style="color:var(--dim)">New window (Ctrl+N)</span><span class="pbtn" id="nwBtn">Open</span>';
+  list.appendChild(nw);
+  $('nwBtn').onclick = () => window.aura.newWindow();
+}
+function profileForm(p) {
+  const list = $('plist');
+  let color = p ? p.color : PCOLORS[Math.floor(Math.random() * PCOLORS.length)];
+  $('ptitle').textContent = p ? 'Edit profile' : 'New profile';
+  list.innerHTML = `<div class="set" style="display:block"><input class="pin" id="pname" maxlength="24" placeholder="Name" value="${p ? esc(p.name) : ''}"></div>
+    <div class="set"><div class="colors" id="pcol">${PCOLORS.map(c => `<span data-c="${c}" style="background:${c}" class="${c === color ? 'sel' : ''}"></span>`).join('')}</div></div>
+    <div class="set"><span class="pbtn" id="pcancel">Back</span><span class="pbtn" id="psave">${p ? 'Save' : 'Create'}</span></div>`;
+  $('pcol').onclick = (e) => { const c = e.target.dataset.c; if (!c) return; color = c; [...$('pcol').children].forEach(s => s.classList.toggle('sel', s.dataset.c === c)); };
+  $('pcancel').onclick = () => renderProfiles();
+  const go = async () => {
+    const name = $('pname').value.trim();
+    if (!name) { $('pname').focus(); return; }
+    if (p) { await window.aura.editProfile(p.id, name, color); renderProfiles(); }
+    else { await window.aura.addProfile(name, color); $('panel').classList.remove('show'); toast('Profile created, it opened in a new window 🔥'); }
+  };
+  $('psave').onclick = go;
+  $('pname').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  $('pname').focus();
+}
+
+// ---- AI side panel (Gemini / ChatGPT / Claude) ----
+const AIS = { gemini: 'https://gemini.google.com/app', chatgpt: 'https://chatgpt.com/', claude: 'https://claude.ai/new', chat: 'https://claude.ai/artifact/28878hcboZzAuyHNtgbMAQ' };
+let aiWhich = null;
+let aiWv = null, aiOpen = false, aiWcId = null;
+function sideWidth(w) {
+  w = Math.max(320, Math.min(w, window.innerWidth - 360));
+  store.settings.sideW = w;
+  document.documentElement.style.setProperty('--sw', aiOpen ? w + 'px' : '0px');
+}
+function loadAi(which) {
+  aiWhich = which; $('aiPick').value = which; setTimeout(markSideBtns);
+  $('askPage').hidden = which === 'chat';
+  if (aiWv) aiWv.remove();
+  aiWv = document.createElement('webview');
+  if (store.partition) aiWv.setAttribute('partition', store.partition);
+  aiWv.setAttribute('allowpopups', '');
+  aiWv.setAttribute('src', AIS[which] || AIS.gemini);
+  aiWv.addEventListener('dom-ready', () => { try { aiWcId = aiWv.getWebContentsId(); } catch {} });
+  $('sbody').appendChild(aiWv);
+}
+function markSideBtns() {
+  $('aiBtn').classList.toggle('on', aiOpen && aiWhich !== 'chat');
+  $('chatBtn').classList.toggle('on', aiOpen && aiWhich === 'chat');
+}
+function toggleAi(force) {
+  aiOpen = force === undefined ? !aiOpen : force;
+  $('side').classList.toggle('show', aiOpen);
+  markSideBtns();
+  sideWidth(store.settings.sideW || 420);
+  if (aiOpen && !aiWv) loadAi(store.settings.ai || 'gemini');
+  // freeze the ai panel while it's closed so it doesnt eat battery
+  if (aiWcId != null) window.aura.freeze(aiWcId, !aiOpen);
+  if (aiOpen) setTimeout(() => aiWv && aiWv.focus(), 100);
+}
+async function askAboutPage() {
+  if (active && active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
+  if (!active || !active.wv || !active.ready || isNewtab(active.url)) { toast('open a real page first bro 🫩'); return; }
+  let info = { sel: '', text: '' };
+  try {
+    info = await active.wv.executeJavaScript(`({ sel: String(getSelection()), text: (document.body && document.body.innerText || '').replace(/\\s+/g,' ').slice(0, 6000) })`);
+  } catch {}
+  const prompt = info.sel.trim()
+    ? `Explain this from "${active.title}" (${active.url}):\n\n${info.sel.trim().slice(0, 4000)}`
+    : `Summarize this page and tell me the key points.\nTitle: ${active.title}\nURL: ${active.url}\n\nPage text:\n${info.text}`;
+  if (!aiOpen) toggleAi(true);
+  const fill = () => aiWv.executeJavaScript(`(() => {
+    const el = document.querySelector('rich-textarea .ql-editor, div[contenteditable="true"], textarea');
+    if (!el) return false;
+    el.focus();
+    if (el.tagName === 'TEXTAREA') { el.value = ${JSON.stringify(prompt)}; el.dispatchEvent(new Event('input', { bubbles: true })); }
+    else document.execCommand('insertText', false, ${JSON.stringify(prompt)});
+    return true;
+  })()`).catch(() => false);
+  let ok = false;
+  for (let i = 0; i < 10 && !ok; i++) { ok = await fill(); if (!ok) await new Promise(r => setTimeout(r, 700)); }
+  if (ok) toast('page sent to the AI box, hit enter 🔥');
+  else { try { await navigator.clipboard.writeText(prompt); } catch {} toast('couldnt reach the box, copied it so just paste ✌️'); }
+}
+
+function toggleAdblock() {
+  store.settings.adblock = !store.settings.adblock; save();
+  $('shield').classList.toggle('off', !store.settings.adblock);
+  if (!store.settings.adblock) $('shield').innerHTML = '&#128737; off';
+  else $('shield').innerHTML = '&#128737; ' + blocked + ' blocked';
+}
+let blocked = 0;
+
+// find
+function openFind() { $('find').classList.add('show'); $('findIn').focus(); $('findIn').select(); }
+function closeFind() { $('find').classList.remove('show'); try { active && active.wv && active.ready && active.wv.stopFindInPage('clearSelection'); } catch {} }
+
+let toastT;
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+
+function zoom(d) {
+  if (!active || !active.ready) return;
+  let z = d === 0 ? 1 : Math.min(3, Math.max(0.3, active.wv.getZoomFactor() + d));
+  active.wv.setZoomFactor(z); updateNav();
+}
+
+function handleKey(k, ctrl, shift, alt) {
+  if (ctrl && k === 't') { if (shift) { const u = closed.pop(); if (u) createTab(u); } else createTab(); }
+  else if (ctrl && k === 'w') active && closeTab(active);
+  else if (ctrl && k === 'n') window.aura.newWindow();
+  else if (alt && k === 'g') toggleAi();
+  else if (alt && k === 'c') openChat();
+  else if (alt && k === 'f') openPanel('menu');
+  else if (alt && k === 'h') startHidePicker();
+  else if (ctrl && k === 'j') openPanel('downloads');
+  else if (k === 'escape' && $('lens').classList.contains('show')) endLens();
+  else if (ctrl && k === 'l') { $('url').focus(); $('url').select(); }
+  else if ((ctrl && k === 'r') || k === 'f5') active && active.wv.reload();
+  else if (ctrl && k === 'd') toggleBookmark();
+  else if (ctrl && k === 'h') openPanel('history');
+  else if (ctrl && k === 'f') openFind();
+  else if (ctrl && k === 'tab') { const i = tabs.indexOf(active); activate(tabs[(i + (shift ? -1 : 1) + tabs.length) % tabs.length]); }
+  else if (ctrl && (k === '=' || k === '+')) zoom(0.1);
+  else if (ctrl && k === '-') zoom(-0.1);
+  else if (ctrl && k === '0') zoom(0);
+  else if (k === 'f11') window.aura.win('full');
+  else if (k === 'f12') active && active.wv.openDevTools();
+  else if (alt && k === 'arrowleft') active && active.wv.canGoBack() && active.wv.goBack();
+  else if (alt && k === 'arrowright') active && active.wv.canGoForward() && active.wv.goForward();
+  else return false;
+  return true;
+}
+
+// wiring
+$('newtab').onclick = () => createTab();
+$('back').onclick = () => active.wv.goBack();
+$('fwd').onclick = () => active.wv.goForward();
+$('reload').onclick = () => active.wv.reload();
+$('home').onclick = () => active.wv.loadURL(newtabSrc());
+$('star').onclick = toggleBookmark;
+$('shield').onclick = toggleAdblock;
+$('batt').onclick = () => openPanel('battery');
+$('dlBtn').onclick = () => openPanel('downloads');
+$('speedBtn').onclick = () => openPanel('speed');
+$('histBtn').onclick = () => openPanel('history');
+$('setBtn').onclick = () => openPanel('settings');
+$('avatar').onclick = () => openPanel('profiles');
+$('aiBtn').onclick = () => { if (aiOpen && aiWhich === 'chat') { aiWcId = null; loadAi(store.settings.ai && store.settings.ai !== 'chat' ? store.settings.ai : 'gemini'); } else toggleAi(); };
+const openChat = () => {
+  if (aiOpen && aiWhich === 'chat') { toggleAi(false); return; }
+  if (!aiOpen) toggleAi(true);
+  if (aiWhich !== 'chat') { aiWcId = null; loadAi('chat'); }
+};
+$('chatBtn').onclick = openChat;
+$('menuBtn').onclick = () => openPanel('menu');
+$('updPill').onclick = () => { saveSession(true); window.aura.restartUpdate(); };
+// middle click empty tab bar = new tab, double click empty = maximize
+$('tabs').addEventListener('mousedown', (e) => { if (e.button === 1 && (e.target.id === 'tabs')) { e.preventDefault(); createTab(); } });
+$('tabs').addEventListener('auxclick', (e) => { if (e.button === 1 && e.target.id === 'newtab') { e.preventDefault(); createTab(); } });
+$('sideX').onclick = () => toggleAi(false);
+$('askPage').onclick = askAboutPage;
+$('aiPick').onchange = (e) => { if (e.target.value !== 'chat') { store.settings.ai = e.target.value; save(); } aiWcId = null; loadAi(e.target.value); };
+$('sgrip').onmousedown = (e) => {
+  e.preventDefault(); document.body.classList.add('dragging');
+  const mv = (ev) => sideWidth(window.innerWidth - ev.clientX);
+  const up = () => { document.body.classList.remove('dragging'); removeEventListener('mousemove', mv); removeEventListener('mouseup', up); save(); };
+  addEventListener('mousemove', mv); addEventListener('mouseup', up);
+};
+$('pclose').onclick = () => $('panel').classList.remove('show');
+$('mn').onclick = () => window.aura.win('min');
+$('mx').onclick = () => window.aura.win('max');
+$('cl').onclick = () => window.aura.win('close');
+$('top').ondblclick = (e) => { if (e.target.id === 'top' || e.target.id === 'tabs') window.aura.win('max'); };
+// ---- omnibox: history, bookmarks and live search suggestions as u type ----
+let omniItems = [], omniSel = 0, omniSeq = 0, omniTyped = '';
+const searchQueryOf = (u) => {
+  try {
+    const x = new URL(u);
+    if (/(^|\.)google\.[a-z.]+$/.test(x.hostname) && x.pathname === '/search') return x.searchParams.get('q');
+    if (/duckduckgo\.com$/.test(x.hostname)) return x.searchParams.get('q');
+    if (/bing\.com$/.test(x.hostname) && x.pathname === '/search') return x.searchParams.get('q');
+    if (/search\.brave\.com$/.test(x.hostname)) return x.searchParams.get('q');
+  } catch {}
+  return null;
+};
+function historyStats() {
+  // one entry per url: visit count + latest time
+  const m = new Map();
+  for (const h of store.history) {
+    if (!h.url || isNewtab(h.url)) continue;
+    const e = m.get(h.url);
+    if (e) { e.n++; if (h.time > e.time) e.time = h.time; }
+    else m.set(h.url, { url: h.url, title: h.title || h.url, time: h.time || 0, n: 1 });
+  }
+  return [...m.values()];
+}
+function localMatches(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const now = Date.now(), out = [], seenSearch = new Set();
+  const score = (e) => e.n * 3 + Math.max(0, 20 - (now - e.time) / 864e5);
+  const hits = (s) => words.every(w => s.includes(w));
+  for (const e of historyStats()) {
+    const sq = searchQueryOf(e.url);
+    if (sq) {
+      const k = sq.toLowerCase();
+      if (seenSearch.has(k) || (words.length && !hits(k))) continue;
+      seenSearch.add(k);
+      out.push({ kind: 'past', text: sq, sub: 'u searched this', go: sq, s: score(e) + 5 });
+      continue;
+    }
+    const hay = (e.title + ' ' + e.url).toLowerCase();
+    if (words.length && !hits(hay)) continue;
+    const starts = words.length && e.url.replace(/^https?:\/\/(www\.)?/, '').toLowerCase().startsWith(words[0]);
+    out.push({ kind: 'hist', text: e.title, sub: e.url, go: e.url, url: e.url, s: score(e) + (starts ? 30 : 0) });
+  }
+  for (const b of store.bookmarks) {
+    const hay = (b.title + ' ' + b.url).toLowerCase();
+    if (words.length && hits(hay)) out.push({ kind: 'bm', text: b.title, sub: b.url, go: b.url, url: b.url, s: 25 });
+  }
+  const best = new Map();
+  out.forEach(o => { const k = o.kind === 'past' ? 'q:' + o.text.toLowerCase() : o.go; if (!best.has(k) || best.get(k).s < o.s) best.set(k, o); });
+  return [...best.values()].sort((a, b) => b.s - a.s);
+}
+function omniRender() {
+  const box = $('omni');
+  if (!omniItems.length) { box.hidden = true; return; }
+  const ICON = { search: '&#128269;', sugg: '&#128269;', past: '&#128339;', hist: '', bm: '&#11088;', url: '&#127760;' };
+  box.innerHTML = '';
+  omniItems.forEach((it, i) => {
+    const d = document.createElement('div');
+    d.className = 'oi' + (i === omniSel ? ' sel' : '');
+    const ic = it.kind === 'hist' ? `<img src="${fav(it.url)}" onerror="this.replaceWith(document.createTextNode('\u{1F310}'))">` : ICON[it.kind];
+    d.innerHTML = `<span class="oic">${ic}</span><span class="ot"></span><span class="os"></span>${it.kind === 'hist' || it.kind === 'past' ? '<span class="ox" title="Remove from history">&#10005;</span>' : ''}`;
+    d.querySelector('.ot').textContent = it.text;
+    d.querySelector('.os').textContent = it.sub ? (it.kind === 'hist' || it.kind === 'bm' ? ' — ' : ' · ') + it.sub : '';
+    d.onmousedown = (e) => {
+      e.preventDefault();
+      if (e.target.classList.contains('ox')) { forget(it); return; }
+      omniGo(it, e.button === 1 || e.ctrlKey);
+    };
+    d.onmouseenter = () => { omniSel = i; [...box.children].forEach((c, j) => c.classList.toggle('sel', j === i)); };
+    box.appendChild(d);
+  });
+  const r = $('urlwrap').getBoundingClientRect();
+  Object.assign(box.style, { left: r.left + 'px', top: (r.bottom + 4) + 'px', width: r.width + 'px' });
+  box.hidden = false;
+}
+function forget(it) {
+  if (it.kind === 'past') store.history = store.history.filter(h => (searchQueryOf(h.url) || '').toLowerCase() !== it.text.toLowerCase());
+  else store.history = store.history.filter(h => h.url !== it.url);
+  save(); toast('removed from history'); omniUpdate(true);
+}
+function omniClose() { $('omni').hidden = true; omniItems = []; }
+function omniGo(it, newTab) {
+  omniClose();
+  $('url').blur();
+  if (newTab) { const u = toUrl(it.go); if (u) createTab(u, true); return; }
+  go(it.go);
+}
+async function omniUpdate(keepSel) {
+  const q = $('url').value, seq = ++omniSeq, trimmed = q.trim();
+  const base = [];
+  if (trimmed) {
+    const asUrl = toUrl(trimmed), isUrl = asUrl && !asUrl.startsWith(ENGINES[store.settings.engine || 'google']);
+    if (isUrl) base.push({ kind: 'url', text: trimmed, sub: 'open site', go: trimmed });
+    base.push({ kind: 'search', text: trimmed, sub: 'search ' + (store.settings.engine || 'google'), go: trimmed.startsWith('?') ? trimmed.slice(1) : trimmed });
+  }
+  const local = localMatches(trimmed).slice(0, trimmed ? 5 : 8);
+  omniItems = base.concat(local);
+  if (!keepSel) omniSel = 0;
+  omniRender();
+  if (!trimmed || store.settings.suggest === false || /^[a-z]+:\/\//i.test(trimmed)) return;
+  // live suggestions from the search engine (fetched by the main process)
+  const sugg = await window.aura.suggest(store.settings.engine || 'google', trimmed).catch(() => []);
+  if (seq !== omniSeq || document.activeElement !== $('url')) return;
+  const have = new Set(omniItems.map(i => (i.kind === 'past' || i.kind === 'search' ? i.text.toLowerCase() : '')));
+  const extra = sugg.filter(s => s && !have.has(s.toLowerCase())).slice(0, 5).map(s => ({ kind: 'sugg', text: s, sub: '', go: s }));
+  const firstLocal = omniItems.findIndex(i => i.kind !== 'url' && i.kind !== 'search');
+  const head = firstLocal < 0 ? omniItems : omniItems.slice(0, firstLocal), tail = firstLocal < 0 ? [] : omniItems.slice(firstLocal);
+  omniItems = head.concat(extra.slice(0, 3), tail.slice(0, 5), extra.slice(3));
+  omniRender();
+}
+$('url').addEventListener('input', () => { omniTyped = $('url').value; omniUpdate(); });
+$('url').addEventListener('keydown', (e) => {
+  const open = !$('omni').hidden && omniItems.length;
+  if (e.key === 'ArrowDown' && open) { e.preventDefault(); omniSel = (omniSel + 1) % omniItems.length; omniRender(); $('url').value = omniItems[omniSel].kind === 'hist' || omniItems[omniSel].kind === 'bm' ? omniItems[omniSel].url : omniItems[omniSel].text; }
+  else if (e.key === 'ArrowUp' && open) { e.preventDefault(); omniSel = (omniSel - 1 + omniItems.length) % omniItems.length; omniRender(); $('url').value = omniItems[omniSel].kind === 'hist' || omniItems[omniSel].kind === 'bm' ? omniItems[omniSel].url : omniItems[omniSel].text; }
+  else if (e.key === 'Delete' && e.shiftKey && open && ['hist', 'past'].includes(omniItems[omniSel].kind)) { e.preventDefault(); forget(omniItems[omniSel]); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    const it = open ? omniItems[omniSel] : null;
+    const typedNow = $('url').value;
+    if (it && (it.text === typedNow || it.url === typedNow)) omniGo(it, e.altKey); else { omniClose(); if (e.altKey) { const u = toUrl(typedNow); if (u) createTab(u, true); } else go(typedNow); $('url').blur(); }
+  }
+  else if (e.key === 'Escape') { if (open) { omniClose(); $('url').value = omniTyped || $('url').value; } else { updateNav(); $('url').blur(); } }
+});
+let omniHandoff = false;
+$('url').addEventListener('focus', () => { if (omniHandoff) { omniHandoff = false; return; } setTimeout(() => $('url').select(), 0); omniTyped = ''; omniUpdate(); });
+$('url').addEventListener('blur', () => setTimeout(omniClose, 120));
+window.addEventListener('resize', () => { if (!$('omni').hidden) omniRender(); });
+$('findIn').addEventListener('input', (e) => { const v = e.target.value; if (v) active.wv.findInPage(v); else closeFind(), openFind(); });
+$('findIn').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.value) active.wv.findInPage(e.target.value, { findNext: true, forward: !e.shiftKey }); if (e.key === 'Escape') closeFind(); });
+$('findX').onclick = closeFind;
+document.addEventListener('keydown', (e) => { if (handleKey(e.key.toLowerCase(), e.ctrlKey, e.shiftKey, e.altKey)) e.preventDefault(); });
+
+window.aura.on('open-tab', (d) => typeof d === 'string' ? createTab(d) : createTab(d.url, d.bg));
+window.aura.on('tool', (name) => {
+  if (name.startsWith('omnibox')) { const q = decodeURIComponent(name.split('/')[1] || ''); omniHandoff = true; $('url').focus(); $('url').value = q; omniTyped = q; omniUpdate(); const n = $('url'); n.setSelectionRange(q.length, q.length); return; }
+  const map = { chat: () => openChat(), ai: () => toggleAi(true), lens: () => startLens(), battery: () => openPanel('battery'), speed: () => openPanel('speed'), downloads: () => openPanel('downloads'), menu: () => openPanel('menu'), theme: () => openPanel('theme'), profiles: () => openPanel('profiles'), history: () => openPanel('history') };
+  if (map[name]) map[name]();
+});
+window.aura.on('shortcut', (s) => handleKey(s.key, s.ctrl, s.shift, s.alt));
+window.aura.on('blocked', (n) => { blocked = n; if (store.settings.adblock) $('shield').innerHTML = '&#128737; ' + n + ' blocked'; });
+window.aura.on('download', (d) => toast(d.state === 'completed' ? 'Downloaded ' + d.name + ' 🔥' : 'Download failed 💔'));
+window.aura.on('win-blur', () => relockAll());
+function showUpdate(u) {
+  const p = $('updPill'); p.hidden = false;
+  p.innerHTML = '&#11014; Update ' + esc(u.version);
+  p.title = (u.notes ? 'New: ' + u.notes + '\n' : '') + 'Click to restart into it';
+}
+window.aura.on('update-ready', (u) => { showUpdate(u); toast('Orchard ' + u.version + ' downloaded, click the green button to restart 🔥'); });
+window.aura.appVersion().then(v => { if (v.pending) showUpdate(v.pending); });
+window.aura.on('profile-changed', (p) => applyProfile(p));
+window.aura.on('power', (b) => { onBattery = b; applySaver(); });
+window.aura.on('max-state', (m) => $('mx').innerHTML = m ? '&#10697;' : '&#9744;');
+
+window.aura.on('attach-tab', (u) => { const t = createTab(u || undefined); window.aura.win('focus'); });
+window.aura.getStore().then(async (s) => {
+  store = s;
+  store.settings = store.settings || { engine: 'google', adblock: true };
+  $('shield').classList.toggle('off', !store.settings.adblock);
+  if (!store.settings.adblock) $('shield').innerHTML = '&#128737; off';
+  if (store.settings.sleepMins === undefined) store.settings.sleepMins = 5;
+  applyProfile(store.profile);
+  $('aiPick').value = store.settings.ai || 'gemini';
+  blocked = store.blocked || 0;
+  renderBookmarks();
+  const first = await window.aura.initialTab();
+  if (first !== null && first !== undefined) createTab(first || undefined);
+  else if (!restoreSession()) createTab();
+  window.aura.onBattery().then(b => { onBattery = b; applySaver(); });
+  if (navigator.getBattery) navigator.getBattery().then(bt => {
+    const up = () => { battLevel = bt.level; charging = bt.charging; applySaver(); };
+    bt.addEventListener('levelchange', up); bt.addEventListener('chargingchange', up); up();
+  }).catch(() => updateSaverUI());
+  else updateSaverUI();
+  setInterval(updateSaverUI, 15000);
+});
