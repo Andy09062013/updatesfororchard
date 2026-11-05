@@ -9,8 +9,8 @@
       "file": "unanchored.js",
       "inject": true,
       "description": "Floating bars, buttons and popups fall with gravity. Drag them, throw them, bounce them off the edges, and they still work when u tap them. Run it again to put everything back.",
-      "size": 5939,
-      "sha256": "90f92502f57ff4db0e02e11020d94ae98a296ba76d72f6431353602efab89387"
+      "size": 6043,
+      "sha256": "df7868e4968220e501cb0a113ef11064e61421096f794710b815c32d724528cf"
     }
   ]
 }

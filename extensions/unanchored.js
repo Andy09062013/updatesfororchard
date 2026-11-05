@@ -12,11 +12,12 @@
     if (!(el instanceof HTMLElement)) return false;
     if (el === document.body || el === document.documentElement) return false;
     var cs = getComputedStyle(el);
-    if (cs.position !== 'fixed' && cs.position !== 'sticky') return false;
+    if (cs.position !== 'fixed' && cs.position !== 'sticky' && cs.position !== 'absolute') return false;
     if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity === 0) return false;
     var r = el.getBoundingClientRect();
     if (r.width < 8 || r.height < 8) return false;
     if (r.width > vw() * 0.92 && r.height > vh() * 0.92) return false; // full-screen overlay
+    if (r.height > vh() * 0.96) return false; // tall page-height wrapper
     return true;
   }
   function place(b) { b.el.style.transform = 'translate(' + b.x + 'px,' + b.y + 'px) rotate(' + b.rot + 'deg)'; }

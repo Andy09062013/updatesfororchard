@@ -1,6 +1,6 @@
 {
-  "version": "2.6.0",
-  "notes": "New Unanchored extension (floating UI falls with gravity, drag & throw it), guest mode that saves nothing, and the right-click sticky note menu now lands at ur cursor",
+  "version": "2.6.1",
+  "notes": "Fixed the Unanchored extension not loading (it saved as the wrong file type), and it now also drops absolutely-positioned floating UI so it works on more sites",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "1399fa534deb8405a670e027153fb9e197727b14fc1ba18888a1d0e06311cb04"
+      "sha256": "740a1645da1ca0f83f3447fbb1d2677d8181c9145ff19bff343f1118e2b37c6b"
     },
     {
       "path": "newtab.html",
@@ -37,7 +37,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "045b55bb93e415773625ff5e2901c5e330edd75af103893badf1b5dbb6e7d88c"
+      "sha256": "5ff47a72b7e881bbede148806cf65906795774c2a903beb7075e3de7d000aa84"
     },
     {
       "path": "preload.js",

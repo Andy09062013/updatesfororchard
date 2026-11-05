@@ -828,23 +828,29 @@ ipcMain.handle('ext-install', async (e, id) => {
     const buf = Buffer.from(await r.arrayBuffer());
     if (x.sha256 && require('crypto').createHash('sha256').update(buf).digest('hex') !== x.sha256) return { error: 'the download got corrupted, try again' };
     fs.mkdirSync(extDir, { recursive: true });
-    fs.writeFileSync(path.join(extDir, id + '.html'), buf);
+    const saved = id + (x.file.endsWith('.js') ? '.js' : '.html');
+    fs.writeFileSync(path.join(extDir, saved), buf);
     const list = readExt().filter(i => i.id !== id);
-    list.push({ id, name: x.name, category: x.category, description: x.description, icon: x.icon, version: x.version, size: buf.length, installed: Date.now(), inject: !!x.inject, file: x.file });
+    list.push({ id, name: x.name, category: x.category, description: x.description, icon: x.icon, version: x.version, size: buf.length, installed: Date.now(), inject: !!x.inject, file: saved });
     writeExt(list);
     return { ok: true };
   } catch (ex) { return { error: String(ex.message || ex) }; }
 });
 ipcMain.handle('ext-remove', (e, id) => {
   if (!okExtId(id)) return false;
+  try { const f = (readExt().find(x => x.id === id) || {}).file; if (f && /^[A-Za-z0-9_.-]+$/.test(f)) fs.unlinkSync(path.join(extDir, f)); } catch {}
   try { fs.unlinkSync(path.join(extDir, id + '.html')); } catch {}
+  try { fs.unlinkSync(path.join(extDir, id + '.js')); } catch {}
   writeExt(readExt().filter(i => i.id !== id));
   return true;
 });
 function extFile(id) {
-  const it = readExt().find(x => x.id === id);
-  const name = it && /^[A-Za-z0-9_.-]+$/.test(it.file || '') ? it.file : id + '.html';
-  return path.join(extDir, name);
+  const it = readExt().find(x => x.id === id) || {};
+  const cands = [];
+  if (it.file && /^[A-Za-z0-9_.-]+$/.test(it.file)) cands.push(it.file);
+  cands.push(id + '.js', id + '.html');
+  for (const n of cands) { const p = path.join(extDir, n); try { if (fs.existsSync(p)) return p; } catch {} }
+  return path.join(extDir, cands[0]);
 }
 ipcMain.handle('ext-url', (e, id) => {
   if (!okExtId(id)) return null;
