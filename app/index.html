@@ -7,6 +7,7 @@
 <style>
 :root{--bg:#120c0b;--bar:#1b1211;--tab:#241816;--tabA:#30201d;--txt:#f6ece8;--dim:#a8918a;--acc:#e8432e;--acc2:#ffb83d;--leaf:#6cc35a}
 *{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--txt);font:13px "Segoe UI",system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none}
 #top{display:flex;align-items:flex-end;background:var(--bar);height:40px;-webkit-app-region:drag;padding-left:8px}
 #logo{display:flex;align-items:center;gap:6px;font-weight:800;letter-spacing:1px;padding:0 10px 9px 2px;font-size:15px;color:var(--acc2)}
@@ -132,6 +133,8 @@ body.dragging webview{pointer-events:none}
 .lockcard small{color:var(--dim)}
 .lockcard input{width:100%;background:#150e0d;border:1px solid #3a2622;border-radius:9px;color:var(--txt);padding:9px 12px;outline:0;text-align:center;font:inherit}
 .lockcard input:focus{border-color:var(--acc)}
+.lockcard .forgot{font-size:12px;color:var(--dim);cursor:pointer;text-decoration:underline;margin-top:2px}
+.lockcard .forgot:hover{color:var(--acc2)}
 .lockerr{color:#ff6b6b;font-size:12px;min-height:15px}
 #ctx{position:fixed;z-index:50;min-width:210px;background:#201513;border:1px solid #3a2622;border-radius:10px;padding:5px;box-shadow:0 14px 40px #000a}
 #ctx .ci{padding:8px 12px;border-radius:7px;cursor:pointer}

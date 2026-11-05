@@ -326,15 +326,24 @@ function showLock(t, st) {
   if (!t.lockEl) {
     const d = document.createElement('div');
     d.className = 'lockpane';
-    d.innerHTML = '<div class="lockcard"><div style="font-size:40px">&#128274;</div><b>This tab is locked</b><small>enter your tab password</small><input type="password" placeholder="Password"><div class="lockerr"></div><span class="pbtn">Unlock</span></div>';
+    d.innerHTML = '<div class="lockcard"><div style="font-size:40px">&#128274;</div><b>This tab is locked</b><small>enter your tab password</small><div style="display:flex;gap:6px;width:100%"><input type="password" placeholder="Password"><span class="pbtn eye" title="Show password">&#128065;</span></div><div class="lockerr"></div><span class="pbtn ok unl">Unlock</span><a class="forgot">Forgot password?</a></div>';
     const inp = d.querySelector('input'), err = d.querySelector('.lockerr');
+    d.querySelector('.eye').onclick = () => { inp.type = inp.type === 'password' ? 'text' : 'password'; inp.focus(); };
+    inp.addEventListener('keyup', (e) => { if (e.getModifierState && e.getModifierState('CapsLock')) err.textContent = 'caps lock is on'; else if (err.textContent === 'caps lock is on') err.textContent = ''; });
+    d.querySelector('.forgot').onclick = async () => {
+      const v = await modal('Forgot ur tab password?', 'This closes every locked tab and removes the password. Ur other tabs stay. Type RESET to do it.', [{ id: 'c', label: 'Type RESET' }], 'Reset');
+      if (!v || v.c.trim().toUpperCase() !== 'RESET') return;
+      tabs.filter(x => x.locked).forEach(x => closeTab(x, true));
+      delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1;
+      save(); saveSession(true); layoutViews(); toast('password removed, locked tabs closed');
+    };
     let fails = 0, wait = 0;
     const tryIt = async () => {
       if (Date.now() < wait) { err.textContent = 'too many tries, wait a sec'; return; }
-      if (await checkPw(inp.value)) { lastUnlock = Date.now(); t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); if (t.wv) t.wv.focus(); }
+      if (await checkPw(inp.value)) { lastUnlock = Date.now(); t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); toast('unlocked 🔓'); }
       else { fails++; err.textContent = 'wrong password 💔'; inp.select(); if (fails >= 5) { wait = Date.now() + 15000; fails = 0; } }
     };
-    d.querySelector('.pbtn').onclick = tryIt;
+    d.querySelector('.unl').onclick = tryIt;
     inp.onkeydown = (e) => { if (e.key === 'Enter') tryIt(); };
     d.onmousedown = () => { if (t !== active) activate(t); };
     $('views').appendChild(d);

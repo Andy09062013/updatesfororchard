@@ -1,6 +1,6 @@
 {
-  "version": "1.9.0",
-  "notes": "Orchard Mail: ur Gmail in a side panel, signed in through Chrome. Open in Chrome bar on Google logins",
+  "version": "1.9.1",
+  "notes": "Fixed locked tabs staying covered after typing the right password, added show password and forgot password",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "94ec35f0c2717a01d39b978bdefd1a9169362cc74d620e6090fff65cd42f6fb7"
+      "sha256": "97021336405266f7ef0ef3a3714973c3f0628c75d181f843ca1e686099b2eeea"
     },
     {
       "path": "main.js",
@@ -33,7 +33,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "e47398b04f8afe2786c0d00d141a7b29503693d23b00457bfca6a4701eacfa12"
+      "sha256": "2c219398a7972b9338baf1bd7678d3b43c9042a9932e55baf0c1353e29951ee0"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "f8fec27aea2e53be7851d9a3b88ca682672938e89484e4fbc5379aaeb63e1eb0"
+      "sha256": "1f2288740aeadca90f8af182c956ad9c9e0a87d3901e0502e0cf1ffce5eb1dcf"
     }
   ]
 }
