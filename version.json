@@ -1,6 +1,6 @@
 {
-  "version": "2.4.0",
-  "notes": "Cheaper videos on battery (H.264 + YouTube quality cap) and a much bigger ad and tracker blocker",
+  "version": "2.4.1",
+  "notes": "Downloads go straight to ur Downloads folder like Chrome, no Save As popup",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "1bbca8d3ed32582c996dae7b4d2c6ef44b1fb6f26e7ff54a06533262e692d548"
+      "sha256": "2bbd89727cb5ffbe320c8cac0a889f779bfaccaa241c986503913094fe74cdf1"
     },
     {
       "path": "newtab.html",
@@ -37,7 +37,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "9b1a1cd9b647cd1482336d54961dee465d65f47624a6e109053d3d3ef2f88b1a"
+      "sha256": "cc44f5e56dfff09a4a981797320aa1d0cdf33e49cdcbd36fcdad17530ca51f7e"
     },
     {
       "path": "preload.js",
@@ -45,7 +45,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "d697eccf541141e59c89cf3c7774f05f48b0221e1f4e8d1d2ed4bc2a89faed9b"
+      "sha256": "fc5e5baf4ceb94cc00466e8797249ab7c87ad9215ad32eb3584324a034440dfb"
     },
     {
       "path": "throttle.ps1",

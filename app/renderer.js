@@ -848,6 +848,9 @@ function renderSettings() {
     + hd('TAB LOCK')
     + `<div class="set">Tab lock password <span style="display:flex;gap:6px">${S.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>`
     + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Right click a tab and pick Lock tab. It locks again when u switch tabs or leave Orchard.</div>`
+    + hd('DOWNLOADS')
+    + `<div class="set">Ask where to save each file ${sw(!!S.askDownload, 'askDl')}</div>`
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Off: files go straight into ur Downloads folder, like Chrome.</div>`
     + hd('LOOKS')
     + `<div class="set">New tab background <span class="pbtn" id="thm">Change</span></div>`
     + hd('PRIVACY')
@@ -869,6 +872,7 @@ function renderSettings() {
   $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
   toggle('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
   toggle('dkp2', () => !!store.settings.darkPages, (v) => { store.settings.darkPages = v; save(); applySaver(); });
+  toggle('askDl', () => !!store.settings.askDownload, (v) => { store.settings.askDownload = v; save(); });
   toggle('cvT2', () => store.settings.cheapVideo !== false, (v) => { store.settings.cheapVideo = v; save(); syncThrottle(); });
   toggle('slowT2', () => store.settings.slowApps !== false, (v) => { store.settings.slowApps = v; save(); syncThrottle(); });
   $('battOpen').onclick = () => openPanel('battery');
@@ -1443,6 +1447,7 @@ function renderDownloads() {
 }
 window.aura.on('dl', (d) => {
   const prev = dls.get(d.id);
+  if (!prev && d.state === 'progressing') toast('⬇ downloading ' + d.name);
   if (prev && d.state === 'progressing') d.speed = Math.max(0, (d.received - prev.received) / Math.max(0.05, (d.time - prev.time) / 1000));
   dls.set(d.id, d);
   updateDlBtn();

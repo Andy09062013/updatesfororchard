@@ -57,9 +57,22 @@ const sendTo = (wc, ch, d) => { if (wc && !wc.isDestroyed()) wc.send(ch, d); };
 const setUp = new Set();
 const downloads = new Map();
 let dlId = 0;
+// "report.pdf" -> "report (1).pdf" if it's already there (or being downloaded right now), like Chrome
+const reservedDl = new Set();
+function uniqueDownloadPath(name) {
+  const dir = app.getPath('downloads');
+  const clean = String(name || 'download').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/^\.+/, '').slice(0, 180) || 'download';
+  const ext = path.extname(clean), base = clean.slice(0, clean.length - ext.length);
+  for (let n = 0; n < 1000; n++) {
+    const p = path.join(dir, n ? `${base} (${n})${ext}` : clean);
+    if (!fs.existsSync(p) && !reservedDl.has(p)) { reservedDl.add(p); return p; }
+  }
+  const p = path.join(dir, `${base} ${Date.now()}${ext}`); reservedDl.add(p); return p;
+}
 function setupSession(id) {
   if (setUp.has(id)) return;
   setUp.add(id);
+  const profId = id;
   const ses = sessionFor(id);
   try {
     const vp = path.join(__dirname, 'video-preload.js');
@@ -83,8 +96,15 @@ function setupSession(id) {
     const host = hostOf(wc);
     const id = ++dlId;
     downloads.set(id, item);
-    const info = (state) => ({ id, name: item.getFilename(), url: item.getURL(), received: item.getReceivedBytes(), total: item.getTotalBytes(), state, paused: item.isPaused(), path: item.getSavePath(), time: Date.now() });
+    // like Chrome: save straight to Downloads, no "Save As" box (unless the user turned asking on)
+    let savePath = '';
+    if (!(storeFor(profId).settings || {}).askDownload) {
+      savePath = uniqueDownloadPath(item.getFilename());
+      item.setSavePath(savePath);
+    }
+    const info = (state) => ({ id, name: path.basename(item.getSavePath() || savePath || item.getFilename()), url: item.getURL(), received: item.getReceivedBytes(), total: item.getTotalBytes(), state, paused: item.isPaused(), path: item.getSavePath() || savePath, time: Date.now() });
     sendTo(host, 'dl', info('progressing'));
+    item.once('done', () => reservedDl.delete(savePath));
     let last = 0;
     item.on('updated', (ev, state) => { if (Date.now() - last > 250) { last = Date.now(); sendTo(host, 'dl', info(state)); } });
     item.once('done', (ev, state) => { sendTo(host, 'dl', info(state)); sendTo(host, 'download', { name: item.getFilename(), state, path: item.getSavePath() }); });
