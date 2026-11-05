@@ -1,7 +1,7 @@
 {
   "name": "orchard-browser",
   "productName": "Orchard",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "Orchard - an apple themed browser",
   "main": "boot.js",
   "author": "you",

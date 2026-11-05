@@ -752,6 +752,7 @@ const FEATURES = [
   ['&#9993;', 'Orchard Mail', 'ur Gmail in a side panel, sign in through Chrome', 'Alt+M', () => openMail()],
   ['&#128172;', 'Orchard Chat', 'chat with friends by email, groups, files', 'Alt+C', () => openChat()],
   ['&#10022;', 'Ask AI', 'Gemini, ChatGPT or Claude on the side', 'Alt+G', () => toggleAi(true)],
+  ['&#9989;', 'Answer the questions', 'sends the questions on this page to the AI', '', () => askAboutPage('answer')],
   ['&#128269;', 'Google Lens', 'drag over anything to search it', 'Lens icon', () => startLens()],
   ['&#128065;', 'Hide elements', 'click ads, popups, anything to hide it on that site', 'Alt+H', () => startHidePicker()],
   ['TOOLS'],
@@ -1314,17 +1315,26 @@ function toggleAi(force) {
   placeChat();
   if (aiOpen) setTimeout(() => aiWv && aiWv.focus(), 100);
 }
-async function askAboutPage() {
+async function askAboutPage(mode) {
   if (active && active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
   if (!active || !active.wv || !active.ready || isNewtab(active.url)) { toast('open a real page first bro 🫩'); return; }
   let info = { sel: '', text: '' };
+  const limit = mode === 'answer' ? 14000 : 6000;
   try {
-    info = await active.wv.executeJavaScript(`({ sel: String(getSelection()), text: (document.body && document.body.innerText || '').replace(/\\s+/g,' ').slice(0, 6000) })`);
+    info = await active.wv.executeJavaScript(`({ sel: String(getSelection()), text: (document.body && document.body.innerText || '').replace(/[ \\t]+/g,' ').replace(/\\n{3,}/g,'\\n\\n').slice(0, ${limit}) })`);
   } catch {}
-  const prompt = info.sel.trim()
-    ? `Explain this from "${active.title}" (${active.url}):\n\n${info.sel.trim().slice(0, 4000)}`
-    : `Summarize this page and tell me the key points.\nTitle: ${active.title}\nURL: ${active.url}\n\nPage text:\n${info.text}`;
+  const sel = info.sel.trim();
+  let prompt;
+  if (mode === 'answer') {
+    prompt = `Answer the questions ${sel ? 'below' : 'on this page'}. For each one, give the answer and a short explanation of why, so I understand it.\nTitle: ${active.title}\nURL: ${active.url}\n\n${sel ? 'Questions:\n' + sel.slice(0, 8000) : 'Page text:\n' + info.text}`;
+  } else if (mode === 'explain' || (!mode && sel)) {
+    prompt = `Explain this from "${active.title}" (${active.url}):\n\n${(sel || info.text).slice(0, 4000)}`;
+  } else {
+    prompt = `Summarize this page and tell me the key points.\nTitle: ${active.title}\nURL: ${active.url}\n\nPage text:\n${info.text}`;
+  }
+  if (aiWhich === 'chat' || aiWhich === 'mail') { aiWhich = store.settings.ai && store.settings.ai !== 'chat' && store.settings.ai !== 'mail' ? store.settings.ai : 'gemini'; if (aiOpen) loadAi(aiWhich); }
   if (!aiOpen) toggleAi(true);
+  if (!aiWv) loadAi(aiWhich || 'gemini');
   const fill = () => aiWv.executeJavaScript(`(() => {
     const el = document.querySelector('rich-textarea .ql-editor, div[contenteditable="true"], textarea');
     if (!el) return false;
@@ -1421,7 +1431,15 @@ $('updPill').onclick = () => { saveSession(true); window.aura.restartUpdate(); }
 $('tabs').addEventListener('mousedown', (e) => { if (e.button === 1 && (e.target.id === 'tabs')) { e.preventDefault(); createTab(); } });
 $('tabs').addEventListener('auxclick', (e) => { if (e.button === 1 && e.target.id === 'newtab') { e.preventDefault(); createTab(); } });
 $('sideX').onclick = () => toggleAi(false);
-$('askPage').onclick = askAboutPage;
+$('askPage').onclick = async (e) => {
+  let hasSel = false;
+  try { hasSel = !!(active && active.wv && active.ready && (await active.wv.executeJavaScript('String(getSelection()).trim().length')) > 0); } catch {}
+  showMenu(e, [
+    ['&#128221; Summarize this page', () => askAboutPage('summary')],
+    ['&#9989; Answer the questions' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answer')],
+    hasSel ? ['&#128161; Explain what I highlighted', () => askAboutPage('explain')] : null
+  ]);
+};
 $('aiPick').onchange = (e) => { if (e.target.value !== 'chat' && e.target.value !== 'mail') { store.settings.ai = e.target.value; save(); } aiWcId = null; loadAi(e.target.value); };
 $('sgrip').onmousedown = (e) => {
   e.preventDefault(); document.body.classList.add('dragging');

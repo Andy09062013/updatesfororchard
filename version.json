@@ -1,6 +1,6 @@
 {
-  "version": "1.9.3",
-  "notes": "Chat notifications bottom right (Windows notifications when Orchard is in the background), profiles show ur Google account, removed the Google sign in bar",
+  "version": "1.9.4",
+  "notes": "Ask about this page now has Answer the questions and Explain what I highlighted",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "9dfb6493caf3b2afd05c2c8d2b74c31a754d403bccb5d98b2fae7f70dd105eb6"
+      "sha256": "f61ab789b8aa58daf33dca1e5f00bfaa6ec67d07884926235aa7cadd97b3940b"
     },
     {
       "path": "main.js",
@@ -33,7 +33,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "f3e01160826e8e5ba5ca1626b42fd9bd5a9d70ed9f69fa065d5d98facdc4e404"
+      "sha256": "be80ad500b5c2cafa85178d6a1aabc238a230b617daf21c9792ced6cd27a825a"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "5e7bcc5ad84d59fd90a053894e577e086f56e9a49e3e1e05eeaae1b86efa30d8"
+      "sha256": "00985a3637a8032701586c4fcea9ab5fc1f7aa99fe3e6eb06dd3e7428ab41088"
     }
   ]
 }
