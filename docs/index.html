@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orchard</title>
+<meta name="description" content="Orchard is a Windows browser built around saving your battery. Tabs that rest, an ad blocker, built in chat, mail, calendar and more.">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* layout: centered 1080px column, hero split (copy | product shot), then bands */
+:root{
+  --bg:#120c0b; --band:#1a1110; --card:#211614; --line:#3a2622; --fg:#f6ece8; --dim:#b39a92;
+  --red:#e8432e; --gold:#ffb83d; --leaf:#6cc35a;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif; --body:"Figtree","Segoe UI",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+img{max-width:100%;height:auto;display:block}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px;border-radius:6px}
+
+/* nav */
+nav{display:flex;align-items:center;gap:12px;padding-block:20px}
+.brand{display:flex;align-items:center;gap:10px;font:800 20px var(--display);letter-spacing:.06em;color:var(--gold);text-decoration:none}
+.brand img{width:30px;height:30px}
+nav .sp{flex:1}
+nav a.l{color:var(--dim);text-decoration:none;font-size:14px;font-weight:500}
+nav a.l:hover{color:var(--fg)}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.05fr 1fr;gap:48px;align-items:center;padding-block:40px 70px}
+.eco{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:#6cc35a1c;border:1px solid #6cc35a55;color:#cdeec4;font-size:13px;font-weight:600}
+.eco b{color:#8fe07a}
+h1{font:800 clamp(44px,7vw,78px)/1.0 var(--display);letter-spacing:-.02em;margin:18px 0 18px;text-wrap:balance}
+h1 em{font-style:normal;color:var(--red)}
+.lede{font-size:18.5px;color:#dccbc4;max-width:30em}
+.cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:30px}
+.dl{display:inline-flex;align-items:center;gap:12px;background:var(--red);color:#fff;text-decoration:none;padding:15px 26px;border-radius:14px;font:700 17px var(--body);box-shadow:0 10px 30px #e8432e44;transition:transform .15s,box-shadow .15s}
+.dl:hover{transform:translateY(-2px);box-shadow:0 14px 36px #e8432e66}
+.dl svg{flex:none}
+.dl small{display:block;font-weight:500;font-size:12px;opacity:.85}
+.meta{color:var(--dim);font-size:13.5px}
+.shot{position:relative}
+.shot img{border-radius:14px;border:1px solid var(--line);box-shadow:0 30px 80px #000c}
+.shot .glow{position:absolute;inset:-12% -8%;background:radial-gradient(closest-side,#e8432e33,transparent 70%),radial-gradient(closest-side at 80% 90%,#6cc35a26,transparent 70%);z-index:-1;filter:blur(10px)}
+
+/* battery band */
+.band{background:var(--band);border-block:1px solid #2b1c19}
+.sec{padding-block:72px}
+.kicker{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--leaf)}
+h2{font:800 clamp(30px,4.4vw,44px)/1.1 var(--display);letter-spacing:-.01em;margin:10px 0 14px;text-wrap:balance}
+.sec>.wrap>p.intro{color:#dccbc4;max-width:36em;font-size:17px}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
+.mode{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+.mode .tag{display:inline-block;font:800 15px var(--display);padding:3px 12px;border-radius:12px;margin-bottom:12px}
+.mode.eco1 .tag{background:#6cc35a22;color:#9be08a}
+.mode.saver .tag{background:#6cc35a40;color:#c9f5bd}
+.mode.ultra .tag{background:#ffb83d2e;color:var(--gold)}
+.mode .when{font-size:13px;color:var(--dim);margin-bottom:12px}
+.mode dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14.5px}
+.mode dt{color:var(--dim)}
+.mode dd{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* features */
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
+.feat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+.feat .ic{font-size:24px;margin-bottom:8px}
+.feat h3{font:700 17px var(--body);margin-bottom:4px}
+.feat p{color:var(--dim);font-size:14.5px}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px}
+.duo figure{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.duo figcaption{padding:12px 16px;color:var(--dim);font-size:13.5px}
+
+/* install */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:30px;counter-reset:s}
+.step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;position:relative}
+.step::before{counter-increment:s;content:counter(s);position:absolute;top:18px;right:18px;font:800 34px var(--display);color:#3a2622}
+.step h3{font:700 16px var(--body);margin-bottom:6px;padding-right:30px}
+.step p{color:var(--dim);font-size:14.5px}
+.step code{font:13px Consolas,monospace;background:#150e0d;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#e8dcd6}
+.faq{margin-top:30px;display:grid;gap:10px;max-width:760px}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+summary{cursor:pointer;font-weight:600}
+details p{color:var(--dim);font-size:14.5px;margin-top:8px}
+.final{text-align:center;padding-block:80px}
+.final .cta{justify-content:center}
+footer{border-top:1px solid #2b1c19;padding-block:28px;color:var(--dim);font-size:13px}
+footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+footer .sp{flex:1}
+
+@media (max-width:860px){
+  .hero{grid-template-columns:1fr;gap:32px;padding-block:20px 50px}
+  .modes,.feats,.steps,.duo{grid-template-columns:1fr}
+  nav a.l{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="wrap">
+  <nav>
+    <a class="brand" href="#"><img src="apple.png" alt="">ORCHARD</a>
+    <span class="sp"></span>
+    <a class="l" href="#battery">Battery</a>
+    <a class="l" href="#features">Features</a>
+    <a class="l" href="#install">Install</a>
+  </nav>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <div>
+      <span class="eco">&#127811; <b>Eco</b> · 4 tabs resting · 212 ads blocked</span>
+      <h1>The browser that <em>saves</em> your battery.</h1>
+      <p class="lede">Orchard puts tabs u aren't using to sleep, blocks ads before they load, and goes into Ultra saver by itself when ur battery gets low. Chat, mail, a calendar and games come built in.</p>
+      <div class="cta">
+        <a class="dl" href="https://github.com/Andy09062013/updatesfororchard/raw/main/OrchardSetup.exe" download>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+          <span>Download for Windows<small>OrchardSetup.exe · 7 MB</small></span>
+        </a>
+        <span class="meta" id="ver">Windows 10 and 11 · free</span>
+      </div>
+    </div>
+    <div class="shot"><div class="glow"></div><img src="shot.jpg" alt="Orchard with the AI side panel open next to the new tab page" width="1300" height="820"></div>
+  </section>
+
+  <section class="band" id="battery">
+    <div class="wrap sec">
+      <span class="kicker">The core of Orchard</span>
+      <h2>Three battery modes, switched for u.</h2>
+      <p class="intro">Plugged in, Orchard runs in Eco. Unplug and it moves to Saver. Drop under 20% and Ultra kicks in. U can also pick a mode urself.</p>
+      <div class="modes">
+        <div class="mode eco1"><span class="tag">Eco</span><div class="when">always on, even plugged in</div>
+          <dl><dt>Tabs freeze after</dt><dd>15 seconds</dd><dt>Tabs sleep after</dt><dd>5 minutes</dd><dt>Ads</dt><dd>blocked</dd></dl></div>
+        <div class="mode saver"><span class="tag">Saver</span><div class="when">when u unplug</div>
+          <dl><dt>Tabs freeze after</dt><dd>3 seconds</dd><dt>Tabs sleep after</dt><dd>2 minutes</dd><dt>Videos</dt><dd>never autoplay</dd><dt>Animations</dt><dd>calmed down</dd></dl></div>
+        <div class="mode ultra"><span class="tag">Ultra</span><div class="when">under 20% battery</div>
+          <dl><dt>Background tabs</dt><dd>asleep right away</dd><dt>Tabs freeze after</dt><dd>1 second</dd><dt>Pages</dt><dd>go dark (OLED)</dd></dl></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap sec" id="features">
+    <span class="kicker" style="color:var(--gold)">Built in</span>
+    <h2>Everything u'd install an extension for.</h2>
+    <div class="feats">
+      <div class="feat"><div class="ic">&#10022;</div><h3>Ask AI</h3><p>Gemini, ChatGPT or Claude beside any page. One click to answer the questions on it.</p></div>
+      <div class="feat"><div class="ic">&#128172;</div><h3>Orchard Chat</h3><p>Message friends by email, make groups, send pics and files. Pop up notifications.</p></div>
+      <div class="feat"><div class="ic">&#9993;</div><h3>Orchard Mail</h3><p>Ur Gmail in a side panel, signed in with Google's official login.</p></div>
+      <div class="feat"><div class="ic">&#128197;</div><h3>Calendar</h3><p>Add events to any day and get pinged when it's time.</p></div>
+      <div class="feat"><div class="ic">&#9707;</div><h3>Split screen</h3><p>Up to 4 tabs side by side. Drag tabs out to make new windows.</p></div>
+      <div class="feat"><div class="ic">&#128065;</div><h3>Hide anything</h3><p>Click ads, popups or sidebars on a site and they stay gone.</p></div>
+      <div class="feat"><div class="ic">&#128269;</div><h3>Google Lens</h3><p>Drag over anything on a page to search it.</p></div>
+      <div class="feat"><div class="ic">&#129518;</div><h3>Calculator</h3><p>Normal or scientific, right in the toolbar.</p></div>
+      <div class="feat"><div class="ic">&#128100;</div><h3>Profiles</h3><p>Separate logins, bookmarks and history for school and personal.</p></div>
+    </div>
+    <div class="duo">
+      <figure><img src="extensions.jpg" alt="The Orchard Extensions store with games and educational apps" loading="lazy" width="1300" height="820"><figcaption>Orchard Extensions: games and learning apps that run offline.</figcaption></figure>
+      <figure><img src="calendar.jpg" alt="The Orchard calendar with events and a reminder" loading="lazy" width="1300" height="820"><figcaption>The calendar, with an "event passed" heads up.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="band" id="install">
+    <div class="wrap sec">
+      <span class="kicker">Install</span>
+      <h2>Two minutes, then it updates itself.</h2>
+      <div class="steps">
+        <div class="step"><h3>Download the installer</h3><p><code>OrchardSetup.exe</code> is 7 MB. It grabs the rest (about 150 MB) while it installs.</p></div>
+        <div class="step"><h3>Run it</h3><p>If Windows says "Windows protected your PC", click <b>More info</b>, then <b>Run anyway</b>. Small apps without a paid certificate get that.</p></div>
+        <div class="step"><h3>That's it</h3><p>Orchard opens and puts itself in the Start menu and on ur desktop. New versions arrive on their own.</p></div>
+      </div>
+      <div class="faq">
+        <details><summary>Is it safe?</summary><p>The installer downloads the Chromium engine straight from Electron's official GitHub and Orchard's files from this repo, and checks every file against its SHA-256 before installing. Everything is open in the repo.</p></details>
+        <details><summary>Can I sign in to Google?</summary><p>Google blocks sign in on custom browsers. Orchard Mail uses Google's official app login so u can still read Gmail, and any tab can be opened in Chrome from its right click menu.</p></details>
+        <details><summary>How do I uninstall?</summary><p>Windows Settings, Apps, Orchard, Uninstall. Ur bookmarks and settings stay in <code>%APPDATA%\Orchard</code> in case u come back.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap final">
+    <h2>Give ur battery a break.</h2>
+    <div class="cta">
+      <a class="dl" href="https://github.com/Andy09062013/updatesfororchard/raw/main/OrchardSetup.exe" download>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+        <span>Download Orchard<small>for Windows 10 and 11</small></span>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><span>&#127822; Orchard</span><span class="sp"></span><a href="https://github.com/Andy09062013/updatesfororchard">Source on GitHub</a></div></footer>
+
+<script>
+// show the newest version number from the repo
+fetch('https://raw.githubusercontent.com/Andy09062013/updatesfororchard/main/version.json', { cache: 'no-store' })
+  .then(r => r.json()).then(v => { if (v && v.version) document.getElementById('ver').textContent = 'Version ' + v.version + ' · Windows 10 and 11 · free'; })
+  .catch(() => {});
+</script>
+</body>
+</html>
