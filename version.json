@@ -1,6 +1,6 @@
 {
-  "version": "2.1.1",
-  "notes": "Settings back to a simple scrolling panel instead of a full page",
+  "version": "2.1.2",
+  "notes": "The chat button now opens Google Chat (great for school accounts). Orchard Chat moved to the menu",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "090decdc22e5cdebfa35813611cdf6c64a3c7e875e9266db0f16469093c14abf"
+      "sha256": "b6067f9355106dbbd1c6fc0e41cfddbf65016c11160610aa198b4385f351a0c7"
     },
     {
       "path": "main.js",
@@ -33,7 +33,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "7b311189c9571bcf6c9bb63b9e9d4a20e6d07c48d96c065f0bd0fcdee923ea25"
+      "sha256": "853741f1991f74064b4cc3b0e354952019aea21881eddfe2c78a5bb45be981e4"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "d2d763029cd9c21ff8e6ac5308c195a2d73bb1b7cb1b67a721d78a8ce25a75a1"
+      "sha256": "2bb6559243bafae345d241f95a9300d233024a9120ba9ef3ba4d5d06c19ddd86"
     }
   ]
 }

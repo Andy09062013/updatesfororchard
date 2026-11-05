@@ -607,7 +607,7 @@ window.aura.on('chat-event', (ev) => {
   }
 });
 window.aura.on('chat-open', (id) => openChatTo(id));
-setTimeout(() => { if (store.settings.chatNotify !== false) { ensureChat(); placeChat(); } }, 3000);
+// Orchard Chat background notifier only runs once the user actually opens Orchard Chat
 
 // ---- Orchard Mail (Gmail via Google's official sign-in in Chrome) ----
 const M = window.aura.mail;
@@ -1144,7 +1144,8 @@ const FEATURES = [
   ['&#128433;', 'Drag tabs', 'drag to reorder, drag out for a new window', 'Drag', () => toast('grab a tab and drag it out of the window')],
   ['SMART STUFF'],
   ['&#9993;', 'Orchard Mail', 'ur Gmail in a side panel, sign in through Chrome', 'Alt+M', () => openMail()],
-  ['&#128172;', 'Orchard Chat', 'chat with friends by email, groups, files', 'Alt+C', () => openChat()],
+  ['&#128172;', 'Google Chat', 'ur school Google Chat in the side panel', 'Alt+C', () => openGoogleChat()],
+  ['&#127822;', 'Orchard Chat', 'the built-in chat, friends join by email', '', () => openChat()],
   ['&#10022;', 'Ask AI', 'Gemini, ChatGPT or Claude on the side', 'Alt+G', () => toggleAi(true)],
   ['&#9989;', 'Answer the questions', 'sends the questions on this page to the AI', '', () => askAboutPage('answer')],
   ['&#128269;', 'Google Lens', 'drag over anything to search it', 'Lens icon', () => startLens()],
@@ -1678,7 +1679,7 @@ function profileForm(p) {
 }
 
 // ---- AI side panel (Gemini / ChatGPT / Claude) ----
-const AIS = { gemini: 'https://gemini.google.com/app', chatgpt: 'https://chatgpt.com/', claude: 'https://claude.ai/new', chat: 'https://claude.ai/artifact/28878hcboZzAuyHNtgbMAQ' };
+const AIS = { gemini: 'https://gemini.google.com/app', chatgpt: 'https://chatgpt.com/', claude: 'https://claude.ai/new', chat: 'https://claude.ai/artifact/28878hcboZzAuyHNtgbMAQ', gchat: 'https://chat.google.com/' };
 let aiWhich = null;
 let aiWv = null, aiOpen = false, aiWcId = null;
 function sideWidth(w) {
@@ -1688,7 +1689,7 @@ function sideWidth(w) {
 }
 function loadAi(which) {
   aiWhich = which; $('aiPick').value = which; setTimeout(markSideBtns);
-  $('askPage').parentElement.hidden = which === 'chat' || which === 'mail';
+  $('askPage').parentElement.hidden = which === 'chat' || which === 'mail' || which === 'gchat';
   if (which === 'mail') { $('mailPane').hidden = false; if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } placeChat(); mailShow(); return; }
   $('mailPane').hidden = true;
   if (which === 'chat') { if (aiWv) { aiWv.remove(); aiWv = null; aiWcId = null; } ensureChat(); placeChat(); return; }
@@ -1702,7 +1703,7 @@ function loadAi(which) {
 }
 function markSideBtns() {
   $('aiBtn').classList.toggle('on', aiOpen && aiWhich !== 'chat' && aiWhich !== 'mail');
-  $('chatBtn').classList.toggle('on', aiOpen && aiWhich === 'chat');
+  $('chatBtn').classList.toggle('on', aiOpen && (aiWhich === 'gchat' || aiWhich === 'chat'));
   $('mailBtn').classList.toggle('on', aiOpen && aiWhich === 'mail');
   document.querySelectorAll('#aipills span').forEach(s => s.classList.toggle('on', s.dataset.ai === aiWhich));
   $('aipills').classList.toggle('off', aiWhich === 'chat' || aiWhich === 'mail');
@@ -1712,8 +1713,8 @@ function toggleAi(force) {
   $('side').classList.toggle('show', aiOpen);
   markSideBtns();
   sideWidth(store.settings.sideW || 420);
-  if (aiOpen && (aiWhich === 'mail' || aiWhich === 'chat')) loadAi(aiWhich);
-  else if (aiOpen && !aiWv) loadAi(store.settings.ai && store.settings.ai !== 'mail' ? store.settings.ai : 'gemini');
+  if (aiOpen && (aiWhich === 'mail' || aiWhich === 'chat' || aiWhich === 'gchat')) loadAi(aiWhich);
+  else if (aiOpen && !aiWv) loadAi(store.settings.ai && !['mail', 'chat', 'gchat'].includes(store.settings.ai) ? store.settings.ai : 'gemini');
   // freeze the ai panel while it's closed so it doesnt eat battery
   if (aiWcId != null) window.aura.freeze(aiWcId, !aiOpen);
   placeChat();
@@ -1736,7 +1737,7 @@ async function askAboutPage(mode) {
   } else {
     prompt = `Summarize this page and tell me the key points.\nTitle: ${active.title}\nURL: ${active.url}\n\nPage text:\n${info.text}`;
   }
-  if (aiWhich === 'chat' || aiWhich === 'mail') { aiWhich = store.settings.ai && store.settings.ai !== 'chat' && store.settings.ai !== 'mail' ? store.settings.ai : 'gemini'; if (aiOpen) loadAi(aiWhich); }
+  if (aiWhich === 'chat' || aiWhich === 'mail' || aiWhich === 'gchat') { aiWhich = store.settings.ai && !['chat','mail','gchat'].includes(store.settings.ai) ? store.settings.ai : 'gemini'; if (aiOpen) loadAi(aiWhich); }
   if (!aiOpen) toggleAi(true);
   if (!aiWv) loadAi(aiWhich || 'gemini');
   const fill = () => aiWv.executeJavaScript(`(() => {
@@ -1779,7 +1780,7 @@ function handleKey(k, ctrl, shift, alt) {
   else if (ctrl && k === 'w') active && closeTab(active);
   else if (ctrl && k === 'n') window.aura.newWindow();
   else if (alt && k === 'g') toggleAi();
-  else if (alt && k === 'c') openChat();
+  else if (alt && k === 'c') openGoogleChat();
   else if (alt && k === 'f') openPanel('menu');
   else if (alt && k === 'h') startHidePicker();
   else if (alt && k === 'm') openMail();
@@ -1823,13 +1824,19 @@ $('extBtn').onclick = (e) => extMenu(e);
 $('opX').onclick = closePage;
 document.querySelectorAll('#aipills span').forEach(s => s.onclick = () => { store.settings.ai = s.dataset.ai; save(); aiWcId = null; loadAi(s.dataset.ai); });
 $('avatar').onclick = () => openPanel('profiles');
-$('aiBtn').onclick = () => { if (aiOpen && (aiWhich === 'chat' || aiWhich === 'mail')) { aiWcId = null; loadAi(store.settings.ai && store.settings.ai !== 'chat' ? store.settings.ai : 'gemini'); } else toggleAi(); };
+$('aiBtn').onclick = () => { if (aiOpen && (aiWhich === 'chat' || aiWhich === 'mail' || aiWhich === 'gchat')) { aiWcId = null; loadAi(store.settings.ai && !['chat','mail','gchat'].includes(store.settings.ai) ? store.settings.ai : 'gemini'); } else toggleAi(); };
 const openChat = () => {
   if (aiOpen && aiWhich === 'chat') { toggleAi(false); return; }
   aiWhich = 'chat';
   if (!aiOpen) toggleAi(true); else loadAi('chat');
 };
-$('chatBtn').onclick = openChat;
+// the 💬 button now opens Google Chat (Orchard Chat stays in the ☰ menu)
+const openGoogleChat = () => {
+  if (aiOpen && aiWhich === 'gchat') { toggleAi(false); return; }
+  aiWhich = 'gchat';
+  if (!aiOpen) toggleAi(true); else loadAi('gchat');
+};
+$('chatBtn').onclick = openGoogleChat;
 const openMail = () => {
   if (aiOpen && aiWhich === 'mail') { toggleAi(false); return; }
   aiWhich = 'mail';
