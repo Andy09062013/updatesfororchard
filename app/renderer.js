@@ -158,7 +158,7 @@ function saveSession(now) {
   clearTimeout(sessT);
   const doSave = () => {
     store.session = {
-      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title, locked: !!t.locked })),
+      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title })),
       active: Math.max(0, tabs.filter(t => t.url && !isNewtab(t.url)).indexOf(active))
     };
     save();
@@ -173,7 +173,6 @@ function restoreSession() {
   s.tabs.forEach((x, i) => {
     const t = createTab(x.url, true, i !== s.active);
     if (x.title) t.title = x.title;
-    if (x.locked) t.locked = true;
     renderTab(t);
   });
   restoring = false;
@@ -321,7 +320,7 @@ function unsplit(t) {
 }
 
 // ---- tab lock ----
-function lockReady() { return !!store.settings.lockHash; }
+function lockReady() { return false; } // tab locking was removed
 function showLock(t, st) {
   if (!t.lockEl) {
     const d = document.createElement('div');
@@ -704,7 +703,6 @@ const FEATURES = [
   ['&#10133;', 'New tab', 'opens the start page', 'Ctrl+T', () => createTab()],
   ['&#128468;', 'New window', 'same profile, fresh window', 'Ctrl+N', () => window.aura.newWindow()],
   ['&#9707;', 'Split screen', 'right click a tab, pick split. up to 4', 'Right click tab', () => { const o = tabs.find(t => t !== active); if (o) splitWith(o); else toast('open another tab first, then right click it'); }],
-  ['&#128274;', 'Lock a tab', 'password protect a tab. locks when u leave', 'Right click tab', () => active && toggleLock(active)],
   ['&#8634;', 'Reopen closed tab', 'brings back the last tab u closed', 'Ctrl+Shift+T', () => { const u = closed.pop(); if (u) createTab(u); else toast('no closed tabs'); }],
   ['&#128433;', 'Drag tabs', 'drag to reorder, drag out for a new window', 'Drag', () => toast('grab a tab and drag it out of the window')],
   ['SMART STUFF'],
@@ -752,9 +750,6 @@ function tabMenu(e, t) {
     t === active ? null : [split.includes(t) && split.includes(active) ? 'Already in split' : 'Split screen with this tab', () => splitWith(t), split.includes(t) && split.includes(active)],
     split.includes(t) ? ['Remove from split', () => unsplit(t)] : null,
     split.length ? ['Exit split screen', () => unsplit()] : null,
-    null,
-    [t.locked ? '&#128275; Remove lock' : '&#128274; Lock tab', () => toggleLock(t)],
-    t.locked && t.unlocked ? ['Lock now', () => { t.unlocked = false; renderTab(t); layoutViews(); updateNav(); }] : null,
     null,
     ['Close tab', () => closeTab(t)]
   ];
@@ -903,7 +898,6 @@ function openPanel(kind) {
       <div class="set">Search engine <select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${store.settings.engine === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
       <div class="set"><span>Orchard <b id="verTxt">v…</b></span><span class="pbtn" id="updChk">Check for updates</span></div>
       <div class="set">Search suggestions <span class="pbtn" id="sgT">${store.settings.suggest === false ? 'OFF' : 'ON'}</span></div>
-      <div class="set">Tab lock password <span style="display:flex;gap:6px">${store.settings.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>
       <div class="set">New tab background <span class="pbtn" id="thm">&#127912; Change</span></div>
       <div class="set">Reopen tabs on startup <span class="pbtn" id="rst">${store.settings.restore === false ? 'OFF' : 'ON'}</span></div>
       <div class="set">Battery saver <select id="svr">${SAVER_OPTS}</select></div>
@@ -924,18 +918,6 @@ function openPanel(kind) {
       $('updChk').textContent = 'Check for updates';
       toast(msg[r.status] || 'hmm');
       if (r.status === 'ready') showUpdate(r);
-    };
-    const reopen = () => { $('panel').classList.remove('show'); openPanel('settings'); };
-    if ($('pwSet')) $('pwSet').onclick = async () => { if (await pwSetupModal()) reopen(); };
-    if ($('pwChg')) $('pwChg').onclick = async () => { if (await pwSetupModal(true)) reopen(); };
-    if ($('pwRst')) $('pwRst').onclick = async () => {
-      const v = await modal('Reset tab password', 'Know it? Type it to remove it. Forgot it? Type FORGOT and every locked tab gets closed, then the password is removed.', [{ id: 'p', label: 'Password or FORGOT', type: 'password' }], 'Reset');
-      if (!v) return;
-      if (v.p === 'FORGOT') { tabs.filter(t => t.locked).forEach(t => closeTab(t, true)); }
-      else if (!(await checkPw(v.p))) { toast('wrong password 💔'); return; }
-      else tabs.forEach(t => { t.locked = false; t.unlocked = false; renderTab(t); });
-      delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1; save(); saveSession(true); layoutViews();
-      toast('password reset'); reopen();
     };
     $('rst').onclick = () => { store.settings.restore = store.settings.restore === false; save(); $('rst').textContent = store.settings.restore === false ? 'OFF' : 'ON'; };
     $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
@@ -1547,7 +1529,7 @@ window.aura.on('shortcut', (s) => handleKey(s.key, s.ctrl, s.shift, s.alt));
 window.aura.on('blocked', (n) => { blocked = n; if (store.settings.adblock) $('shield').innerHTML = '&#128737; ' + n + ' blocked'; });
 window.aura.on('download', (d) => toast(d.state === 'completed' ? 'Downloaded ' + d.name + ' 🔥' : 'Download failed 💔'));
 let lastUnlock = 0;
-window.aura.on('win-blur', () => { if (Date.now() - lastUnlock < 1500 || document.hasFocus()) return; relockAll(); });
+
 window.aura.on('lock-sync', (s) => {
   if ((s.lockVer || 0) <= (store.settings.lockVer || 0)) return;
   store.settings.lockVer = s.lockVer;
@@ -1573,6 +1555,7 @@ window.aura.getStore().then(async (s) => {
   if (!store.settings.adblock) $('shield').innerHTML = '&#128737; off';
   if (store.settings.sleepMins === undefined) store.settings.sleepMins = 5;
   applyProfile(store.profile);
+  if (store.settings.lockHash || store.settings.lockSalt) { delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1; save(); }
   $('aiPick').value = store.settings.ai || 'gemini';
   blocked = store.blocked || 0;
   renderBookmarks();

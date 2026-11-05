@@ -1,6 +1,6 @@
 {
-  "version": "1.9.1",
-  "notes": "Fixed locked tabs staying covered after typing the right password, added show password and forgot password",
+  "version": "1.9.2",
+  "notes": "Removed tab locking",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "2c219398a7972b9338baf1bd7678d3b43c9042a9932e55baf0c1353e29951ee0"
+      "sha256": "4f9cb7be180ef1f3038dc9be86cbe9b59daa8541c8557ec48a18d3f66ec4ef54"
     },
     {
       "path": "preload.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "1f2288740aeadca90f8af182c956ad9c9e0a87d3901e0502e0cf1ffce5eb1dcf"
+      "sha256": "4b8e5434603e55209d118599caf462a2b7626716e2f7f4713abd13523713242b"
     }
   ]
 }
