@@ -5,6 +5,7 @@ const fs = require('fs');
 
 // battery friendly chromium flags: throttle timers in background pages hard
 app.commandLine.appendSwitch('enable-features', 'IntensiveWakeUpThrottling:grace_period_seconds/10,AlignWakeUps');
+app.commandLine.appendSwitch('enable-smooth-scrolling'); // animated wheel scrolling in pages
 
 // keep using the old Aura data folder so bookmarks/profiles carry over after the rename
 try {
@@ -111,6 +112,7 @@ function setupSession(id) {
   });
   ses.on('will-download', (e, item, wc) => {
     const host = hostOf(wc);
+    try { sendTo(host, 'dl-origin', { wcId: wc && !wc.isDestroyed() ? wc.id : null }); } catch {}
     const id = ++dlId;
     downloads.set(id, item);
     // like Chrome: save straight to Downloads, no "Save As" box (unless the user turned asking on)
@@ -593,9 +595,9 @@ async function checkForUpdate() {
   updating = true;
   try {
     const r = await net.fetch(UPDATE_BASE + 'version.json?t=' + Date.now(), { cache: 'no-store' });
-    if (!r.ok) return { status: 'error', error: 'update server answered ' + r.status };
+    if (!r.ok) return { status: 'error', error: 'the update server returned ' + r.status };
     const man = await r.json();
-    if (!man || typeof man.version !== 'string' || !Array.isArray(man.files)) return { status: 'error', error: 'bad version.json' };
+    if (!man || typeof man.version !== 'string' || !Array.isArray(man.files)) return { status: 'error', error: 'the update information is invalid' };
     if (cmpVer(man.version, MY_VERSION) <= 0) return { status: 'latest', version: MY_VERSION };
     if (man.minElectron && cmpVer(man.minElectron, process.versions.electron) > 0) {
       return { status: 'full', version: man.version, notes: man.notes || '', url: man.fullDownload || '' };
@@ -680,7 +682,7 @@ async function accessToken(id) {
     s.access = j.access_token; s.accessExp = Date.now() + (j.expires_in || 3600) * 1000;
     return s.access;
   } catch (e) {
-    if (e.code === 'invalid_grant') { s.refresh = null; s.access = null; mailSave(id); e.code = 'signed_out'; e.message = 'ur Google sign in expired, sign in again'; }
+    if (e.code === 'invalid_grant') { s.refresh = null; s.access = null; mailSave(id); e.code = 'signed_out'; e.message = 'Your Google sign-in has expired. Please sign in again.'; }
     throw e;
   }
 }
@@ -722,20 +724,20 @@ ipcMain.handle('mail-config-set', (e, clientId, clientSecret) => {
 });
 ipcMain.handle('mail-signin', async (e) => {
   const id = profileOf(e), s = ms(id);
-  if (!s.clientId || !s.clientSecret) return { error: 'add ur client ID and client secret first' };
+  if (!s.clientId || !s.clientSecret) return { error: 'Enter your client ID and client secret first.' };
   const verifier = b64url(require('crypto').randomBytes(32));
   const challenge = b64url(require('crypto').createHash('sha256').update(verifier).digest());
   const state = require('crypto').randomBytes(16).toString('hex');
   return await new Promise((resolve) => {
     let redirect = '', finished = false;
-    const page = (title, msg) => `<!doctype html><meta charset="utf-8"><title>Orchard Mail</title><body style="font-family:Segoe UI,sans-serif;background:#120c0b;color:#f6ece8;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><div style="font-size:54px">🍎</div><h2>${title}</h2><p style="color:#c9b3ab">${msg}</p></div>`;
+    const page = (title, msg) => `<!doctype html><meta charset="utf-8"><title>Orchard Mail</title><body style="font-family:Segoe UI,sans-serif;background:#1e1f22;color:#e8e9eb;display:grid;place-items:center;height:100vh;margin:0"><div style="text-align:center"><h2 style="font-weight:600">${title}</h2><p style="color:#a3a6ac">${msg}</p></div>`;
     const done = (v) => { if (finished) return; finished = true; clearTimeout(timer); try { server.close(); } catch {} resolve(v); };
     const server = http.createServer(async (req, res) => {
       const u = new URL(req.url, 'http://127.0.0.1');
       if (u.pathname !== '/') { res.writeHead(404); res.end(); return; }
       const code = u.searchParams.get('code'), err = u.searchParams.get('error');
       if (err || !code || u.searchParams.get('state') !== state) {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Sign in cancelled', 'U can close this tab.'));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Sign-in cancelled', 'You can close this tab.'));
         return done({ error: err === 'access_denied' ? 'sign in was cancelled' : (err || 'sign in failed') });
       }
       try {
@@ -747,7 +749,7 @@ ipcMain.handle('mail-signin', async (e) => {
         const pp = getProfile(id);
         if (pp && s.email && (/^(Me|Person \d+)$/.test(pp.name))) { pp.name = s.email.split('@')[0].slice(0, 24); saveProfiles(); }
         if (pp) for (const [wcId, pid] of winProfile) if (pid === id) sendTo(webContents.fromId(wcId), 'profile-changed', { ...pp, email: s.email });
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Signed in to Orchard Mail', 'Ur all set. Close this tab and go back to Orchard.'));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(page('Signed in to Orchard Mail', 'You can close this tab and return to Orchard.'));
         const w = BrowserWindow.fromWebContents(e.sender); if (w) { if (w.isMinimized()) w.restore(); w.focus(); }
         done({ ok: true, email: s.email });
       } catch (ex) {
@@ -755,8 +757,8 @@ ipcMain.handle('mail-signin', async (e) => {
         done({ error: String(ex.message || ex) });
       }
     });
-    const timer = setTimeout(() => done({ error: 'sign in timed out, try again' }), 5 * 60 * 1000);
-    server.on('error', (ex) => done({ error: 'could not start sign in: ' + ex.message }));
+    const timer = setTimeout(() => done({ error: 'Sign-in timed out. Please try again.' }), 5 * 60 * 1000);
+    server.on('error', (ex) => done({ error: 'Sign-in could not start: ' + ex.message }));
     server.listen(0, '127.0.0.1', () => {
       redirect = 'http://127.0.0.1:' + server.address().port;
       const auth = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
@@ -814,7 +816,7 @@ ipcMain.handle('mail-send', async (e, d) => {
   try {
     const clean = (v) => String(v || '').replace(/[\r\n]+/g, ' ').trim();
     const to = clean(d.to), subject = clean(d.subject);
-    if (!to) return { error: 'who is it to?' };
+    if (!to) return { error: 'Enter a recipient.' };
     const enc = (v) => /^[\x20-\x7e]*$/.test(v) ? v : '=?UTF-8?B?' + Buffer.from(v, 'utf8').toString('base64') + '?=';
     const lines = ['From: ' + (s.email || 'me'), 'To: ' + to, 'Subject: ' + enc(subject), 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'];
     if (d.inReplyTo) { const r = clean(d.inReplyTo); lines.push('In-Reply-To: ' + r, 'References: ' + r); }
@@ -845,7 +847,7 @@ async function extCatalog() {
   const j = await r.json();
   return (j.extensions || []).filter(x => x && okExtId(x.id) && typeof x.file === 'string' && /^[A-Za-z0-9_.-]+\.(html|js)$/.test(x.file)).map(x => ({
     id: x.id, name: String(x.name || x.id).slice(0, 60), category: x.category === 'educational' ? 'educational' : 'game',
-    description: String(x.description || '').slice(0, 300), icon: String(x.icon || '🧩').slice(0, 4), version: String(x.version || '1.0.0').slice(0, 20),
+    description: String(x.description || '').slice(0, 300), icon: String(x.icon || '').slice(0, 4), version: String(x.version || '1.0.0').slice(0, 20),
     size: +x.size || 0, file: x.file, sha256: String(x.sha256 || ''), inject: !!x.inject
   }));
 }
@@ -855,11 +857,11 @@ ipcMain.handle('ext-install', async (e, id) => {
   try {
     if (!okExtId(id)) return { error: 'bad id' };
     const x = (await extCatalog()).find(i => i.id === id);
-    if (!x) return { error: 'not in the store any more' };
+    if (!x) return { error: 'This extension is no longer available.' };
     const r = await net.fetch(UPDATE_BASE + 'extensions/' + x.file + '?v=' + encodeURIComponent(x.version), { cache: 'no-store' });
-    if (!r.ok) return { error: 'download failed (' + r.status + ')' };
+    if (!r.ok) return { error: 'the download failed (' + r.status + ')' };
     const buf = Buffer.from(await r.arrayBuffer());
-    if (x.sha256 && require('crypto').createHash('sha256').update(buf).digest('hex') !== x.sha256) return { error: 'the download got corrupted, try again' };
+    if (x.sha256 && require('crypto').createHash('sha256').update(buf).digest('hex') !== x.sha256) return { error: 'the download was corrupted. Please try again' };
     fs.mkdirSync(extDir, { recursive: true });
     const saved = id + (x.file.endsWith('.js') ? '.js' : '.html');
     fs.writeFileSync(path.join(extDir, saved), buf);

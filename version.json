@@ -1,6 +1,6 @@
 {
-  "version": "2.8.0",
-  "notes": "Drag files from your computer onto Orchard to open them in tabs, drag finished downloads out to any folder, and dropping a file onto a web page still uploads it. Right-click any tab to Charge it (stays full speed on battery) or Supercharge it (max frame rate + priority), with a glowing badge on the tab.",
+  "version": "3.0.0",
+  "notes": "A redesigned interface: calmer graphite colours with one solid accent, line icons instead of emojis, and clearer wording throughout. Animations are smoother and now stay on in battery saver modes. New: right-click an image to save or copy it, vertical tabs (Settings > Appearance), and tabs that only open to start a download now close automatically.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,23 +29,23 @@
     },
     {
       "path": "index.html",
-      "sha256": "017d1b6e15382fd296d177550f29d2e3011d92756ee60aeb41d41b68cc3c6651"
+      "sha256": "873c1fda9822984e4bdc328203d94c22836d998482d64689035e1f98911513bb"
     },
     {
       "path": "main.js",
-      "sha256": "ef68026ed46e54ba2d765a41df3f41610e865d9082108f93cbd361c54d094491"
+      "sha256": "e127dcaedf87f5f91031ab19fdd4552cdf0b4cda9b9242ef5dcda5763d838fc3"
     },
     {
       "path": "newtab.html",
-      "sha256": "d16035550ae016c47f0aa26ad3d3bc1f9e3f06ba19e45a05ae1d71e868b7cea0"
+      "sha256": "cc39e632b11504e907446c84d15162a8a3773d7b92cae62a092e2e286593ca96"
     },
     {
       "path": "package.json",
-      "sha256": "6ecb2ee90b4b952c1cc436f470a42b3f789649895272a33f3d3207fb53fd54c9"
+      "sha256": "cf158bb8dc3a275b8f4f477bc478498351f35e87f5b8011a4ba4661c9274967a"
     },
     {
       "path": "preload.js",
-      "sha256": "1601f68f7e587209503b85c7a66acd1b92d57a2039d906d28f8a9b84eb8de106"
+      "sha256": "3f5fd38dd68ceff7f8616e5694d003505d562c2d760649c9baf405f9bafbb97b"
     },
     {
       "path": "pw-preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "51bb1eecb32e20dd38bf26b0fe31dd254b862a7cbdc8dd4020602c2003146c5b"
+      "sha256": "fba71ba28fab320bfdab30e381a52e4a9bfb4e866906a484418ae63e2929293f"
     },
     {
       "path": "throttle.ps1",

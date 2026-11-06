@@ -1,5 +1,85 @@
 const $ = (id) => document.getElementById(id);
 const NEWTAB = new URL('newtab.html', location.href).href;
+// ---- icons: one line-icon set for the whole UI (24px grid, 1.8 stroke) ----
+const ICONS = {
+  back: '<path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>',
+  fwd: '<path d="M5 12h14"/><path d="M12 5l7 7-7 7"/>',
+  reload: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>',
+  home: '<path d="M4 10.5 12 4l8 6.5"/><path d="M6 9v11h12V9"/><path d="M10 20v-5h4v5"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 7.6-1.7"/>',
+  warn: '<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.5"/><path d="M12 17.2h.01"/>',
+  star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  starFill: '<path fill="currentColor" d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  battery: '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="M6 10.5v3"/>',
+  batteryCharging: '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="m11.5 9-2 3h3l-2 3"/>',
+  shield: '<path d="M12 3.5 5 6.2v5.6c0 4.3 3 7.6 7 8.7 4-1.1 7-4.4 7-8.7V6.2z"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  assistant: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M14.5 4.5v15"/><path d="M17 9h1.5M17 12h1.5"/>',
+  x: '<path d="M6 6l12 12"/><path d="M18 6 6 18"/>',
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  minus: '<path d="M5 12h14"/>',
+  max: '<rect x="5.5" y="5.5" width="13" height="13" rx="1"/>',
+  chevL: '<path d="m14.5 6-6 6 6 6"/>',
+  chevD: '<path d="m6 9.5 6 6 6-6"/>',
+  up: '<path d="M12 19V5"/><path d="m5.5 11.5 6.5-6.5 6.5 6.5"/>',
+  down: '<path d="M12 5v14"/><path d="m5.5 12.5 6.5 6.5 6.5-6.5"/>',
+  download: '<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 15v4h16v-4"/>',
+  check: '<path d="M20 6.5 9 17.5l-5-5"/>',
+  bolt: '<path d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/>',
+  boltFill: '<path fill="currentColor" d="M13 2.5 4.5 13.5H11l-1 8 8.5-11H12z"/>',
+  moon: '<path d="M20 13.4A8 8 0 1 1 10.6 4a6.3 6.3 0 0 0 9.4 9.4z"/>',
+  volume: '<path d="M11 5.5 6.5 9H3v6h3.5l4.5 3.5z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/>',
+  note: '<path d="M15 3.5H5.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2V9z"/><path d="M15 3.5V9h5.5"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.3 2.4 3.4 5.2 3.4 8.5s-1.1 6.1-3.4 8.5c-2.3-2.4-3.4-5.2-3.4-8.5S9.7 5.9 12 3.5z"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+  eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 6A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16.6 16.6 0 0 1-2.4 3.2M6.6 6.7C4 8.4 2.5 12 2.5 12S6 18.5 12 18.5c1.6 0 3-.4 4.2-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7"/><path d="m16.5 6.5 2.5 2.5"/><path d="m14 9 2 2"/>',
+  trash: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
+  folder: '<path d="M3.5 6.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  file: '<path d="M14 3.5H6.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V9z"/><path d="M14 3.5V9h5.5"/>',
+  mail: '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6.5L20.5 7"/>',
+  chat: '<path d="M4 5.5h16v11H9.5L4 20.5z"/>',
+  calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  calc: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8.5 7h7"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15.5h.01M12 15.5h.01M15.5 15.5h.01M8.5 19h.01M12 19h.01M15.5 19h.01"/>',
+  puzzle: '<path d="M10 3.5a2 2 0 0 1 4 0V5h4a1 1 0 0 1 1 1v4h-1.5a2 2 0 0 0 0 4H19v4a1 1 0 0 1-1 1h-4v-1.5a2 2 0 0 0-4 0V19H6a1 1 0 0 1-1-1v-4h1.5a2 2 0 0 0 0-4H5V6a1 1 0 0 1 1-1h4z"/>',
+  wifi: '<path d="M2.5 9a14 14 0 0 1 19 0"/><path d="M5.8 12.5a9 9 0 0 1 12.4 0"/><path d="M9 16a4.5 4.5 0 0 1 6 0"/><path d="M12 19.5h.01"/>',
+  user: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
+  guest: '<path d="M3 11.5h18"/><path d="m5.5 11.5 1.8-5.5h9.4l1.8 5.5"/><circle cx="7.5" cy="16" r="2.8"/><circle cx="16.5" cy="16" r="2.8"/><path d="M10.3 16h3.4"/>',
+  menu: '<path d="M4 6.5h16M4 12h16M4 17.5h16"/>',
+  more: '<circle cx="12" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="18.5" r="1.2" fill="currentColor"/>',
+  pen: '<path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  reply: '<path d="M9.5 8.5 4.5 13l5 4.5"/><path d="M4.5 13H14a5.5 5.5 0 0 1 5.5 5.5"/>',
+  archive: '<rect x="3.5" y="4.5" width="17" height="4.5" rx="1"/><path d="M5 9v10.5h14V9"/><path d="M10 13h4"/>',
+  palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2a1.7 1.7 0 0 1 1.3-2.8h2a3.9 3.9 0 0 0 3.9-3.9c0-4.2-3.8-7.4-8.5-7.4z"/><circle cx="7.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="7.8" r="1" fill="currentColor"/><circle cx="15" cy="8.3" r="1" fill="currentColor"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+  split: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15"/>',
+  window: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 8.5h17"/>',
+  external: '<path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 11 13"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',
+  copy: '<rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/>',
+  play: '<path d="M7 4.5v15l12-7.5z"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
+  sparkOff: '',
+  lens: '<path d="M3.5 8.5v-3a2 2 0 0 1 2-2h3"/><path d="M15.5 3.5h3a2 2 0 0 1 2 2v3"/><path d="M20.5 15.5v3a2 2 0 0 1-2 2h-3"/><path d="M8.5 20.5h-3a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.2"/>',
+  hide: '<path d="M3 3l18 18"/><path d="M10.6 6A9.7 9.7 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16.6 16.6 0 0 1-2.4 3.2M6.6 6.7C4 8.4 2.5 12 2.5 12S6 18.5 12 18.5c1.6 0 3-.4 4.2-1"/>',
+  speed: '<path d="M4.5 17.5a8.5 8.5 0 1 1 15 0"/><path d="m12 13 4-4.5"/><circle cx="12" cy="13.5" r="1.3" fill="currentColor"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.8h.01"/>',
+  restore: '<path d="M9 9h10v10H9z"/><path d="M6 15H5V5h10v1"/>',
+  chevR: '<path d="m9.5 6 6 6-6 6"/>',
+  anchor: '<circle cx="12" cy="5.5" r="2"/><path d="M12 7.5v13"/><path d="M8 11h8"/><path d="M4.5 13a7.5 7.5 0 0 0 15 0"/>',
+  leaf: '<path d="M5 19c0-8 5-13.5 14.5-14.5C19 14 13.5 19 5 19z"/><path d="M5 19 13 11"/>',
+  apple: '<path d="M12 7.5c-1.7-1.3-5.5-1.4-6.8 2-1.3 3.5.6 9 3.5 10.3 1.2.5 2.2 0 3.3 0s2.1.5 3.3 0c2.9-1.3 4.8-6.8 3.5-10.3-1.3-3.4-5.1-3.3-6.8-2z"/><path d="M12 7.5c0-2 .8-3.5 2.5-4.3"/>',
+};
+const APPLE_MARK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7.6c-1.7-1.3-5.2-1.4-6.7 1.5-1.7 3.3-.3 9.1 2.8 11.7 1.3 1.1 2.4.9 3.9.3 1.5.6 2.6.8 3.9-.3 3.1-2.6 4.5-8.4 2.8-11.7-1.5-2.9-5-2.8-6.7-1.5z"/><path d="M12.3 7.3c.1-1.7.7-3 1.7-3.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13.6 4.9c1.1-1.6 3-2.2 4.6-1.8-.4 1.7-2 3.1-4.6 1.8z"/></svg>';
+function ic(name, size) {
+  const s = size || 16;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+// static markup asks for icons with data-ic="name" (and optional data-s="size")
+function fillIcons(root) { (root || document).querySelectorAll('[data-ic]').forEach(el => { el.innerHTML = ic(el.dataset.ic, +el.dataset.s || 18) + (el.dataset.label ? '<span>' + el.dataset.label + '</span>' : ''); }); }
+fillIcons(); // the script sits at the end of <body>, so the markup is already there
 const ENGINES = {
   google: 'https://www.google.com/search?q=',
   duckduckgo: 'https://duckduckgo.com/?q=',
@@ -45,13 +125,14 @@ function makeWebview(t, url) {
   const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); } renderTab(t); saveSession(); };
   wv.addEventListener('ipc-message', (e) => { if (e.channel === 'orchard-context') showPageMenu(t, e.args[0]); });
   wv.addEventListener('did-navigate', nav);
+  wv.addEventListener('did-navigate', () => { t.committed = true; });
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
   wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
   wv.addEventListener('media-started-playing', () => { t.audio = true; renderTab(t); });
   wv.addEventListener('media-paused', () => { t.audio = false; renderTab(t); if (t !== active) scheduleFreeze(t); });
   wv.addEventListener('did-fail-load', (e) => {
     if (e.errorCode === -3 || !e.isMainFrame) return;
-    wv.executeJavaScript(`document.body.innerHTML='<div style="font-family:Segoe UI;text-align:center;margin-top:18vh;color:#444"><h1 style=font-size:60px>&#128565;</h1><h2>Bro this page aint loading</h2><p>${String(e.errorDescription).replace(/[<>'"`]/g,'')}</p></div>'`).catch(()=>{});
+    wv.executeJavaScript(`document.body.innerHTML='<div style="font-family:Segoe UI;text-align:center;margin-top:18vh;color:#444"><h2 style=font-weight:600;font-size:22px;margin-bottom:8px>This page could not be loaded</h2><p style=color:#777>Check the address and your connection, then reload.</p><p>${String(e.errorDescription).replace(/[<>'"`]/g,'')}</p></div>'`).catch(()=>{});
   });
 }
 
@@ -79,7 +160,7 @@ function createTab(url, bg, asleep) {
 let drag = null, dragJustEnded = false;
 function startTabDrag(e, t) {
   if (e.button !== 0 || e.target.classList.contains('x')) return;
-  drag = { t, x0: e.clientX, y0: e.clientY, off: e.clientX - t.el.getBoundingClientRect().left, on: false, out: false, pid: e.pointerId };
+  drag = { t, x0: e.clientX, y0: e.clientY, off: e.clientX - t.el.getBoundingClientRect().left, offY: e.clientY - t.el.getBoundingClientRect().top, on: false, out: false, pid: e.pointerId };
   try { t.el.setPointerCapture(e.pointerId); } catch {}
 }
 let dragFrame = 0, dragEvt = null;
@@ -103,6 +184,7 @@ function dragStep(e) {
     if (Math.abs(e.clientX - d.x0) < 5 && Math.abs(e.clientY - d.y0) < 5) return;
     d.on = true; d.t.el.classList.add('dragging'); activate(d.t);
   }
+  if (document.body.classList.contains('vtabs')) return dragStepV(e);
   const strip = $('tabs').getBoundingClientRect();
   d.out = e.clientY < strip.top - 40 || e.clientY > strip.bottom + 50 || e.clientX < -20 || e.clientX > innerWidth + 20;
   document.body.classList.toggle('tearing', d.out);
@@ -130,6 +212,80 @@ function dragStep(e) {
     }
   }
 }
+function glideV(el, fromTop) {
+  const now = el.getBoundingClientRect().top, dy = fromTop - now;
+  if (!dy) return;
+  el.style.transition = 'none'; el.style.transform = `translateY(${dy}px)`;
+  el.getBoundingClientRect();
+  el.style.transition = 'transform .2s var(--ease)'; el.style.transform = '';
+  setTimeout(() => { if (!el.classList.contains('dragging')) el.style.transition = ''; }, 220);
+}
+// reorder in the vertical tab list (drag up/down; drag far right to tear into a new window)
+function dragStepV(e) {
+  const d = drag;
+  const strip = $('tabs').getBoundingClientRect();
+  d.out = e.clientX > strip.right + 80 || e.clientX < -20 || e.clientY < -20 || e.clientY > innerHeight + 20;
+  document.body.classList.toggle('tearing', d.out);
+  if (d.out) { d.t.el.style.transform = `translate(${e.clientX - d.x0}px, ${e.clientY - d.y0}px)`; return; }
+  const els = [...$('tabs').querySelectorAll('.tab:not(.closing)')];
+  const me = d.t.el;
+  const base = me.getBoundingClientRect().top - (parseFloat(me.dataset.dx) || 0);
+  const dy = Math.max(strip.top - base, Math.min(strip.bottom - me.offsetHeight - base, e.clientY - d.offY - base));
+  me.style.transform = `translateY(${dy}px)`; me.dataset.dx = dy;
+  const mid = base + dy + me.offsetHeight / 2;
+  for (const o of els) {
+    if (o === me) continue;
+    const rr = o.getBoundingClientRect(), om = rr.top + rr.height / 2;
+    const idxMe = els.indexOf(me), idxO = els.indexOf(o);
+    if ((idxO > idxMe && mid > om) || (idxO < idxMe && mid < om)) {
+      const before = me.getBoundingClientRect().top - dy, oBefore = rr.top;
+      if (idxO > idxMe) o.after(me); else o.before(me);
+      const shift = (me.getBoundingClientRect().top - dy) - before;
+      me.dataset.dx = dy - shift; me.style.transform = `translateY(${dy - shift}px)`;
+      glideV(o, oBefore);
+      syncTabOrder();
+      break;
+    }
+  }
+}
+
+// ---- vertical tabs, like Chrome ----
+function applyVTabs() {
+  const on = !!store.settings.vtabs;
+  document.body.classList.toggle('vtabs', on);
+  document.body.classList.toggle('vcol', on && !!store.settings.vtabsCollapsed);
+  document.documentElement.style.setProperty('--vw', Math.max(160, Math.min(420, store.settings.vtabsWidth || 240)) + 'px');
+  const tabsEl = $('tabs'), logo = $('logo'), wb = $('winbtns');
+  if (on) { $('vhead').insertBefore(logo, $('vcol')); $('vside').insertBefore(tabsEl, $('vgrip')); $('nav').appendChild(wb); }
+  else { const top = $('top'); top.insertBefore(logo, top.firstChild); logo.after(tabsEl); top.appendChild(wb); }
+  $('vcol').title = store.settings.vtabsCollapsed ? 'Expand tabs' : 'Collapse tabs';
+  const relayout = () => { try { layoutViews(); } catch {} };
+  relayout(); setTimeout(relayout, 220);
+}
+function setVTabs(on) { store.settings.vtabs = !!on; save(); applyVTabs(); toast(on ? 'Tabs are now shown vertically.' : 'Tabs are now shown at the top.'); }
+$('vcol').onclick = () => { store.settings.vtabsCollapsed = !store.settings.vtabsCollapsed; save(); applyVTabs(); };
+$('vgrip').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const g = $('vgrip'); try { g.setPointerCapture(e.pointerId); } catch {}
+  document.body.classList.add('vdrag');
+  const left = $('vside').getBoundingClientRect().left;
+  const mv = (ev) => { const w = Math.round(Math.max(160, Math.min(420, ev.clientX - left))); store.settings.vtabsWidth = w; document.documentElement.style.setProperty('--vw', w + 'px'); };
+  const up = () => { g.removeEventListener('pointermove', mv); g.removeEventListener('pointerup', up); document.body.classList.remove('vdrag'); save(); try { layoutViews(); } catch {} };
+  g.addEventListener('pointermove', mv); g.addEventListener('pointerup', up);
+});
+
+// a tab opened only to download something closes itself, like Chrome
+window.aura.on('dl-origin', (o) => {
+  if (!o || o.wcId == null) return;
+  const t = tabs.find(x => { try { return x.wv && x.wv.getWebContentsId() === o.wcId; } catch { return false; } });
+  if (!t || t.committed) return;
+  setTimeout(() => {
+    if (!tabs.includes(t) || t.committed) return;
+    if (tabs.length === 1) { try { t.wv.loadURL(newtabSrc()).catch(() => {}); } catch {} }
+    else closeTab(t, true);
+  }, 150);
+});
+
 function syncTabOrder() {
   const order = [...$('tabs').querySelectorAll('.tab:not(.closing)')];
   tabs.sort((a, b) => order.indexOf(a.el) - order.indexOf(b.el));
@@ -177,20 +333,20 @@ window.addEventListener('drop', (e) => {
     else createTab(url, opened > 0);
     opened++;
   });
-  if (opened) toast(opened > 1 ? ('opening ' + opened + ' files 📂') : ('opening ' + (files[0].name || 'file') + ' 📂'));
+  if (opened) toast(opened > 1 ? ('Opening ' + opened + ' files.') : ('Opening ' + (files[0].name || 'file') + '.'));
 }, false);
 
 function renderTab(t) {
   let icon;
   const masked = t.locked && !t.unlocked && lockReady();
-  if (masked) icon = '<span style="width:16px;text-align:center">&#128274;</span>';
-  else if (t.sleeping) icon = '<span style="width:16px;text-align:center" title="sleeping, saving battery">&#128164;</span>';
+  if (masked) icon = '<span class="ticon">' + ic('lock', 14) + '</span>';
+  else if (t.sleeping) icon = '<span class="ticon" title="Sleeping to save battery">' + ic('moon', 14) + '</span>';
   else if (t.loading && !t.frozen) icon = '<span class="spin"></span>';
   else if (t.icon || !isNewtab(t.url)) icon = `<img src="${t.icon || fav(t.url)}" onerror="this.style.visibility='hidden'">`;
-  else icon = '<img src="apple-logo.png" alt="">';
+  else icon = '<span class="ticon">' + APPLE_MARK + '</span>';
   const title = masked ? 'Locked tab' : isNewtab(t.url) ? 'New Tab' : (t.title || t.url);
-  const chg = t.charge >= 1 ? `<span class="chg" title="${t.charge === 2 ? 'supercharged' : 'charged'}">${t.charge === 2 ? '&#128640;' : '&#9889;'}</span>` : '';
-  t.el.innerHTML = icon + '<span class="t"></span>' + chg + (t.locked && !masked ? '<span title="locked tab, unlocked for now" style="font-size:11px">&#128275;</span>' : '') + (t.audio ? '<span title="playing audio">&#128266;</span>' : '') + '<span class="x">&#10005;</span>';
+  const chg = t.charge >= 1 ? `<span class="chg" title="${t.charge === 2 ? 'Supercharged' : 'Charged'}">${ic(t.charge === 2 ? 'boltFill' : 'bolt', 13)}</span>` : '';
+  t.el.innerHTML = icon + '<span class="t"></span>' + chg + (t.locked && !masked ? '<span class="badge" title="Locked tab, currently unlocked">' + ic('unlock', 13) + '</span>' : '') + (t.audio ? '<span class="badge" title="Playing audio">' + ic('volume', 14) + '</span>' : '') + '<span class="x" title="Close tab">' + ic('x', 14) + '</span>';
   t.el.querySelector('.t').textContent = title;
   t.el.title = title + (t.charge === 2 ? ' (supercharged)' : t.charge === 1 ? ' (charged)' : '') + (t.sleeping ? ' (sleeping)' : t.frozen ? ' (frozen)' : '');
   t.el.classList.toggle('sleep', !!(t.sleeping || t.frozen));
@@ -230,7 +386,7 @@ function restoreSession() {
   return true;
 }
 
-// ---- battery stuff ----
+// ---- battery ----
 let onBattery = false, battLevel = null, charging = true;
 // battery is the core of Orchard: 0 = normal (still frugal), 1 = saver, 2 = ultra
 function saverLevel() {
@@ -259,7 +415,7 @@ function setCharge(t, level) {
   t.charge = level;
   applyCharge(t);
   saveSession();
-  toast(level === 2 ? 'tab supercharged — max fps + priority 🚀' : level === 1 ? 'tab charged — full speed on battery ⚡' : 'charge off, back to normal');
+  toast(level === 2 ? 'Tab supercharged: no frame rate limit and higher priority.' : level === 1 ? 'Tab charged: it stays at full speed on battery.' : 'Charge removed.');
 }
 function freeze(t, f) {
   if (!t.wv || !t.ready || t.wcId == null || t.frozen === f) return;
@@ -299,7 +455,7 @@ function updateSaverUI() {
   const b = $('batt');
   const pct = battLevel === null ? '' : Math.round(battLevel * 100) + '%';
   const plugged = charging && !onBattery;
-  b.innerHTML = '<span class="leaf">&#127811;</span> ' + (plugged ? '&#9889;' : '') + pct + ' <b>' + (lvl >= 2 ? 'Ultra' : lvl ? 'Saver' : 'Eco') + '</b>' + (restingCount() ? ' <span class="rest">' + restingCount() + ' &#128164;</span>' : '');
+  b.innerHTML = ic(plugged ? 'batteryCharging' : 'battery', 15) + '<span class="lvl">' + pct + '</span> <b>' + (lvl >= 2 ? 'Ultra' : lvl ? 'Saver' : 'Eco') + '</b>' + (restingCount() ? ' <span class="rest">' + restingCount() + ' resting</span>' : '');
   b.classList.toggle('on', on); b.classList.toggle('ultra', lvl >= 2);
   b.title = 'Battery: ' + (pct || '?') + (plugged ? ' (charging)' : '') + '\nMode: ' + ['Eco (normal, still frugal)', 'Saver', 'Ultra saver'][lvl] + '\n' + restingCount() + ' tab(s) frozen or asleep, using no power\n' + blocked + ' ads blocked\nclick for battery usage';
 }
@@ -318,13 +474,13 @@ function applySaver() {
   applyFps();
   updateSaverUI();
   tabs.forEach(t => { if (!isShown(t) && t.ready) scheduleFreeze(t); emulateFor(t); });
-  if (lvl >= 2 && lastLvl < 2 && lastLvl !== -1) { tabs.forEach(t => { if (!isShown(t)) sleepTab(t); }); toast('Ultra saver on 🥶 background tabs asleep, pages calmed down'); }
-  else if (lvl === 1 && lastLvl === 0) toast('unplugged, Saver mode on 🍃');
+  if (lvl >= 2 && lastLvl < 2 && lastLvl !== -1) { tabs.forEach(t => { if (!isShown(t)) sleepTab(t); }); toast('Ultra saver is on. Background tabs are asleep.'); }
+  else if (lvl === 1 && lastLvl === 0) toast('Running on battery. Saver mode is on.');
   lastLvl = lvl;
   if (typeof placeChat === 'function') placeChat();
   if (battLevel !== null && !charging) {
-    if (battLevel <= 0.1 && !warned10) { warned10 = true; toast('10% battery bro, Ultra saver is on 🪫'); }
-    else if (battLevel <= 0.2 && !warned20) { warned20 = true; if (store.settings.saver === 'auto' || !store.settings.saver) toast('20% battery, switched to Ultra saver 🪫'); }
+    if (battLevel <= 0.1 && !warned10) { warned10 = true; toast('Battery at 10%. Ultra saver is on.'); }
+    else if (battLevel <= 0.2 && !warned20) { warned20 = true; if (store.settings.saver === 'auto' || !store.settings.saver) toast('Battery at 20%. Switched to Ultra saver.'); }
   } else { warned20 = warned10 = false; }
   sleepCheck();
 }
@@ -384,9 +540,9 @@ function splitWith(t) {
   if (t === active) return;
   if (!split.includes(active)) split = [active];
   if (split.includes(t)) return;
-  if (split.length >= 4) { toast('split screen fits 4 tabs max bro 🫩'); return; }
+  if (split.length >= 4) { toast('Split screen supports up to four tabs.'); return; }
   split.push(t);
-  layoutViews(); updateNav(); toast('split screen on, click a side to use it');
+  layoutViews(); updateNav(); toast('Split screen is on. Click a pane to use it.');
 }
 function unsplit(t) {
   split = t ? split.filter(x => x !== t) : [];
@@ -400,22 +556,22 @@ function showLock(t, st) {
   if (!t.lockEl) {
     const d = document.createElement('div');
     d.className = 'lockpane';
-    d.innerHTML = '<div class="lockcard"><div style="font-size:40px">&#128274;</div><b>This tab is locked</b><small>enter your tab password</small><div style="display:flex;gap:6px;width:100%"><input type="password" placeholder="Password"><span class="pbtn eye" title="Show password">&#128065;</span></div><div class="lockerr"></div><span class="pbtn ok unl">Unlock</span><a class="forgot">Forgot password?</a></div>';
+    d.innerHTML = '<div class="lockcard"><div class="lkicon">' + ic('lock', 30) + '</div><b>This tab is locked</b><small>Enter your tab password to continue.</small><div style="display:flex;gap:6px;width:100%"><input type="password" placeholder="Password"><span class="pbtn eye" title="Show password">' + ic('eye', 16) + '</span></div><div class="lockerr"></div><span class="pbtn ok unl">Unlock</span><a class="forgot">Forgot password?</a></div>';
     const inp = d.querySelector('input'), err = d.querySelector('.lockerr');
     d.querySelector('.eye').onclick = () => { inp.type = inp.type === 'password' ? 'text' : 'password'; inp.focus(); };
-    inp.addEventListener('keyup', (e) => { if (e.getModifierState && e.getModifierState('CapsLock')) err.textContent = 'caps lock is on'; else if (err.textContent === 'caps lock is on') err.textContent = ''; });
+    inp.addEventListener('keyup', (e) => { if (e.getModifierState && e.getModifierState('CapsLock')) err.textContent = 'Caps Lock is on.'; else if (err.textContent === 'Caps Lock is on.') err.textContent = ''; });
     d.querySelector('.forgot').onclick = async () => {
-      const v = await modal('Forgot ur tab password?', 'This closes every locked tab and removes the password. Ur other tabs stay. Type RESET to do it.', [{ id: 'c', label: 'Type RESET' }], 'Reset');
+      const v = await modal('Forgot your tab password?', 'This closes every locked tab and removes the password. Your other tabs stay open. Type RESET to continue.', [{ id: 'c', label: 'Type RESET' }], 'Reset');
       if (!v || v.c.trim().toUpperCase() !== 'RESET') return;
       tabs.filter(x => x.locked).forEach(x => closeTab(x, true));
       delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1;
-      save(); saveSession(true); layoutViews(); toast('password removed, locked tabs closed');
+      save(); saveSession(true); layoutViews(); toast('Password removed. Locked tabs were closed.');
     };
     let fails = 0, wait = 0;
     const tryIt = async () => {
-      if (Date.now() < wait) { err.textContent = 'too many tries, wait a sec'; return; }
-      if (await checkPw(inp.value)) { lastUnlock = Date.now(); t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); toast('unlocked 🔓'); }
-      else { fails++; err.textContent = 'wrong password 💔'; inp.select(); if (fails >= 5) { wait = Date.now() + 15000; fails = 0; } }
+      if (Date.now() < wait) { err.textContent = 'Too many attempts. Please wait a moment.'; return; }
+      if (await checkPw(inp.value)) { lastUnlock = Date.now(); t.unlocked = true; inp.value = ''; err.textContent = ''; fails = 0; layoutViews(); renderTab(t); updateNav(); toast('Tab unlocked.'); }
+      else { fails++; err.textContent = 'Incorrect password.'; inp.select(); if (fails >= 5) { wait = Date.now() + 15000; fails = 0; } }
     };
     d.querySelector('.unl').onclick = tryIt;
     inp.onkeydown = (e) => { if (e.key === 'Enter') tryIt(); };
@@ -444,10 +600,10 @@ function relockAll() {
 async function toggleLock(t) {
   if (t.locked) {
     if (!t.unlocked && !(await askPw('Unlock this tab for good', 'Enter your tab password to remove the lock.'))) return;
-    t.locked = false; t.unlocked = false; toast('lock removed');
+    t.locked = false; t.unlocked = false; toast('Lock removed.');
   } else {
     if (!lockReady()) { const ok = await pwSetupModal(); if (!ok) return; }
-    t.locked = true; t.unlocked = t === active || isShown(t); toast('tab locked 🔒 it locks when u leave it');
+    t.locked = true; t.unlocked = t === active || isShown(t); toast('Tab locked. It locks again when you leave it.');
   }
   renderTab(t); layoutViews(); saveSession(true);
 }
@@ -455,16 +611,16 @@ async function askPw(title, sub) {
   const v = await modal(title, sub, [{ id: 'p', label: 'Password', type: 'password' }], 'Unlock');
   if (!v) return false;
   if (await checkPw(v.p)) { lastUnlock = Date.now(); return true; }
-  toast('wrong password 💔'); return false;
+  toast('Incorrect password.'); return false;
 }
 async function pwSetupModal(change) {
   const fields = (change ? [{ id: 'old', label: 'Current password', type: 'password' }] : []).concat([{ id: 'a', label: 'New password', type: 'password' }, { id: 'b', label: 'Type it again', type: 'password' }]);
   const v = await modal(change ? 'Change tab password' : 'Set a tab password', 'Locked tabs need this to open.', fields, 'Save');
   if (!v) return false;
-  if (change && !(await checkPw(v.old))) { toast('current password is wrong 💔'); return false; }
-  if (!v.a || v.a.length < 4) { toast('make it at least 4 characters'); return false; }
-  if (v.a !== v.b) { toast('passwords dont match'); return false; }
-  await setPw(v.a); toast('password saved 🔥'); return true;
+  if (change && !(await checkPw(v.old))) { toast('The current password is incorrect.'); return false; }
+  if (!v.a || v.a.length < 4) { toast('Use at least four characters.'); return false; }
+  if (v.a !== v.b) { toast('The passwords do not match.'); return false; }
+  await setPw(v.a); toast('Password saved.'); return true;
 }
 function modal(title, sub, fields, okText) {
   return new Promise((res) => {
@@ -497,10 +653,10 @@ const PICKER = `new Promise((done) => {
   window.__orchardPick = true;
   const box = document.createElement('div'), tag = document.createElement('div'), bar = document.createElement('div');
   const Z = 2147483647;
-  box.style.cssText = 'position:fixed;pointer-events:none;z-index:' + Z + ';background:rgba(232,67,46,.25);outline:2px solid #e8432e;border-radius:3px;transition:all .05s';
-  tag.style.cssText = 'position:fixed;pointer-events:none;z-index:' + Z + ';background:#1b1211;color:#ffb83d;font:12px/1.4 Consolas,monospace;padding:3px 7px;border-radius:5px;max-width:60vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
-  bar.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:' + Z + ';background:#1b1211;color:#f6ece8;font:13px Segoe UI,system-ui,sans-serif;padding:8px 14px;border-radius:10px;border:1px solid #e8432e;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none';
-  bar.textContent = 'Click something to hide it  ·  ↑ bigger  ↓ smaller  ·  Esc to stop';
+  box.style.cssText = 'position:fixed;pointer-events:none;z-index:' + Z + ';background:rgba(201,74,62,.2);outline:2px solid #c94a3e;border-radius:3px;transition:all .06s ease-out';
+  tag.style.cssText = 'position:fixed;pointer-events:none;z-index:' + Z + ';background:#2b2d31;color:#e8e9eb;font:12px/1.4 Consolas,monospace;padding:3px 7px;border-radius:4px;max-width:60vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis';
+  bar.style.cssText = 'position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:' + Z + ';background:#2b2d31;color:#e8e9eb;font:13px Segoe UI,system-ui,sans-serif;padding:8px 14px;border-radius:8px;border:1px solid #3a3c41;box-shadow:0 8px 30px rgba(0,0,0,.4);pointer-events:none';
+  bar.textContent = 'Click an element to hide it. Use the arrow keys to select a larger or smaller area. Press Esc to finish.';
   document.documentElement.append(box, tag, bar);
   let cur = null, trail = [];
   const okId = (id) => id && !/\\d{3,}|[:.]/.test(id) && id.length < 40;
@@ -552,8 +708,8 @@ const PICKER = `new Promise((done) => {
 let picking = false;
 async function startHidePicker() {
   const t = active;
-  if (!t || !t.wv || !t.ready || isNewtab(t.url) || !/^https?:/.test(t.url)) { toast('open a website first, then pick stuff to hide 🫩'); return; }
-  if (t.locked && !t.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
+  if (!t || !t.wv || !t.ready || isNewtab(t.url) || !/^https?:/.test(t.url)) { toast('Open a website first, then choose elements to hide.'); return; }
+  if (t.locked && !t.unlocked && lockReady()) { toast('Unlock the tab first.'); return; }
   if (picking) return;
   picking = true; $('hideBtn').classList.add('on');
   $('panel').classList.remove('show');
@@ -573,17 +729,17 @@ async function startHidePicker() {
     }
   } catch {}
   picking = false; $('hideBtn').classList.remove('on');
-  if (n) toast('hid ' + n + ' thing' + (n > 1 ? 's' : '') + ' on ' + hostOf(t.url) + ' 🔥 manage them with the eye button');
+  if (n) toast('Hid ' + n + ' element' + (n > 1 ? 's' : '') + ' on ' + hostOf(t.url) + '. Manage them from the hide button in the address bar.');
 }
 function renderHides() {
   const list = $('plist'), t = active, h = t ? hostOf(t.url) : '';
   $('ptitle').textContent = 'Hidden elements';
   const rules = hideRulesFor(t && t.url);
   const all = Object.entries(store.hideRules || {}).filter(([, v]) => v.length);
-  list.innerHTML = `<div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">Pick anything on a website (ads, popups, sidebars, comments) and Orchard hides it every time u visit that site.</div>
-    <div class="set"><span class="pbtn ok" id="hidePick">&#128065; Pick elements to hide</span><span class="pbtn" id="hidePause">${store.settings.hidesPaused ? 'Hiding paused' : 'Hiding on'}</span></div>
+  list.innerHTML = `<div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">Choose any part of a website, such as ads, pop-ups, sidebars or comments, and Orchard will hide it every time you visit that site.</div>
+    <div class="set"><span class="pbtn ok" id="hidePick">Choose elements to hide</span><span class="pbtn" id="hidePause">${store.settings.hidesPaused ? 'Hiding is paused' : 'Hiding is on'}</span></div>
     <div class="mhead">${h ? 'ON ' + esc(h.toUpperCase()) : 'THIS PAGE'}</div>`;
-  if (!rules.length) list.insertAdjacentHTML('beforeend', '<div class="set" style="color:var(--dim);font-size:12px">nothing hidden on this site yet</div>');
+  if (!rules.length) list.insertAdjacentHTML('beforeend', '<div class="set" style="color:var(--dim);font-size:12px">Nothing is hidden on this site.</div>');
   rules.forEach((s, i) => {
     const r = document.createElement('div'); r.className = 'row';
     r.innerHTML = '<div class="rt"><div style="font:12px Consolas,monospace"></div></div><span class="pbtn mini">Show again</span>';
@@ -638,10 +794,10 @@ function showNote(n) {
   while (box.children.length >= 4) box.lastElementChild.remove();
   const d = document.createElement('div'); d.className = 'note';
   let hsh = 0; for (const ch of String(n.chat)) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
-  d.innerHTML = '<div class="nav"></div><div class="nb"><div class="nt"><span class="ntt"></span><small>now</small></div><div class="nm"></div></div><span class="nx" title="Dismiss">&#10005;</span>';
+  d.innerHTML = '<div class="nav"></div><div class="nb"><div class="nt"><span class="ntt"></span><small>now</small></div><div class="nm"></div></div><span class="nx" title="Dismiss">' + ic('x', 14) + '</span>';
   const av = d.querySelector('.nav'); av.style.background = NOTE_COLORS[Math.abs(hsh) % NOTE_COLORS.length]; av.textContent = (n.group ? n.title : n.from || n.title || '?').trim().charAt(0).toUpperCase() || '?';
   d.querySelector('.ntt').textContent = n.title || 'Orchard Chat';
-  d.querySelector('.nm').textContent = (n.group ? (n.from || 'Someone') + ': ' : '') + (n.text || 'sent a message');
+  d.querySelector('.nm').textContent = (n.group ? (n.from || 'Someone') + ': ' : '') + (n.text || 'Sent a message');
   const kill = () => { d.style.transition = 'opacity .2s'; d.style.opacity = 0; setTimeout(() => d.remove(), 200); };
   d.onclick = (e) => { kill(); if (!e.target.classList.contains('nx')) openChatTo(n.chat); };
   box.prepend(d);
@@ -681,42 +837,42 @@ async function mailShow() {
 }
 function mailSetup(err) {
   const p = $('mailPane'), c = mailCfg || {};
-  p.innerHTML = `<div class="mtop"><b style="flex:1">&#9993; Orchard Mail</b><span class="pbtn" id="mX">&#10005;</span></div>
+  p.innerHTML = `<div class="mtop"><b style="flex:1">Orchard Mail</b><span class="pbtn" id="mX" title="Close">${ic('x', 14)}</span></div>
   <div class="msetup">
-    <h3>Ur Gmail, inside Orchard</h3>
-    <p>Google won't let u log in on Orchard's pages, but it does allow apps to sign in through ur normal browser. So u sign in once in <b>Chrome</b>, then ur inbox shows up right here.</p>
-    ${c.clientId && c.hasSecret ? '' : `<p><b>One time setup (about 10 min, do it in Chrome):</b></p>
+    <h3>Gmail in Orchard</h3>
+    <p>Google does not allow signing in on embedded pages such as Orchard's, but it does allow apps to sign in through your regular browser. Sign in once in <b>Chrome</b> and your inbox will appear here.</p>
+    ${c.clientId && c.hasSecret ? '' : `<p><b>One-time setup (about 10 minutes, in Chrome):</b></p>
     <ol>
-      <li><a data-u="https://console.cloud.google.com/projectcreate">Make a Google Cloud project</a>, name it Orchard, click Create.</li>
-      <li><a data-u="https://console.cloud.google.com/apis/library/gmail.googleapis.com">Turn on the Gmail API</a> (click Enable).</li>
-      <li><a data-u="https://console.cloud.google.com/auth/branding">Set up the sign in screen</a>: app name Orchard, ur email, audience <b>External</b>, finish.</li>
-      <li>On <a data-u="https://console.cloud.google.com/auth/audience">Audience</a>, add ur own Gmail under <b>Test users</b>.</li>
-      <li><a data-u="https://console.cloud.google.com/auth/clients/create">Create a client</a>: type <b>Desktop app</b>, name Orchard, Create.</li>
-      <li>Copy the <b>Client ID</b> and <b>Client secret</b> into the boxes below.</li>
+      <li><a data-u="https://console.cloud.google.com/projectcreate">Create a Google Cloud project</a> named Orchard.</li>
+      <li><a data-u="https://console.cloud.google.com/apis/library/gmail.googleapis.com">Enable the Gmail API</a>.</li>
+      <li><a data-u="https://console.cloud.google.com/auth/branding">Configure the sign-in screen</a>: app name Orchard, your email address, audience <b>External</b>.</li>
+      <li>Under <a data-u="https://console.cloud.google.com/auth/audience">Audience</a>, add your Gmail address as a <b>Test user</b>.</li>
+      <li><a data-u="https://console.cloud.google.com/auth/clients/create">Create a client</a> of type <b>Desktop app</b> named Orchard.</li>
+      <li>Paste the <b>Client ID</b> and <b>Client secret</b> below.</li>
     </ol>`}
-    <label style="font-size:12px;color:var(--dim)">Client ID<input id="mCid" value="${esc(c.clientId || '')}" placeholder="something.apps.googleusercontent.com"></label>
-    <label style="font-size:12px;color:var(--dim)">Client secret<input id="mSec" type="password" placeholder="${c.hasSecret ? 'saved (paste to change)' : 'GOCSPX-...'}"></label>
-    ${err ? `<p style="color:#ff6b6b">${esc(err)}</p>` : ''}
+    <label style="font-size:12px;color:var(--dim)">Client ID<input id="mCid" value="${esc(c.clientId || '')}" placeholder="example.apps.googleusercontent.com"></label>
+    <label style="font-size:12px;color:var(--dim)">Client secret<input id="mSec" type="password" placeholder="${c.hasSecret ? 'Saved. Paste a new one to replace it.' : 'GOCSPX-...'}"></label>
+    ${err ? `<p style="color:var(--err)">${esc(err)}</p>` : ''}
     <span class="pbtn ok" id="mGo" style="align-self:flex-start;padding:9px 16px">Sign in with Google (opens Chrome)</span>
-    <p>When Chrome opens, pick ur personal Gmail. If Google says "<b>Google hasn't verified this app</b>", that's normal for ur own project: click <b>Continue</b>. Ur emails go straight between Orchard and Google, nobody else sees them.</p>
+    <p>When Chrome opens, choose your Gmail account. If Google shows "<b>Google hasn't verified this app</b>", that is expected for a personal project: select <b>Continue</b>. Your email travels directly between Orchard and Google.</p>
   </div>`;
   p.querySelectorAll('a[data-u]').forEach(a => a.onclick = () => ext(a.dataset.u));
   $('mX').onclick = () => toggleAi(false);
   $('mGo').onclick = async () => {
     const cid = $('mCid').value.trim(), sec = $('mSec').value.trim();
-    if (!/\.apps\.googleusercontent\.com$/.test(cid)) return mailSetup('that Client ID doesnt look right, it ends with .apps.googleusercontent.com');
+    if (!/\.apps\.googleusercontent\.com$/.test(cid)) return mailSetup('That Client ID does not look right. It should end with .apps.googleusercontent.com.');
     if (!sec && !c.hasSecret) return mailSetup('paste the Client secret too');
     await M.setConfig(cid, sec);
-    $('mGo').textContent = 'Waiting for u to sign in in Chrome…';
+    $('mGo').textContent = 'Waiting for you to sign in through Chrome…';
     const r = await M.signIn();
-    if (r.ok) { toast('signed in as ' + r.email + ' 🔥'); mailView = 'list'; mailShow(); mailPoll(); }
+    if (r.ok) { toast('Signed in as ' + r.email + '.'); mailView = 'list'; mailShow(); mailPoll(); }
     else { mailCfg = await M.config(); mailSetup(r.error); }
   };
 }
 async function mailList(append) {
   const p = $('mailPane');
   if (!append) {
-    p.innerHTML = `<div class="mtop"><input id="mSearch" placeholder="Search mail" value="${mailQ === 'in:inbox' ? '' : esc(mailQ)}"><span class="pbtn" id="mRef" title="Refresh">&#8635;</span><span class="pbtn ok" id="mNew" title="New email">&#9998; Write</span><span class="pbtn" id="mMenu" title="Account">&#8942;</span></div><div class="mlist" id="mList"><div class="empty" style="padding:20px;text-align:center;color:var(--dim)">Loading ur inbox…</div></div>`;
+    p.innerHTML = `<div class="mtop"><input id="mSearch" placeholder="Search mail" value="${mailQ === 'in:inbox' ? '' : esc(mailQ)}"><span class="pbtn" id="mRef" title="Refresh">${ic('reload', 15)}</span><span class="pbtn ok" id="mNew" title="New email">${ic('pen', 14)} Compose</span><span class="pbtn" id="mMenu" title="Account">${ic('more', 15)}</span></div><div class="mlist" id="mList"><div class="empty" style="padding:20px;text-align:center;color:var(--dim)">Loading your inbox…</div></div>`;
     $('mSearch').onkeydown = (e) => { if (e.key === 'Enter') { mailQ = e.target.value.trim() || 'in:inbox'; mailList(); } };
     $('mRef').onclick = () => mailList();
     $('mNew').onclick = () => mailCompose();
@@ -729,16 +885,16 @@ async function mailList(append) {
       ['Sent', () => { mailQ = 'in:sent'; mailList(); }],
       null,
       ['Open Gmail in Chrome', () => ext('https://mail.google.com/')],
-      ['Sign out', async () => { await M.signOut(); mailBadge(0); toast('signed out of Orchard Mail'); mailShow(); }]
+      ['Sign out', async () => { await M.signOut(); mailBadge(0); toast('Signed out of Orchard Mail.'); mailShow(); }]
     ]);
   }
   if (mailBusy) return; mailBusy = true;
   const r = await M.list(mailQ, append ? mailNext : null);
   mailBusy = false;
   const box = $('mList'); if (!box) return;
-  if (r.error) { if (r.signedOut) return mailShow(); box.innerHTML = `<div style="padding:20px;color:#ff6b6b;font-size:13px">${esc(r.error)}</div>`; return; }
+  if (r.error) { if (r.signedOut) return mailShow(); box.innerHTML = `<div style="padding:20px;color:var(--err);font-size:13px">${esc(r.error)}</div>`; return; }
   mailMsgs = append ? mailMsgs.concat(r.messages) : r.messages; mailNext = r.next;
-  if (!mailMsgs.length) { box.innerHTML = '<div style="padding:24px;text-align:center;color:var(--dim)">nothing here 🍃</div>'; return; }
+  if (!mailMsgs.length) { box.innerHTML = '<div style="padding:24px;text-align:center;color:var(--dim)">No messages.</div>'; return; }
   box.innerHTML = '';
   mailMsgs.forEach(m => {
     const d = document.createElement('div'); d.className = 'mrow' + (m.unread ? ' unread' : '');
@@ -755,10 +911,10 @@ async function mailList(append) {
 async function mailRead(id) {
   mailView = 'read';
   const p = $('mailPane');
-  p.innerHTML = `<div class="mtop"><span class="pbtn" id="mBack">&#8592; Back</span><span style="flex:1"></span><span class="pbtn" id="mReply" title="Reply">&#8617; Reply</span><span class="pbtn" id="mArch" title="Archive">&#128229;</span><span class="pbtn" id="mTrash" title="Delete">&#128465;</span><span class="pbtn" id="mMore">&#8942;</span></div><div class="mread" id="mRead"><div style="padding:20px;color:var(--dim)">Opening…</div></div>`;
+  p.innerHTML = `<div class="mtop"><span class="pbtn" id="mBack">${ic('back', 14)} Back</span><span style="flex:1"></span><span class="pbtn" id="mReply" title="Reply">${ic('reply', 14)} Reply</span><span class="pbtn" id="mArch" title="Archive">${ic('archive', 15)}</span><span class="pbtn" id="mTrash" title="Delete">${ic('trash', 15)}</span><span class="pbtn" id="mMore" title="More">${ic('more', 15)}</span></div><div class="mread" id="mRead"><div style="padding:20px;color:var(--dim)">Opening…</div></div>`;
   $('mBack').onclick = () => { mailView = 'list'; mailCur = null; mailList(); };
   const m = await M.get(id);
-  if (m.error) { if (m.signedOut) return mailShow(); $('mRead').innerHTML = `<div style="padding:20px;color:#ff6b6b">${esc(m.error)}</div>`; return; }
+  if (m.error) { if (m.signedOut) return mailShow(); $('mRead').innerHTML = `<div style="padding:20px;color:var(--err)">${esc(m.error)}</div>`; return; }
   mailCur = m;
   const box = $('mRead'); box.innerHTML = '<div class="mhd"><h3></h3><small class="a"></small><small class="b"></small></div>';
   box.querySelector('h3').textContent = m.subject || '(no subject)';
@@ -783,7 +939,7 @@ async function mailRead(id) {
   $('mReply').onclick = () => mailCompose({ to: addrFrom(m.from), subject: /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject, threadId: m.threadId, inReplyTo: m.messageId, quote: m });
   $('mMore').onclick = (e) => showMenu(e, [
     ['Mark unread', async () => { await M.modify(id, 'unread'); mailView = 'list'; mailList(); mailPoll(); }],
-    ['Star', async () => { await M.modify(id, 'star'); toast('starred ★'); }],
+    ['Star', async () => { await M.modify(id, 'star'); toast('Message starred.'); }],
     ['Forward', () => mailCompose({ subject: 'Fwd: ' + m.subject, body: '\n\n---------- Forwarded message ----------\nFrom: ' + m.from + '\nSubject: ' + m.subject + '\n\n' + (m.text || '') })],
     ['Open in Chrome', () => ext('https://mail.google.com/mail/u/0/#all/' + m.threadId)]
   ]);
@@ -791,8 +947,8 @@ async function mailRead(id) {
 function mailCompose(d = {}) {
   mailView = 'compose';
   const p = $('mailPane');
-  p.innerHTML = `<div class="mtop"><span class="pbtn" id="mCancel">&#8592; Cancel</span><b style="flex:1;text-align:center">${d.threadId ? 'Reply' : 'New email'}</b><span class="pbtn ok" id="mSend">Send</span></div>
-  <div class="mform"><input id="mTo" placeholder="To (email)"><input id="mSubj" placeholder="Subject"><textarea id="mBody" placeholder="Write ur email…"></textarea></div>`;
+  p.innerHTML = `<div class="mtop"><span class="pbtn" id="mCancel">Cancel</span><b style="flex:1;text-align:center">${d.threadId ? 'Reply' : 'New email'}</b><span class="pbtn ok" id="mSend">Send</span></div>
+  <div class="mform"><input id="mTo" placeholder="To (email)"><input id="mSubj" placeholder="Subject"><textarea id="mBody" placeholder="Write your message…"></textarea></div>`;
   $('mTo').value = d.to || ''; $('mSubj').value = d.subject || '';
   let body = d.body || '';
   if (d.quote) body = '\n\nOn ' + new Date(d.quote.date).toLocaleString() + ', ' + d.quote.from + ' wrote:\n' + (d.quote.text || '').split('\n').map(l => '> ' + l).join('\n');
@@ -803,7 +959,7 @@ function mailCompose(d = {}) {
     $('mSend').textContent = 'Sending…';
     const r = await M.send({ to: $('mTo').value, subject: $('mSubj').value, body: $('mBody').value, threadId: d.threadId, inReplyTo: d.inReplyTo });
     if (r.error) { $('mSend').textContent = 'Send'; toast(r.error); return; }
-    toast('sent ✉️'); mailView = 'list'; mailCur = null; mailList();
+    toast('Message sent.'); mailView = 'list'; mailCur = null; mailList();
   };
 }
 function mailBadge(n) { const b = $('mailBadge'); b.hidden = !n; b.textContent = n > 99 ? '99+' : n; $('mailBtn').title = 'Orchard Mail' + (n ? ' · ' + n + ' unread' : '') + ' (Alt+M)'; }
@@ -814,22 +970,22 @@ setInterval(() => { if (saverLevel() < 2) mailPoll(); }, 5 * 60 * 1000);
 
 // ---- toolbar: choose what shows (Settings > Toolbar) ----
 const TOOLBAR = [
-  ['batt', '&#127811;', 'Battery', 'mode, % and resting tabs'],
-  ['shield', '&#128737;', 'Ad blocker counter', 'how many ads got blocked'],
-  ['speedBtn', '&#128246;', 'WiFi speed test', ''],
-  ['dlBtn', '&#11015;', 'Downloads', ''],
-  ['histBtn', '&#128339;', 'History', ''],
-  ['calBtn', '&#128197;', 'Calendar', ''],
-  ['calcBtn', '&#129518;', 'Calculator', ''],
-  ['extBtn', '&#129513;', 'Extensions', ''],
-  ['setBtn', '&#9881;', 'Settings', 'u can still open it from the ☰ menu'],
-  ['mailBtn', '&#9993;', 'Orchard Mail', ''],
-  ['chatBtn', '&#128172;', 'Orchard Chat', ''],
-  ['aiBtn', '&#10022;', 'Ask AI', ''],
-  ['avatar', '&#128100;', 'Profile picture', ''],
-  ['hideBtn', '&#128065;', 'Hide elements (address bar)', ''],
-  ['lensBtn', '&#128269;', 'Google Lens (address bar)', ''],
-  ['star', '&#11088;', 'Bookmark star (address bar)', '']
+  ['batt', 'battery', 'Battery', 'Mode, charge level and resting tabs'],
+  ['shield', 'shield', 'Ad blocker counter', 'Number of ads blocked'],
+  ['speedBtn', 'speed', 'Connection speed test', ''],
+  ['dlBtn', 'download', 'Downloads', ''],
+  ['histBtn', 'clock', 'History', ''],
+  ['calBtn', 'calendar', 'Calendar', ''],
+  ['calcBtn', 'calc', 'Calculator', ''],
+  ['extBtn', 'puzzle', 'Extensions', ''],
+  ['setBtn', 'gear', 'Settings', 'Still available from the menu'],
+  ['mailBtn', 'mail', 'Orchard Mail', ''],
+  ['chatBtn', 'chat', 'Google Chat', ''],
+  ['aiBtn', 'assistant', 'AI assistant', ''],
+  ['avatar', 'user', 'Profile', ''],
+  ['hideBtn', 'hide', 'Hide elements (address bar)', ''],
+  ['lensBtn', 'lens', 'Google Lens (address bar)', ''],
+  ['star', 'star', 'Bookmark (address bar)', '']
 ];
 function applyToolbar() {
   const tb = store.settings.toolbar || {};
@@ -851,10 +1007,10 @@ let pageKind = null;
 function openPage(kind, icon, title, navItems, render) {
   $('panel').classList.remove('show');
   pageKind = kind;
-  $('opicon').innerHTML = icon; $('optitle').textContent = title;
+  $('opicon').innerHTML = ic(icon, 20); $('optitle').textContent = title;
   const nav = $('opnav'); nav.innerHTML = '';
-  navItems.forEach(([key, ic, label]) => {
-    const a = document.createElement('a'); a.dataset.k = key; a.innerHTML = `<span>${ic}</span><span></span>`; a.lastChild.textContent = label;
+  navItems.forEach(([key, icn, label]) => {
+    const a = document.createElement('a'); a.dataset.k = key; a.innerHTML = `<span style="display:grid">${ic(icn, 16)}</span><span></span>`; a.lastChild.textContent = label;
     a.onclick = () => render(key);
     nav.appendChild(a);
   });
@@ -871,49 +1027,51 @@ function bindSwitch(id, get, set) { const el = $(id); if (!el) return; el.onclic
 function openSettings() { openPanel('settings'); }
 // simple scrolling settings panel (the familiar dropdown, not a whole page)
 function renderSettings() {
-  $('ptitle').innerHTML = '&#9881; Settings';
+  $('ptitle').textContent = 'Settings';
   const list = $('plist'), S = store.settings;
   const hd = (t) => `<div class="mhead">${t}</div>`;
   const sw = (on, id) => `<span class="sw${on ? ' on' : ''}" id="${id}"></span>`;
   const sel = (id, opts) => `<select id="${id}">${opts}</select>`;
   list.innerHTML =
-    hd('SEARCH')
-    + `<div class="set">Search engine ${sel('eng', Object.keys(ENGINES).map(k => `<option value="${k}" ${S.engine === k ? 'selected' : ''}>${k}</option>`).join(''))}</div>`
+    hd('Search')
+    + `<div class="set">Search engine ${sel('eng', Object.keys(ENGINES).map(k => `<option value="${k}" ${S.engine === k ? 'selected' : ''}>${({ google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing', brave: 'Brave Search' })[k] || k}</option>`).join(''))}</div>`
     + `<div class="set">Search suggestions ${sw(S.suggest !== false, 'sgT')}</div>`
-    + hd('BATTERY')
+    + hd('Battery')
     + `<div class="set">Battery saver ${sel('svr', SAVER_OPTS)}</div>`
     + `<div class="set">Sleep unused tabs after ${sel('slp', [[2, '2 min'], [5, '5 min'], [10, '10 min'], [30, '30 min'], [0, 'never']].map(([v, l]) => `<option value="${v}" ${(S.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
     + `<div class="set">Freeze background tabs ${sw(S.freeze !== false, 'frz')}</div>`
     + (thrStat.supported ? `<div class="set">Slow down other apps on battery ${sw(S.slowApps !== false, 'slowT2')}</div>` : '')
-    + `<div class="set">Cheaper videos on battery ${sw(S.cheapVideo !== false, 'cvT2')}</div>`
-    + `<div class="set">Dark pages always ${sw(!!S.darkPages, 'dkp2')}</div>`
-    + `<div class="set">See what's using battery <span class="pbtn" id="battOpen">Open</span></div>`
-    + hd('TABS')
+    + `<div class="set">Lighter video on battery ${sw(S.cheapVideo !== false, 'cvT2')}</div>`
+    + `<div class="set">Always use dark pages ${sw(!!S.darkPages, 'dkp2')}</div>`
+    + `<div class="set">Battery usage <span class="pbtn" id="battOpen">Open</span></div>`
+    + hd('Tabs')
     + `<div class="set">Reopen tabs on startup ${sw(S.restore !== false, 'rst')}</div>`
     + `<div class="set">Rest all other tabs now <span class="pbtn" id="slpNow">Rest</span></div>`
-    + hd('AI, CHAT & MAIL')
-    + `<div class="set">AI side panel ${sel('aiDef', [['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
+    + hd('Assistant, chat and mail')
+    + `<div class="set">Assistant in side panel ${sel('aiDef', [['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
     + `<div class="set">Orchard Chat notifications ${sw(S.chatNotify !== false, 'cnT')}</div>`
     + `<div class="set">Orchard Mail <span class="pbtn" id="mailOpen">Open</span></div>`
-    + hd('TAB LOCK')
+    + hd('Tab lock')
     + `<div class="set">Tab lock password <span style="display:flex;gap:6px">${S.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>`
-    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Right click a tab and pick Lock tab. It locks again when u switch tabs or leave Orchard.</div>`
-    + hd('PASSWORDS')
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Right-click a tab and choose Lock tab. It locks again when you switch tabs or leave Orchard.</div>`
+    + hd('Passwords')
     + `<div class="set">Offer to save passwords ${sw(S.savePasswords !== false, 'spw')}</div>`
     + `<div class="set">Saved passwords <span class="pbtn" id="pwMng">Manage</span></div>`
-    + hd('DOWNLOADS')
+    + hd('Downloads')
     + `<div class="set">Ask where to save each file ${sw(!!S.askDownload, 'askDl')}</div>`
-    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Off: files go straight into ur Downloads folder, like Chrome.</div>`
-    + hd('LOOKS')
-    + `<div class="set">New tab background <span class="pbtn" id="thm">Change</span></div>`
-    + hd('PRIVACY')
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">When this is off, files are saved directly to your Downloads folder.</div>`
+    + hd('Appearance')
+    + `<div class="set">Start page background <span class="pbtn" id="thm">Change</span></div>`
+    + `<div class="set">Open tabs vertically ${sw(!!S.vtabs, 'vtT')}</div>`
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Shows tabs in a sidebar on the left. Use the arrow to collapse it and drag its edge to resize it.</div>`
+    + hd('Privacy')
     + `<div class="set">Ad blocker ${sw(!!S.adblock, 'adT')}</div>`
     + `<div class="set">Hidden elements <span class="pbtn" id="hidesOpen">Manage</span></div>`
-    + `<div class="set">Clear history, cookies, cache <span class="pbtn" id="clr">Clear</span></div>`
-    + hd('TOOLBAR BUTTONS')
-    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Turn the top buttons on or off. The ☰ menu always stays.</div>`
-    + TOOLBAR.map(([id, ic, label]) => `<div class="set"><span style="display:flex;gap:8px;align-items:center"><span style="width:18px;text-align:center">${ic}</span>${label}</span>${sw((S.toolbar || {})[id] !== false, 'tb_' + id)}</div>`).join('')
-    + `<div class="set"><span></span><span class="pbtn" id="tbReset">Show everything</span></div>`
+    + `<div class="set">Clear history, cookies and cache <span class="pbtn" id="clr">Clear</span></div>`
+    + hd('Toolbar')
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Choose which buttons appear in the toolbar. The menu button is always shown.</div>`
+    + TOOLBAR.map(([id, icn, label]) => `<div class="set"><span style="display:flex;gap:10px;align-items:center"><span style="color:var(--dim);display:grid">${ic(icn, 16)}</span>${label}</span>${sw((S.toolbar || {})[id] !== false, 'tb_' + id)}</div>`).join('')
+    + `<div class="set"><span></span><span class="pbtn" id="tbReset">Show all buttons</span></div>`
     + hd('ABOUT & UPDATES')
     + `<div class="set">Orchard <b id="verTxt">v…</b></div>`
     + `<div class="set">Updates <span class="pbtn" id="updChk">Check for updates</span></div>`
@@ -928,11 +1086,12 @@ function renderSettings() {
   toggle('spw', () => store.settings.savePasswords !== false, (v) => { store.settings.savePasswords = v; save(); });
   if ($('pwMng')) $('pwMng').onclick = () => openPanel('passwords');
   toggle('askDl', () => !!store.settings.askDownload, (v) => { store.settings.askDownload = v; save(); });
+  toggle('vtT', () => !!store.settings.vtabs, (v) => setVTabs(v));
   toggle('cvT2', () => store.settings.cheapVideo !== false, (v) => { store.settings.cheapVideo = v; save(); syncThrottle(); });
   toggle('slowT2', () => store.settings.slowApps !== false, (v) => { store.settings.slowApps = v; save(); syncThrottle(); });
   $('battOpen').onclick = () => openPanel('battery');
   toggle('rst', () => store.settings.restore !== false, (v) => { store.settings.restore = v; save(); });
-  $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); };
+  $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n === 1 ? '1 tab is now resting.' : n + ' tabs are now resting.'); };
   $('aiDef').onchange = (e) => { store.settings.ai = e.target.value; save(); if (aiOpen && !['chat', 'mail', 'gchat'].includes(aiWhich)) { aiWcId = null; loadAi(e.target.value); } };
   toggle('cnT', () => store.settings.chatNotify !== false, (v) => { store.settings.chatNotify = v; save(); if (v) ensureChat(); placeChat(); });
   $('mailOpen').onclick = () => openMail();
@@ -940,25 +1099,25 @@ function renderSettings() {
   if ($('pwSet')) $('pwSet').onclick = async () => { if (await pwSetupModal()) renderSettings(); };
   if ($('pwChg')) $('pwChg').onclick = async () => { if (await pwSetupModal(true)) renderSettings(); };
   if ($('pwRst')) $('pwRst').onclick = async () => {
-    const v = await modal('Reset tab password', 'Know it? Type it to remove it. Forgot it? Type FORGOT and every locked tab gets closed, then the password is removed.', [{ id: 'p', label: 'Password or FORGOT', type: 'password' }], 'Reset');
+    const v = await modal('Reset tab password', 'Enter the password to remove it. If you have forgotten it, type FORGOT: every locked tab will be closed and the password removed.', [{ id: 'p', label: 'Password or FORGOT', type: 'password' }], 'Reset');
     if (!v) return;
     if (v.p === 'FORGOT') tabs.filter(t => t.locked).forEach(t => closeTab(t, true));
-    else if (!(await checkPw(v.p))) { toast('wrong password 💔'); return; }
+    else if (!(await checkPw(v.p))) { toast('Incorrect password.'); return; }
     else tabs.forEach(t => { t.locked = false; t.unlocked = false; renderTab(t); });
     delete store.settings.lockHash; delete store.settings.lockSalt; store.settings.lockVer = (store.settings.lockVer || 0) + 1;
-    save(); saveSession(true); layoutViews(); toast('password reset'); renderSettings();
+    save(); saveSession(true); layoutViews(); toast('Tab password removed.'); renderSettings();
   };
   toggle('adT', () => !!store.settings.adblock, () => { toggleAdblock(); });
   $('hidesOpen').onclick = () => openPanel('hides');
   let armed = false;
-  $('clr').onclick = async () => { if (!armed) { armed = true; $('clr').textContent = 'Click again'; return; } await window.aura.clearData(); store.history = []; toast('everything wiped 🥶'); $('clr').textContent = 'Cleared'; };
+  $('clr').onclick = async () => { if (!armed) { armed = true; $('clr').textContent = 'Click again'; return; } await window.aura.clearData(); store.history = []; toast('History, cookies and cache cleared.'); $('clr').textContent = 'Cleared'; };
   TOOLBAR.forEach(([id]) => toggle('tb_' + id, () => (store.settings.toolbar || {})[id] !== false, (v) => { store.settings.toolbar = { ...(store.settings.toolbar || {}), [id]: v }; save(); applyToolbar(); }));
   $('tbReset').onclick = () => { store.settings.toolbar = {}; save(); applyToolbar(); renderSettings(); };
   window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version + (v.pending ? ' · update ' + v.pending.version + ' ready' : ''); });
   $('updChk').onclick = async () => {
     $('updChk').textContent = 'Checking…';
     const res = await window.aura.checkUpdate();
-    const msg = { latest: 'ur on the newest version 🔥', ready: 'update ' + res.version + ' ready, restart to get it', busy: 'already checking', full: 'v' + res.version + ' needs a fresh download of the full zip', error: 'couldnt check: ' + res.error };
+    const msg = { latest: 'Orchard is up to date.', ready: 'Version ' + res.version + ' is ready. Restart to finish updating.', busy: 'Already checking for updates.', full: 'Version ' + res.version + ' needs a full download from the website.', error: 'Could not check for updates: ' + res.error };
     $('updChk').textContent = 'Check for updates';
     toast(msg[res.status] || 'hmm');
     if (res.status === 'ready') showUpdate(res);
@@ -970,54 +1129,54 @@ const EXT = window.aura.ext;
 let extFilter = 'all', extCatalogCache = null;
 async function extMenu(e) {
   const list = await EXT.list();
-  showMenu(e, list.map(x => [`${esc(x.icon || '&#129513;')} ${esc(x.name)}`, () => extPlay(x.id)]).concat(list.length ? [null] : [], [
-    ['&#129513; ' + (list.length ? 'Manage extensions' : 'Get extensions'), () => openExtensions()]
+  showMenu(e, list.map(x => [esc(x.name), () => extPlay(x.id)]).concat(list.length ? [null] : [], [
+    [list.length ? 'Manage extensions' : 'Browse extensions', () => openExtensions()]
   ]));
 }
 async function extPlay(id) {
   const it = (await EXT.list()).find(x => x.id === id);
   if (it && it.inject) {
-    if (!active || !active.wv || !active.ready || isNewtab(active.url) || !/^https?:|^file:/.test(active.url)) { toast('open a website first, then run it 🫩'); return; }
+    if (!active || !active.wv || !active.ready || isNewtab(active.url) || !/^https?:|^file:/.test(active.url)) { toast('Open a website first, then run the extension.'); return; }
     const code = await EXT.code(id);
-    if (!code) { toast("couldn't load the extension"); return; }
-    try { await active.wv.executeJavaScript(code, true); } catch (e) { toast('that page blocked it'); }
+    if (!code) { toast('The extension could not be loaded.'); return; }
+    try { await active.wv.executeJavaScript(code, true); } catch (e) { toast('This page blocked the extension.'); }
     return;
   }
   const u = await EXT.url(id); if (u) createTab(u);
 }
 function openExtensions() {
-  openPage('extensions', '&#129513;', 'Orchard Extensions', [
-    ['all', '&#10024;', 'Discover'], ['game', '&#127918;', 'Games'], ['educational', '&#128218;', 'Educational'], ['installed', '&#9989;', 'Installed']
+  openPage('extensions', 'puzzle', 'Extensions', [
+    ['all', 'puzzle', 'All extensions'], ['game', 'play', 'Games'], ['educational', 'note', 'Educational'], ['installed', 'check', 'Installed']
   ], renderExtensions);
 }
 async function renderExtensions(f) {
   extFilter = f; markNav(f);
   const m = $('opmain');
-  const head = { all: ['Discover', 'Games and learning apps that run right inside Orchard. Get one and it works offline too.'], game: ['Games', ''], educational: ['Educational', ''], installed: ['Installed', 'Extensions on this computer.'] }[f];
+  const head = { all: ['All extensions', 'Add-ons that run inside Orchard. Once installed, they also work offline.'], game: ['Games', ''], educational: ['Educational', ''], installed: ['Installed', 'Extensions on this computer.'] }[f];
   m.innerHTML = `<div class="opsec" style="max-width:none"><h2>${head[0]}</h2>${head[1] ? `<p>${head[1]}</p>` : ''}<div class="extgrid" id="extGrid"><div style="color:var(--dim)">Loading…</div></div></div>`;
   const installed = await EXT.list();
   let items;
   if (f === 'installed') items = installed.map(x => ({ ...x, installed: x }));
   else {
     const cat = extCatalogCache || await EXT.catalog();
-    if (cat.error) { $('extGrid').innerHTML = `<div style="color:#ff6b6b">couldn't reach the extension store: ${esc(cat.error)}</div>`; if (!installed.length) return; items = installed.map(x => ({ ...x, installed: x })); }
+    if (cat.error) { $('extGrid').innerHTML = `<div style="color:var(--err)">The extension catalogue could not be reached: ${esc(cat.error)}</div>`; if (!installed.length) return; items = installed.map(x => ({ ...x, installed: x })); }
     else { extCatalogCache = cat; items = cat.items.filter(x => f === 'all' || x.category === f).map(x => ({ ...x, installed: installed.find(i => i.id === x.id) })); }
   }
   const g = $('extGrid');
-  if (!items.length) { g.innerHTML = `<div style="color:var(--dim)">${f === 'installed' ? 'nothing installed yet, check Discover' : 'nothing here yet'}</div>`; return; }
+  if (!items.length) { g.innerHTML = `<div style="color:var(--dim)">${f === 'installed' ? 'No extensions installed. Browse All extensions to add one.' : 'No extensions in this category.'}</div>`; return; }
   g.innerHTML = '';
   items.forEach(x => {
     const c = document.createElement('div'); c.className = 'extcard';
     const upd = x.installed && x.version && x.installed.version !== x.version && f !== 'installed';
-    c.innerHTML = `<div class="eh"><div class="ei"></div><div><div class="en"></div><span class="lab ${x.category === 'educational' ? 'educational' : 'game'}">${x.category === 'educational' ? 'Educational' : 'Game'}</span></div></div><p></p><div class="ef"><small></small>${x.installed ? `<span class="pbtn" data-a="rm">Remove</span>${upd ? '<span class="pbtn" data-a="get">Update</span>' : ''}<span class="pbtn ok" data-a="play">${x.inject ? '&#9889; Activate' : '&#9654; Play'}</span>` : '<span class="pbtn ok" data-a="get">Get</span>'}</div>`;
-    c.querySelector('.ei').textContent = x.icon || '🧩';
+    c.innerHTML = `<div class="eh"><div class="ei"></div><div><div class="en"></div><span class="lab ${x.category === 'educational' ? 'educational' : 'game'}">${x.category === 'educational' ? 'Educational' : 'Game'}</span></div></div><p></p><div class="ef"><small></small>${x.installed ? `<span class="pbtn" data-a="rm">Remove</span>${upd ? '<span class="pbtn" data-a="get">Update</span>' : ''}<span class="pbtn ok" data-a="play">${x.inject ? 'Activate' : 'Open'}</span>` : '<span class="pbtn ok" data-a="get">Get</span>'}</div>`;
+    c.querySelector('.ei').innerHTML = ic({ unanchored: 'anchor' }[x.id] || 'puzzle', 22);
     c.querySelector('.en').textContent = x.name;
     c.querySelector('p').textContent = x.description || '';
     c.querySelector('small').textContent = (x.size ? (x.size / 1e6).toFixed(1) + ' MB' : '') + (x.version ? ' · v' + x.version : '');
     c.onclick = async (ev) => {
       const a = ev.target.dataset.a; if (!a) return;
       if (a === 'play') { closePage(); extPlay(x.id); }
-      if (a === 'get') { ev.target.textContent = 'Getting…'; const res = await EXT.install(x.id); if (res.error) { toast("couldn't get it: " + res.error); ev.target.textContent = 'Get'; return; } toast(x.name + ' installed 🔥'); renderExtensions(extFilter); }
+      if (a === 'get') { ev.target.textContent = 'Getting…'; const res = await EXT.install(x.id); if (res.error) { toast('Could not install the extension: ' + res.error); ev.target.textContent = 'Get'; return; } toast(x.name + ' installed.'); renderExtensions(extFilter); }
       if (a === 'rm') { await EXT.remove(x.id); toast(x.name + ' removed'); renderExtensions(extFilter); }
     };
     g.appendChild(c);
@@ -1078,7 +1237,7 @@ function calcPress(k) {
   else if (k === '=') {
     if (!calcExpr.trim()) return;
     try { const v = calcEval(calcExpr); calcHist.unshift(calcExpr + ' = ' + calcFmt(v)); calcHist = calcHist.slice(0, 8); calcAns = v; calcExpr = calcFmt(v); calcJust = true; }
-    catch { renderCalcDisp('error, check ur sum'); return; }
+    catch { renderCalcDisp('Error. Check the expression.'); return; }
   }
   else if (k === 'DEG') { calcDeg = !calcDeg; renderCalc(); return; }
   else {
@@ -1101,7 +1260,7 @@ function renderCalcDisp(err) {
 function renderCalc() {
   const sci = !!store.settings.calcSci, p = $('panel');
   p.classList.add('calcw'); p.classList.toggle('sci', sci);
-  $('ptitle').innerHTML = '&#129518; Calculator <span class="pbtn" id="cMode" style="margin-left:8px;font-size:11px">' + (sci ? 'Normal' : 'Scientific') + '</span>';
+  $('ptitle').innerHTML = 'Calculator <span class="pbtn" id="cMode" style="margin-left:8px;font-size:11px">' + (sci ? 'Normal' : 'Scientific') + '</span>';
   const K = (k, cls) => `<div class="ck ${cls || ''}" data-k="${k}">${k === '*' ? '×' : k === '/' ? '÷' : k === '-' ? '−' : k}</div>`;
   const basic = ['C', '⌫', '%', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', 'Ans', '0', '.', '='];
   const sciKeys = ['DEG', '(', ')', 'sin', 'cos', 'tan', 'sin⁻¹', 'cos⁻¹', 'tan⁻¹', 'ln', 'log', '√', 'x²', 'xʸ', '!', 'π', 'e', '1/x', 'eˣ', '10ˣ'];
@@ -1132,7 +1291,7 @@ const fmtT = (t) => { const [h, mi] = t.split(':').map(Number); return new Date(
 const eventsOn = (key) => (store.events || []).filter(e => e.date === key).sort((a, b) => a.time.localeCompare(b.time));
 function openCalendar(dateKey) {
   if (dateKey) { const [y, m, d] = dateKey.split('-').map(Number); calView = new Date(y, m - 1, 1); calSel = dateKey; }
-  openPage('calendar', '&#128197;', 'Calendar', [['month', '&#128197;', 'Month'], ['upcoming', '&#9200;', 'Upcoming']], renderCalendar);
+  openPage('calendar', 'calendar', 'Calendar', [['month', 'calendar', 'Month'], ['upcoming', 'clock', 'Upcoming']], renderCalendar);
 }
 function renderCalendar(sec) {
   markNav(sec);
@@ -1141,9 +1300,9 @@ function renderCalendar(sec) {
   if (sec === 'upcoming') {
     const now = Date.now();
     const up = (store.events || []).filter(e => evAt(e).getTime() >= now - 3600e3).sort((a, b) => evAt(a) - evAt(b));
-    m.innerHTML = `<div class="opsec"><h2>Upcoming</h2><p>Everything coming up. Orchard pings u when it's time (while it's open), and tells u if u missed one.</p><div class="agenda" id="upList"></div></div>`;
+    m.innerHTML = `<div class="opsec"><h2>Upcoming</h2><p>All upcoming events. While Orchard is open it notifies you when an event starts, and tells you about any you missed.</p><div class="agenda" id="upList"></div></div>`;
     const box = $('upList');
-    if (!up.length) box.innerHTML = '<div style="color:var(--dim)">nothing coming up 🍃</div>';
+    if (!up.length) box.innerHTML = '<div style="color:var(--dim)">No upcoming events.</div>';
     up.forEach(ev => box.appendChild(agendaItem(ev, true)));
     return;
   }
@@ -1158,7 +1317,7 @@ function renderCalendar(sec) {
   const selD = (() => { const [a, b, c] = calSel.split('-').map(Number); return new Date(a, b - 1, c); })();
   m.innerHTML = `<div class="calwrap">
     <div class="calmonth">
-      <div class="calhead"><b>${first.toLocaleDateString([], { month: 'long', year: 'numeric' })}</b><span class="pbtn" id="calPrev">&#8249;</span><span class="pbtn" id="calToday">Today</span><span class="pbtn" id="calNext">&#8250;</span></div>
+      <div class="calhead"><b>${first.toLocaleDateString([], { month: 'long', year: 'numeric' })}</b><span class="pbtn" id="calPrev" title="Previous month">${ic('chevL', 15)}</span><span class="pbtn" id="calToday">Today</span><span class="pbtn" id="calNext" title="Next month">${ic('chevR', 15)}</span></div>
       <div class="calgrid">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(x => `<div class="dow">${x}</div>`).join('')}${cells}</div>
     </div>
     <div class="calday">
@@ -1186,7 +1345,7 @@ function renderCalendar(sec) {
     const ev = { id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), date: calSel, time, title, note: $('evNote').value.trim(), remind: +$('evRemind').value };
     store.events = (store.events || []).concat(ev); save();
     const when = evAt(ev);
-    toast(when < new Date() ? 'added (that time already passed)' : 'event added, Orchard will ping u 🔔');
+    toast(when < new Date() ? 'Event added. Its time has already passed.' : 'Event added. You will get a reminder.');
     renderCalendar('month');
   };
 }
@@ -1194,11 +1353,11 @@ function agendaItem(ev, showDate) {
   const d = document.createElement('div');
   const past = evAt(ev) < new Date();
   d.className = 'agi' + (past ? ' past' : '');
-  d.innerHTML = '<span class="at"></span><div class="ab"><b></b><small></small></div><span class="ax" title="Delete">&#10005;</span>';
+  d.innerHTML = '<span class="at"></span><div class="ab"><b></b><small></small></div><span class="ax" title="Delete">' + ic('x', 14) + '</span>';
   d.querySelector('.at').textContent = (showDate ? evAt(ev).toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' : '') + fmtT(ev.time);
   d.querySelector('b').textContent = ev.title;
   const remindTxt = { 0: '', 5: '5 min before', 10: '10 min before', 15: '15 min before', 30: '30 min before', 60: '1 hour before', 1440: '1 day before' }[ev.remind || 0];
-  d.querySelector('small').textContent = [ev.note, remindTxt ? '🔔 ' + remindTxt : (past ? 'done' : '🔔 at the time')].filter(Boolean).join(' · ');
+  d.querySelector('small').textContent = [ev.note, remindTxt ? 'Reminder ' + remindTxt : (past ? 'Done' : 'Reminder at the event time')].filter(Boolean).join(' · ');
   d.querySelector('.ax').onclick = () => { store.events = (store.events || []).filter(x => x.id !== ev.id); save(); renderCalendar(pageKind === 'calendar' && document.querySelector('#opnav a.on') ? document.querySelector('#opnav a.on').dataset.k : 'month'); };
   return d;
 }
@@ -1208,7 +1367,7 @@ function showEventNote(ev) {
   const d = document.createElement('div'); d.className = 'note';
   d.style.borderLeftColor = ev.passed ? '#8a5a3c' : 'var(--acc2)';
   const head = ev.passed ? 'Event passed' : ev.soon ? 'Coming up at ' + fmtT(ev.time) : 'Happening now';
-  d.innerHTML = '<div class="nav" style="background:#33201d;font-size:18px">' + (ev.passed ? '&#8987;' : '&#128197;') + '</div><div class="nb"><div class="nt"><span class="ntt"></span><small></small></div><div class="nm"></div></div><span class="nx" title="Dismiss">&#10005;</span>';
+  d.innerHTML = '<div class="nav" style="background:var(--surface2);color:var(--txt)">' + ic(ev.passed ? 'clock' : 'calendar', 18) + '</div><div class="nb"><div class="nt"><span class="ntt"></span><small></small></div><div class="nm"></div></div><span class="nx" title="Dismiss">' + ic('x', 14) + '</span>';
   d.querySelector('.ntt').textContent = ev.title;
   d.querySelector('small').textContent = head;
   d.querySelector('.nm').textContent = (ev.passed ? 'Was ' + evAt(ev).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' at ' + fmtT(ev.time) : fmtT(ev.time)) + (ev.note ? ' · ' + ev.note : '');
@@ -1220,7 +1379,7 @@ function showEventNote(ev) {
 window.aura.on('cal-due', (ev) => {
   if (!ev || !ev.title) return;
   if (document.hasFocus()) showEventNote(ev);
-  else window.aura.notify({ title: (ev.passed ? 'Event passed: ' : ev.soon ? 'Coming up: ' : '📅 ') + ev.title, body: (ev.passed ? 'Was at ' : 'At ') + fmtT(ev.time) + (ev.note ? ' · ' + ev.note : ''), action: 'cal:' + ev.date });
+  else window.aura.notify({ title: (ev.passed ? 'Event passed: ' : ev.soon ? 'Coming up: ' : 'Now: ') + ev.title, body: (ev.passed ? 'Was at ' : 'At ') + fmtT(ev.time) + (ev.note ? ' · ' + ev.note : ''), action: 'cal:' + ev.date });
 });
 window.aura.on('note-click', (a) => { if (String(a).startsWith('cal:')) openCalendar(String(a).slice(4)); });
 
@@ -1239,7 +1398,7 @@ function buildNote(tab, n, b) {
   d.className = 'snote' + (n.c ? ' c' + n.c : '');
   d.style.left = Math.max(2, Math.min(n.x, b.width - 60)) + 'px';
   d.style.top = Math.max(2, Math.min(n.y, b.height - 40)) + 'px';
-  d.innerHTML = '<div class="tape"></div><div class="shandle"></div><textarea placeholder="write something…" spellcheck="false"></textarea>';
+  d.innerHTML = '<div class="tape"></div><div class="shandle"></div><textarea placeholder="Write a note…" spellcheck="false"></textarea>';
   const ta = d.querySelector('textarea');
   ta.value = n.text;
   ta.oninput = () => { n.text = ta.value; saveSession(); };
@@ -1256,12 +1415,12 @@ function buildNote(tab, n, b) {
   });
   const end = () => { if (noteDrag && noteDrag.d === d) { noteDrag = null; d.classList.remove('drag'); saveSession(); } };
   d.addEventListener('pointerup', end); d.addEventListener('pointercancel', end);
-  d.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showMenu(e, [['&#128168; Crumple', () => crumpleNote(tab, n, d)], ['Change colour', () => { n.c = (n.c + 1) % 4; saveSession(); renderNotes(); }]]); });
+  d.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); showMenu(e, [['Remove note', () => crumpleNote(tab, n, d)], ['Change colour', () => { n.c = (n.c + 1) % 4; saveSession(); renderNotes(); }]]); });
   return d;
 }
 function addNote(tab, x, y) {
   tab.notes = tab.notes || [];
-  if (tab.notes.length >= 40) { toast('thats a lot of notes on one tab 😭'); return; }
+  if (tab.notes.length >= 40) { toast('This tab already has the maximum of 40 notes.'); return; }
   const n = { id: 'n' + Math.random().toString(36).slice(2), x: x - 14, y: y - 8, text: '', c: tab.notes.length % 4 };
   tab.notes.push(n); saveSession(); renderNotes();
   setTimeout(() => { const el = [...$('noteLayer').children].pop(); if (el) el.querySelector('textarea').focus(); }, 30);
@@ -1281,7 +1440,7 @@ function showPageMenu(t, p) {
   const b = t.wv.getBoundingClientRect();
   const ev = { clientX: b.left + p.x, clientY: b.top + p.y, preventDefault() {} };
   const wv = t.wv, items = [];
-  items.push(['&#128221; Add sticky note here', () => addNote(t, p.x, p.y)]);
+  items.push(['Add sticky note here', () => addNote(t, p.x, p.y)]);
   items.push(null);
   if (p.sel) {
     items.push(['Copy', () => wv.copy()]);
@@ -1290,7 +1449,14 @@ function showPageMenu(t, p) {
     items.push(['Ask AI about this', () => { toggleAi(true); setTimeout(() => askAboutPage('explain'), 300); }]);
   }
   if (p.link) { items.push(['Open link in new tab', () => createTab(p.link, true)]); items.push(['Copy link', () => navigator.clipboard.writeText(p.link).catch(() => {})]); }
-  if (p.src) { items.push(['Open image in new tab', () => createTab(p.src, true)]); items.push(['Search image with Lens', () => startLens()]); }
+  if (p.src) {
+    if (items[items.length - 1] !== null) items.push(null);
+    items.push(['Save image', () => { try { wv.downloadURL(p.src); } catch { toast('This image could not be saved.'); } }]);
+    items.push(['Copy image', () => { try { wv.copyImageAt(Math.round(p.x), Math.round(p.y)); toast('Image copied.'); } catch { toast('This image could not be copied.'); } }]);
+    items.push(['Copy image address', () => navigator.clipboard.writeText(p.src).catch(() => {})]);
+    items.push(['Open image in new tab', () => createTab(p.src, true)]);
+    items.push(['Search image with Google Lens', () => startLens()]);
+  }
   if (p.isEditable) { items.push(null); if (p.canCut) items.push(['Cut', () => wv.cut()]); if (p.canCopy) items.push(['Copy', () => wv.copy()]); if (p.canPaste) items.push(['Paste', () => wv.paste()]); items.push(['Select all', () => wv.selectAll()]); }
   items.push(null);
   items.push(['Back', () => { if (wv.canGoBack()) wv.goBack(); }, !wv.canGoBack()]);
@@ -1305,10 +1471,10 @@ window.aura.on('pw-offer', (d) => {
   pwOffer = d;
   const bar = $('pwbar');
   const host = (() => { try { return new URL(d.origin).hostname.replace(/^www\./, ''); } catch { return d.origin; } })();
-  bar.innerHTML = `<h4>&#128273; ${d.update ? 'Update password?' : 'Save password?'}</h4>
+  bar.innerHTML = `<h4>${ic('key', 16)} ${d.update ? 'Update saved password?' : 'Save password?'}</h4>
     <div class="site">${esc(host)}</div>
     ${d.user ? `<div class="fld"><b>User</b><span>${esc(d.user)}</span></div>` : ''}
-    <div class="fld"><b>Pass</b><span id="pwDot">${'•'.repeat(Math.min(12, d.pass.length))}</span><span class="eye" id="pwEye">&#128065;</span></div>
+    <div class="fld"><b>Password</b><span id="pwDot">${'•'.repeat(Math.min(12, d.pass.length))}</span><span class="eye" id="pwEye" title="Show password">${ic('eye', 15)}</span></div>
     <div class="pwrow"><span class="pbtn" id="pwNever">Never</span><span class="pbtn" id="pwNo">Not now</span><span class="pbtn ok" id="pwYes">${d.update ? 'Update' : 'Save'}</span></div>`;
   bar.hidden = false;
   const r = $('star').getBoundingClientRect();
@@ -1316,30 +1482,30 @@ window.aura.on('pw-offer', (d) => {
   bar.style.top = (r.bottom + 8) + 'px';
   let shown = false;
   $('pwEye').onclick = () => { shown = !shown; $('pwDot').textContent = shown ? d.pass : '•'.repeat(Math.min(12, d.pass.length)); };
-  $('pwYes').onclick = async () => { await window.aura.pwStore(d); toast('password saved 🔐'); closePwBar(); };
+  $('pwYes').onclick = async () => { await window.aura.pwStore(d); toast('Password saved.'); closePwBar(); };
   $('pwNo').onclick = closePwBar;
-  $('pwNever').onclick = async () => { await window.aura.pwNever(d.origin); toast('wont ask for this site'); closePwBar(); };
+  $('pwNever').onclick = async () => { await window.aura.pwNever(d.origin); toast('Orchard will not offer to save passwords for this site.'); closePwBar(); };
   clearTimeout(window._pwT); window._pwT = setTimeout(closePwBar, 25000);
 });
 function closePwBar() { $('pwbar').hidden = true; pwOffer = null; }
 document.addEventListener('mousedown', (e) => { if (!$('pwbar').hidden && !e.target.closest('#pwbar') && !e.target.closest('#url')) closePwBar(); });
 
 async function renderPasswords() {
-  $('ptitle').innerHTML = '&#128273; Saved passwords';
+  $('ptitle').textContent = 'Saved passwords';
   const list = $('plist');
   const items = await window.aura.pwList();
-  if (!items.length) { list.innerHTML = '<div class="set" style="color:var(--dim)">nothing saved yet. log into a site and Orchard will offer to save it.</div>'; return; }
+  if (!items.length) { list.innerHTML = '<div class="set" style="color:var(--dim)">No saved passwords. When you sign in to a site, Orchard will offer to save the password.</div>'; return; }
   list.innerHTML = '';
   items.sort((a, b) => b.updated - a.updated).forEach(it => {
     const host = (() => { try { return new URL(it.origin).hostname.replace(/^www\./, ''); } catch { return it.origin; } })();
     const r = document.createElement('div'); r.className = 'row';
-    r.innerHTML = `<img src="${fav(it.origin)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small></small></div><span class="pbtn mini" data-a="show">Show</span><span class="pbtn mini" data-a="copy">Copy</span><span class="del" data-a="del">&#10005;</span>`;
+    r.innerHTML = `<img src="${fav(it.origin)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small></small></div><span class="pbtn mini" data-a="show">Show</span><span class="pbtn mini" data-a="copy">Copy</span><span class="del" data-a="del" title="Delete">${ic('x', 14)}</span>`;
     r.querySelector('.rt div').textContent = host;
     r.querySelector('small').textContent = it.user || '(no username)';
     r.onclick = async (e) => {
       const a = e.target.dataset.a;
       if (a === 'del') { await window.aura.pwDelete(it.origin, it.user); renderPasswords(); }
-      else if (a === 'copy') { const p = await window.aura.pwReveal(it.origin, it.user); if (p) { navigator.clipboard.writeText(p).catch(() => {}); toast('password copied'); } }
+      else if (a === 'copy') { const p = await window.aura.pwReveal(it.origin, it.user); if (p) { navigator.clipboard.writeText(p).catch(() => {}); toast('Password copied.'); } }
       else if (a === 'show') { const p = await window.aura.pwReveal(it.origin, it.user); const s = e.target; if (p) { s.textContent = s.textContent === 'Show' ? p : 'Show'; } }
     };
     list.appendChild(r);
@@ -1348,48 +1514,48 @@ async function renderPasswords() {
 
 // ---- main menu: every feature in one place ----
 const FEATURES = [
-  ['BATTERY (THE CORE OF ORCHARD)'],
-  ['&#127811;', 'Battery saver', 'see what drains it, pick Eco, Saver or Ultra', 'Battery pill', () => openPanel('battery')],
-  ['&#128164;', 'Rest all tabs', 'put every background tab to sleep now', '', () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); }],
-  ['TABS & WINDOWS'],
-  ['&#10133;', 'New tab', 'opens the start page', 'Ctrl+T', () => createTab()],
-  ['&#128468;', 'New window', 'same profile, fresh window', 'Ctrl+N', () => window.aura.newWindow()],
-  ['&#128274;', 'Lock a tab', 'password protect a tab, locks again when u leave it', 'Right click tab', () => active && toggleLock(active)],
-  ['&#9707;', 'Split screen', 'right click a tab, pick split. up to 4', 'Right click tab', () => { const o = tabs.find(t => t !== active); if (o) splitWith(o); else toast('open another tab first, then right click it'); }],
-  ['&#8634;', 'Reopen closed tab', 'brings back the last tab u closed', 'Ctrl+Shift+T', () => { const u = closed.pop(); if (u) createTab(u); else toast('no closed tabs'); }],
-  ['&#128433;', 'Drag tabs', 'drag to reorder, drag out for a new window', 'Drag', () => toast('grab a tab and drag it out of the window')],
-  ['SMART STUFF'],
-  ['&#9993;', 'Orchard Mail', 'ur Gmail in a side panel, sign in through Chrome', 'Alt+M', () => openMail()],
-  ['&#128172;', 'Google Chat', 'ur school Google Chat in the side panel', 'Alt+C', () => openGoogleChat()],
-  ['&#127822;', 'Orchard Chat', 'the built-in chat, friends join by email', '', () => openChat()],
-  ['&#10022;', 'Ask AI', 'Gemini, ChatGPT or Claude on the side', 'Alt+G', () => toggleAi(true)],
-  ['&#9889;', 'Answer quickly', 'answers the questions on this page, short', '', () => askAboutPage('answer')],
-  ['&#9989;', 'Answer only', 'just the answers, nothing else', '', () => askAboutPage('answeronly')],
-  ['&#128269;', 'Google Lens', 'drag over anything to search it', 'Lens icon', () => startLens()],
-  ['&#128065;', 'Hide elements', 'click ads, popups, anything to hide it on that site', 'Alt+H', () => startHidePicker()],
-  ['TOOLS'],
-  ['&#128246;', 'WiFi speed test', 'ping, download and upload', 'WiFi icon', () => openPanel('speed')],
-  ['&#11015;', 'Downloads', 'progress, open, show in folder', 'Ctrl+J', () => openPanel('downloads')],
-  ['&#128339;', 'History', 'everything u visited', 'Ctrl+H', () => openPanel('history')],
-  ['&#128270;', 'Find in page', 'search words on this page', 'Ctrl+F', () => openFind()],
-  ['YOU'],
-  ['&#128100;', 'Profiles', 'separate logins and bookmarks', 'Avatar', () => openPanel('profiles')],
-  ['\uD83D\uDD76', 'Guest window', 'nothing saved, like incognito', 'Ctrl+Shift+N', () => window.aura.openGuest()],
-  ['&#127912;', 'Backgrounds', 'colors, gradients, ur own pics', 'Settings', () => openPanel('theme')],
-  ['&#11088;', 'Bookmark page', 'adds it to the bar', 'Ctrl+D', () => toggleBookmark()],
-  ['&#129513;', 'Extensions', 'games and learning apps that run in Orchard', '', () => openExtensions()],
-  ['&#128197;', 'Calendar', 'events with reminders', 'Alt+E', () => openCalendar()],
-  ['&#129518;', 'Calculator', 'normal or scientific', 'Alt+K', () => openPanel('calc')],
-  ['&#9881;', 'Settings', 'toolbar, search, battery, chat and more', '', () => openSettings()]
+  ['Battery'],
+  ['battery', 'Battery saver', 'See what uses power and choose Eco, Saver or Ultra.', 'Battery status', () => openPanel('battery')],
+  ['moon', 'Rest all tabs', 'Put every background tab to sleep now.', '', () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n === 1 ? '1 tab is now resting.' : n + ' tabs are now resting.'); }],
+  ['Tabs and windows'],
+  ['plus', 'New tab', 'Open the start page.', 'Ctrl+T', () => createTab()],
+  ['window', 'New window', 'Open a new window with the same profile.', 'Ctrl+N', () => window.aura.newWindow()],
+  ['lock', 'Lock a tab', 'Protect a tab with a password. It locks again when you leave it.', 'Right-click a tab', () => active && toggleLock(active)],
+  ['split', 'Split screen', 'Show up to four tabs side by side.', 'Right-click a tab', () => { const o = tabs.find(t => t !== active); if (o) splitWith(o); else toast('Open another tab first, then right-click it.'); }],
+  ['reload', 'Reopen closed tab', 'Restore the most recently closed tab.', 'Ctrl+Shift+T', () => { const u = closed.pop(); if (u) createTab(u); else toast('There are no closed tabs to reopen.'); }],
+  ['split', 'Vertical tabs', 'Show tabs in a sidebar on the left.', 'Settings', () => setVTabs(!store.settings.vtabs)],
+  ['Communication and assistants'],
+  ['mail', 'Orchard Mail', 'Read your Gmail in the side panel. Sign in through Chrome.', 'Alt+M', () => openMail()],
+  ['chat', 'Google Chat', 'Open Google Chat in the side panel.', 'Alt+C', () => openGoogleChat()],
+  ['chat', 'Orchard Chat', 'Built-in chat. Invite people by email.', '', () => openChat()],
+  ['assistant', 'AI assistant', 'Gemini, ChatGPT or Claude in the side panel.', 'Alt+G', () => toggleAi(true)],
+  ['bolt', 'Answer quickly', 'Answer the questions on this page briefly.', '', () => askAboutPage('answer')],
+  ['check', 'Answer only', 'Give only the answers, with no explanation.', '', () => askAboutPage('answeronly')],
+  ['lens', 'Google Lens', 'Select part of the page to search it.', 'Lens button', () => startLens()],
+  ['hide', 'Hide elements', 'Hide ads, pop-ups or anything else on a site.', 'Alt+H', () => startHidePicker()],
+  ['Tools'],
+  ['speed', 'Connection speed test', 'Measure ping, download and upload.', '', () => openPanel('speed')],
+  ['download', 'Downloads', 'View progress, open files or show them in a folder.', 'Ctrl+J', () => openPanel('downloads')],
+  ['clock', 'History', 'Pages you have visited.', 'Ctrl+H', () => openPanel('history')],
+  ['search', 'Find in page', 'Search for text on this page.', 'Ctrl+F', () => openFind()],
+  ['calendar', 'Calendar', 'Events with reminders.', 'Alt+E', () => openCalendar()],
+  ['calc', 'Calculator', 'Standard and scientific.', 'Alt+K', () => openPanel('calc')],
+  ['Personal'],
+  ['user', 'Profiles', 'Separate sign-ins, bookmarks and history.', 'Profile button', () => openPanel('profiles')],
+  ['guest', 'Guest window', 'Browse without saving anything.', 'Ctrl+Shift+N', () => window.aura.openGuest()],
+  ['palette', 'Start page background', 'Colours or your own images.', '', () => openPanel('theme')],
+  ['star', 'Bookmark this page', 'Add it to the bookmarks bar.', 'Ctrl+D', () => toggleBookmark()],
+  ['puzzle', 'Extensions', 'Add-ons that run inside Orchard.', '', () => openExtensions()],
+  ['gear', 'Settings', 'Toolbar, search, battery, privacy and more.', '', () => openSettings()]
 ];
 function renderMenu() {
-  $('ptitle').textContent = 'Everything in Orchard';
+  $('ptitle').textContent = 'Menu';
   const list = $('plist'); list.innerHTML = '';
   let grid = null;
   FEATURES.forEach(f => {
     if (f.length === 1) { list.appendChild(Object.assign(document.createElement('div'), { className: 'mhead', textContent: f[0] })); grid = document.createElement('div'); grid.className = 'mgrid'; list.appendChild(grid); return; }
     const d = document.createElement('div'); d.className = 'mi';
-    d.innerHTML = `<b><i>${f[0]}</i><span></span></b><small></small>${f[3] ? '<kbd></kbd>' : ''}`;
+    d.innerHTML = `<b><i>${ic(f[0], 16)}</i><span></span></b><small></small>${f[3] ? '<kbd></kbd>' : ''}`;
     d.querySelector('b span').textContent = f[1]; d.querySelector('small').textContent = f[2];
     if (f[3]) d.querySelector('kbd').textContent = f[3];
     d.onclick = () => { $('panel').classList.remove('show'); f[4](); };
@@ -1411,11 +1577,13 @@ function tabMenu(e, t) {
     split.includes(t) ? ['Remove from split', () => unsplit(t)] : null,
     split.length ? ['Exit split screen', () => unsplit()] : null,
     null,
-    [t.locked ? '&#128275; Remove lock' : '&#128274; Lock tab', () => toggleLock(t)],
+    [t.locked ? 'Remove lock' : 'Lock tab', () => toggleLock(t)],
     t.locked && t.unlocked ? ['Lock now', () => { t.unlocked = false; renderTab(t); layoutViews(); updateNav(); }] : null,
     null,
-    (t.charge >= 1) ? ['&#9889; Remove charge', () => setCharge(t, 0)] : ['&#9889; Charge tab (full speed on battery)', () => setCharge(t, 1)],
-    (t.charge === 2) ? ['Back to just charged', () => setCharge(t, 1)] : ['&#128640; Supercharge (max fps + priority)', () => setCharge(t, 2)],
+    (t.charge >= 1) ? ['Remove charge', () => setCharge(t, 0)] : ['Charge tab (full speed on battery)', () => setCharge(t, 1)],
+    (t.charge === 2) ? ['Back to just charged', () => setCharge(t, 1)] : ['Supercharge (no frame rate limit, higher priority)', () => setCharge(t, 2)],
+    null,
+    [store.settings.vtabs ? 'Show tabs at the top' : 'Show tabs vertically', () => setVTabs(!store.settings.vtabs)],
     null,
     ['Close tab', () => closeTab(t)]
   ];
@@ -1462,13 +1630,14 @@ function updateNav() {
   const t = active, u = t.url;
   const masked = t.locked && !t.unlocked && lockReady();
   if (document.activeElement !== $('url')) $('url').value = isNewtab(u) || masked ? '' : u;
-  $('lock').innerHTML = isNewtab(u) ? '&#128269;' : (u.startsWith('https') ? '&#128274;' : '&#9888;');
+  $('lock').innerHTML = isNewtab(u) ? ic('search', 15) : u.startsWith('https') ? ic('lock', 14) : u.startsWith('file:') ? ic('file', 14) : ic('warn', 14);
+  $('lock').title = isNewtab(u) ? '' : u.startsWith('https') ? 'Secure connection' : u.startsWith('file:') ? 'Local file' : 'Not secure';
   let back = false, fwd = false;
   try { if (t.ready) { back = t.wv.canGoBack(); fwd = t.wv.canGoForward(); } } catch {}
   $('back').classList.toggle('off', !back);
   $('fwd').classList.toggle('off', !fwd);
   $('star').classList.toggle('on', store.bookmarks.some(b => b.url === u));
-  $('star').innerHTML = $('star').classList.contains('on') ? '&#9733;' : '&#9734;';
+  $('star').innerHTML = $('star').classList.contains('on') ? ic('starFill', 16) : ic('star', 16);
   try { const z = t.ready ? t.wv.getZoomFactor() : 1; $('zoom').style.display = z !== 1 ? 'inline' : 'none'; $('zoom').textContent = Math.round(z * 100) + '%'; } catch {}
 }
 
@@ -1481,7 +1650,7 @@ function progress(p) {
 function go(q) {
   const u = toUrl(q);
   if (!u || !active) return;
-  if (active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
+  if (active.locked && !active.unlocked && lockReady()) { toast('Unlock the tab first.'); return; }
   active.wv.loadURL(u).catch(() => {});
   active.wv.focus();
 }
@@ -1509,7 +1678,7 @@ function renderBookmarks() {
       ['Open in new tab', () => createTab(b.url, true)],
       null,
       ['Rename', async () => { const v = await modal('Rename bookmark', b.url, [{ id: 'n', label: 'Name', value: b.title }], 'Save'); if (v && v.n.trim()) { b.title = v.n.trim().slice(0, 40); save(); renderBookmarks(); } }],
-      ['&#128465; Remove bookmark', () => { store.bookmarks = store.bookmarks.filter(x => x !== b); save(); renderBookmarks(); updateNav(); toast('bookmark removed'); }]
+      ['Remove bookmark', () => { store.bookmarks = store.bookmarks.filter(x => x !== b); save(); renderBookmarks(); updateNav(); toast('Bookmark removed.'); }]
     ]);
     bm.appendChild(d);
   });
@@ -1518,8 +1687,8 @@ function renderBookmarks() {
 function toggleBookmark() {
   if (!active || isNewtab(active.url)) return;
   const i = store.bookmarks.findIndex(b => b.url === active.url);
-  if (i >= 0) { store.bookmarks.splice(i, 1); toast('Bookmark removed 💔'); }
-  else { store.bookmarks.push({ title: (active.title || active.url).slice(0, 40), url: active.url }); toast('Bookmarked 🔥'); }
+  if (i >= 0) { store.bookmarks.splice(i, 1); toast('Bookmark removed.'); }
+  else { store.bookmarks.push({ title: (active.title || active.url).slice(0, 40), url: active.url }); toast('Page bookmarked.'); }
   save(); renderBookmarks(); updateNav();
 }
 
@@ -1533,10 +1702,10 @@ function openPanel(kind) {
   if (kind === 'calc') { renderCalc(); return; }
   if (kind === 'history') {
     $('ptitle').textContent = 'History';
-    if (!store.history.length) list.innerHTML = '<div class="set" style="color:var(--dim)">nothing here yet</div>';
+    if (!store.history.length) list.innerHTML = '<div class="set" style="color:var(--dim)">No history yet.</div>';
     store.history.slice(0, 300).forEach((h, i) => {
       const r = document.createElement('div'); r.className = 'row';
-      r.innerHTML = `<img src="${fav(h.url)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small></small></div><span class="del">&#10005;</span>`;
+      r.innerHTML = `<img src="${fav(h.url)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small></small></div><span class="del" title="Remove">${ic('x', 14)}</span>`;
       r.querySelector('.rt div').textContent = h.title || h.url;
       r.querySelector('small').textContent = new Date(h.time).toLocaleString() + ' · ' + h.url;
       r.onclick = (e) => {
@@ -1568,39 +1737,39 @@ function openPanel(kind) {
   } else {
     $('ptitle').textContent = 'Settings';
     list.innerHTML = `
-      <div class="set">Search engine <select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${store.settings.engine === k ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+      <div class="set">Search engine <select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${store.settings.engine === k ? 'selected' : ''}>${({ google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing', brave: 'Brave Search' })[k] || k}</option>`).join('')}</select></div>
       <div class="set"><span>Orchard <b id="verTxt">v…</b></span><span class="pbtn" id="updChk">Check for updates</span></div>
-      <div class="set">Orchard Chat notifications <span class="pbtn" id="cnT">${store.settings.chatNotify === false ? 'OFF' : 'ON'}</span></div>
-      <div class="set">Search suggestions <span class="pbtn" id="sgT">${store.settings.suggest === false ? 'OFF' : 'ON'}</span></div>
-      <div class="set">New tab background <span class="pbtn" id="thm">&#127912; Change</span></div>
-      <div class="set">Reopen tabs on startup <span class="pbtn" id="rst">${store.settings.restore === false ? 'OFF' : 'ON'}</span></div>
+      <div class="set">Orchard Chat notifications <span class="pbtn" id="cnT">${store.settings.chatNotify === false ? 'Off' : 'On'}</span></div>
+      <div class="set">Search suggestions <span class="pbtn" id="sgT">${store.settings.suggest === false ? 'Off' : 'On'}</span></div>
+      <div class="set">Start page background <span class="pbtn" id="thm">Change</span></div>
+      <div class="set">Reopen tabs on startup <span class="pbtn" id="rst">${store.settings.restore === false ? 'Off' : 'On'}</span></div>
       <div class="set">Battery saver <select id="svr">${SAVER_OPTS}</select></div>
       <div class="set">Sleep unused tabs after <select id="slp">${[[2,'2 min'],[5,'5 min'],[10,'10 min'],[30,'30 min'],[0,'never']].map(([v,l]) => `<option value="${v}" ${(store.settings.sleepMins ?? 5) == v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-      <div class="set">Freeze background tabs <span class="pbtn" id="frz">${store.settings.freeze === false ? 'OFF' : 'ON'}</span></div>
-      <div class="set">Sleep all other tabs now <span class="pbtn" id="slpNow">&#128164; Sleep</span></div>
-      <div class="set">Ad blocker <span class="pbtn" id="adT">${store.settings.adblock ? 'ON' : 'OFF'}</span></div>
-      <div class="set">Clear history, cookies, cache <span class="pbtn" id="clr">Clear</span></div>
+      <div class="set">Freeze background tabs <span class="pbtn" id="frz">${store.settings.freeze === false ? 'Off' : 'On'}</span></div>
+      <div class="set">Sleep all other tabs now <span class="pbtn" id="slpNow">Sleep</span></div>
+      <div class="set">Ad blocker <span class="pbtn" id="adT">${store.settings.adblock ? 'On' : 'Off'}</span></div>
+      <div class="set">Clear history, cookies and cache <span class="pbtn" id="clr">Clear</span></div>
       <div class="set" style="color:var(--dim);font-size:12px;line-height:1.7;display:block">Shortcuts: Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+F find · Alt+G Gemini · Alt+C chat · Ctrl+J downloads · Ctrl+N new window · Ctrl +/-/0 zoom · F11 fullscreen · F12 devtools</div>`;
     $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
     $('thm').onclick = () => openPanel('theme');
-    $('cnT').onclick = () => { store.settings.chatNotify = store.settings.chatNotify === false; save(); $('cnT').textContent = store.settings.chatNotify === false ? 'OFF' : 'ON'; if (store.settings.chatNotify !== false) ensureChat(); placeChat(); };
-    $('sgT').onclick = () => { store.settings.suggest = store.settings.suggest === false; save(); $('sgT').textContent = store.settings.suggest === false ? 'OFF' : 'ON'; };
+    $('cnT').onclick = () => { store.settings.chatNotify = store.settings.chatNotify === false; save(); $('cnT').textContent = store.settings.chatNotify === false ? 'Off' : 'On'; if (store.settings.chatNotify !== false) ensureChat(); placeChat(); };
+    $('sgT').onclick = () => { store.settings.suggest = store.settings.suggest === false; save(); $('sgT').textContent = store.settings.suggest === false ? 'Off' : 'On'; };
     window.aura.appVersion().then(v => { if ($('verTxt')) $('verTxt').textContent = 'v' + v.version; });
     $('updChk').onclick = async () => {
       $('updChk').textContent = 'Checking…';
       const r = await window.aura.checkUpdate();
-      const msg = { latest: 'ur on the newest version 🔥', ready: 'update ' + r.version + ' ready, restart to get it', busy: 'already checking', full: 'v' + r.version + ' needs a fresh download of the full zip', error: 'couldnt check: ' + r.error };
+      const msg = { latest: 'Orchard is up to date.', ready: 'Version ' + r.version + ' is ready. Restart to finish updating.', busy: 'Already checking for updates.', full: 'Version ' + r.version + ' needs a full download from the website.', error: 'Could not check for updates: ' + r.error };
       $('updChk').textContent = 'Check for updates';
       toast(msg[r.status] || 'hmm');
       if (r.status === 'ready') showUpdate(r);
     };
-    $('rst').onclick = () => { store.settings.restore = store.settings.restore === false; save(); $('rst').textContent = store.settings.restore === false ? 'OFF' : 'ON'; };
+    $('rst').onclick = () => { store.settings.restore = store.settings.restore === false; save(); $('rst').textContent = store.settings.restore === false ? 'Off' : 'On'; };
     $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
     $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
-    $('frz').onclick = () => { store.settings.freeze = store.settings.freeze === false; save(); $('frz').textContent = store.settings.freeze === false ? 'OFF' : 'ON'; if (store.settings.freeze === false) tabs.forEach(t => freeze(t, false)); else applySaver(); };
-    $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (t !== active && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) put to sleep 💤'); };
-    $('adT').onclick = () => { toggleAdblock(); $('adT').textContent = store.settings.adblock ? 'ON' : 'OFF'; };
-    $('clr').onclick = async () => { await window.aura.clearData(); store.history = []; toast('Everything wiped 🥶'); };
+    $('frz').onclick = () => { store.settings.freeze = store.settings.freeze === false; save(); $('frz').textContent = store.settings.freeze === false ? 'Off' : 'On'; if (store.settings.freeze === false) tabs.forEach(t => freeze(t, false)); else applySaver(); };
+    $('slpNow').onclick = () => { let n = 0; tabs.forEach(t => { if (t !== active && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n === 1 ? '1 tab is now asleep.' : n + ' tabs are now asleep.'); };
+    $('adT').onclick = () => { toggleAdblock(); $('adT').textContent = store.settings.adblock ? 'On' : 'Off'; };
+    $('clr').onclick = async () => { await window.aura.clearData(); store.history = []; toast('History, cookies and cache cleared.'); };
   }
 }
 
@@ -1618,7 +1787,7 @@ function renderDownloads() {
   $('ptitle').textContent = 'Downloads';
   $('dlBtn').classList.remove('done');
   const items = [...dls.values()].sort((a, b) => b.id - a.id);
-  if (!items.length) { list.innerHTML = '<div class="set" style="color:var(--dim)">no downloads yet</div>'; return; }
+  if (!items.length) { list.innerHTML = '<div class="set" style="color:var(--dim)">No downloads yet.</div>'; return; }
   list.innerHTML = '';
   items.forEach(d => {
     const r = document.createElement('div'); r.className = 'row'; r.style.alignItems = 'flex-start';
@@ -1626,7 +1795,7 @@ function renderDownloads() {
     const status = d.state === 'completed' ? fmtB(d.total || d.received) + ' · done'
       : d.state === 'cancelled' ? 'cancelled' : d.state === 'interrupted' ? 'failed' : d.paused ? 'paused · ' + pct + '%'
       : fmtB(d.received) + (d.total ? ' / ' + fmtB(d.total) : '') + (d.speed ? ' · ' + fmtB(d.speed) + '/s' : '');
-    r.innerHTML = `<span style="font-size:20px">${d.state === 'completed' ? '&#128196;' : d.state === 'progressing' ? '&#11015;' : '&#9888;'}</span>
+    r.innerHTML = `<span style="color:var(--dim);display:grid">${ic(d.state === 'completed' ? 'file' : d.state === 'progressing' ? 'download' : 'warn', 20)}</span>
       <div class="rt"><div></div><small>${esc(status)}</small>${d.state === 'progressing' ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}</div>
       <div style="display:flex;gap:4px;flex-direction:column">${d.state === 'completed' ? '<span class="pbtn mini" data-a="open">Open</span><span class="pbtn mini" data-a="show">Folder</span>' : d.state === 'progressing' ? `<span class="pbtn mini" data-a="${d.paused ? 'resume' : 'pause'}">${d.paused ? 'Resume' : 'Pause'}</span><span class="pbtn mini" data-a="cancel">Cancel</span>` : ''}</div>`;
     r.querySelector('.rt div').textContent = d.name;
@@ -1653,7 +1822,7 @@ window.aura.dlHistory().then(list => {
 }).catch(() => {});
 window.aura.on('dl', (d) => {
   const prev = dls.get(d.id);
-  if (!prev && d.state === 'progressing') toast('⬇ downloading ' + d.name);
+  if (!prev && d.state === 'progressing') toast('Downloading ' + d.name + '…');
   if (prev && d.state === 'progressing') d.speed = Math.max(0, (d.received - prev.received) / Math.max(0.05, (d.time - prev.time) / 1000));
   dls.set(d.id, d);
   updateDlBtn();
@@ -1666,7 +1835,7 @@ const panelIs = (k) => $('panel').classList.contains('show') && $('panel').datas
 let speed = { running: false, res: null, live: null };
 function renderSpeed() {
   const list = $('plist');
-  $('ptitle').textContent = 'WiFi speed test';
+  $('ptitle').textContent = 'Connection speed test';
   const s = speed, L = s.live || {}, R = s.res || {};
   const num = s.running ? (L.mbps != null ? L.mbps : null) : (R.down != null ? R.down : null);
   const label = s.running ? (L.phase === 'ping' ? 'checking ping...' : L.phase === 'upload' ? 'upload' : 'download') : (R.down != null ? 'download' : 'hit start');
@@ -1676,16 +1845,16 @@ function renderSpeed() {
     ${s.running ? `<div style="padding:8px 14px"><div class="bar"><i style="width:${Math.round((L.progress || 0) * 100)}%"></i></div></div>` : ''}
     <div class="stats"><div><span>Ping</span><b>${f(s.running ? s.ping : R.ping, 0)}</b><span>ms</span></div><div><span>Download</span><b>${f(s.running ? s.down : R.down)}</b><span>Mbps</span></div><div><span>Upload</span><b>${f(s.running ? s.up : R.up)}</b><span>Mbps</span></div></div>
     ${R.jitter != null && !s.running ? `<div class="set" style="color:var(--dim);font-size:12px">Jitter ${f(R.jitter, 0)} ms · ${verdict(R.down)}</div>` : ''}
-    ${s.err ? `<div class="set" style="color:#ff5e5e;font-size:12px">${esc(s.err)}</div>` : ''}
+    ${s.err ? `<div class="set" style="color:var(--err);font-size:12px">${esc(s.err)}</div>` : ''}
     <div class="set" style="justify-content:center"><span class="pbtn" id="spGo">${s.running ? 'Stop' : R.down != null ? 'Test again' : 'Start'}</span></div>
-    <div class="set" style="color:var(--dim);font-size:11px;display:block">uses Cloudflare's speed test servers · ~50-150 MB data</div>`;
+    <div class="set" style="color:var(--dim);font-size:11px;display:block">Uses Cloudflare's speed test servers and transfers about 50 to 150 MB.</div>`;
   $('spGo').onclick = () => {
     if (speed.running) { window.aura.speedStop(); return; }
     speed = { running: true, res: null, live: { phase: 'ping' }, err: null };
     window.aura.speedStart(); renderSpeed();
   };
 }
-function verdict(d) { return d == null ? '' : d < 5 ? 'pretty slow 💔' : d < 25 ? 'decent' : d < 100 ? 'fast 🔥' : 'crazy fast 🥶'; }
+function verdict(d) { return d == null ? '' : d < 5 ? 'Slow' : d < 25 ? 'Adequate' : d < 100 ? 'Fast' : 'Very fast'; }
 window.aura.on('speed', (d) => {
   if (d.phase === 'ping' && d.ping != null) speed.ping = d.ping;
   if (d.phase === 'download') speed.down = d.mbps;
@@ -1697,7 +1866,7 @@ window.aura.on('speed', (d) => {
 });
 
 // ---- battery usage meter ----
-const SAVER_LABELS = { auto: 'Auto (Saver unplugged, Ultra under 20%)', on: 'Saver always', ultra: 'Ultra always', off: 'Off (Eco only)' };
+const SAVER_LABELS = { auto: 'Automatic', on: 'Always Saver', ultra: 'Always Ultra', off: 'Off (Eco only)' };
 const SAVER_OPTS_FN = () => Object.entries(SAVER_LABELS).map(([k, l]) => `<option value="${k}" ${(store.settings.saver || 'auto') === k ? 'selected' : ''}>${l}</option>`).join('');
 Object.defineProperty(window, 'SAVER_OPTS', { get: SAVER_OPTS_FN });
 let meterT = null;
@@ -1713,7 +1882,7 @@ async function renderBattery() {
   const energy = (c) => c < 2 ? ['Low', 'e-low'] : c < 15 ? ['Medium', 'e-med'] : ['High', 'e-high'];
   const pct = battLevel === null ? '--' : Math.round(battLevel * 100) + '%';
   let left = '';
-  try { const bt = await navigator.getBattery(); if (!bt.charging && isFinite(bt.dischargingTime) && bt.dischargingTime > 0) left = Math.floor(bt.dischargingTime / 3600) + 'h ' + Math.round(bt.dischargingTime % 3600 / 60) + 'm left'; else if (bt.charging) left = 'charging'; } catch {}
+  try { const bt = await navigator.getBattery(); if (!bt.charging && isFinite(bt.dischargingTime) && bt.dischargingTime > 0) left = Math.floor(bt.dischargingTime / 3600) + 'h ' + Math.round(bt.dischargingTime % 3600 / 60) + 'm remaining'; else if (bt.charging) left = 'Charging'; } catch {}
   const totalCpu = m.total.cpu / m.cores;
   const [tl, tc] = energy(m.total.cpu);
   const rows = tabs.map(t => {
@@ -1722,53 +1891,53 @@ async function renderBattery() {
   });
   if (byKey.has('ai')) rows.push({ t: { title: (store.settings.ai || 'gemini') + ' panel', id: 'ai', url: AIS[store.settings.ai || 'gemini'] }, cpu: byKey.get('ai').cpu, mem: byKey.get('ai').mem, state: '' });
   rows.sort((a, b) => b.cpu - a.cpu);
-  list.innerHTML = `<div class="stats"><div><span>Battery</span><b>${pct}</b><span>${esc(left || (onBattery ? 'on battery' : 'plugged in'))}</span></div>
-      <div><span>Orchard CPU</span><b>${totalCpu.toFixed(1)}%</b><span>of your PC</span></div>
+  list.innerHTML = `<div class="stats"><div><span>Battery</span><b>${pct}</b><span>${esc(left || (onBattery ? 'On battery' : 'Plugged in'))}</span></div>
+      <div><span>Orchard CPU</span><b>${totalCpu.toFixed(1)}%</b><span>of total CPU</span></div>
       <div><span>Energy</span><b class="${tc}">${tl}</b><span>${fmtB(m.total.mem * 1024)} RAM</span></div></div>
     <div class="set">Battery saver <select id="svr2">${SAVER_OPTS}</select></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> (always on): background tabs freeze after 15s, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' min, ads blocked, background timers throttled.', '<b style="color:var(--leaf)">Saver</b>: tabs freeze after 3s and sleep after 2 min, videos never autoplay and use cheaper formats (YouTube max 720p), websites told to cut animations, Orchard\'s own animations off' + (thrStat.supported && store.settings.slowApps !== false ? ', other apps in the background slowed down.' : '.'), '<b style="color:#ffb83d">Ultra</b>: everything in Saver, plus every background tab sleeps right away, YouTube drops to 480p' + (store.settings.ultraDark === false ? '' : ', pages go dark (saves power on OLED screens)') + (thrStat.supported && store.settings.slowApps !== false ? ' and background apps drop to the lowest priority.' : '.')][saverLevel()]}</div>
-    ${thrStat.supported ? `<div class="set">Slow down other apps on battery <span class="pbtn" id="slowT">${store.settings.slowApps === false ? 'OFF' : 'ON'}</span></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${store.settings.slowApps === false ? 'Off. Other apps run at full speed.' : saverLevel() === 0 ? 'Kicks in when u unplug. Background apps get lower priority and Windows Efficiency mode, the app in front always stays full speed.' : thrStat.count ? `&#128034; Slowing <b style="color:var(--txt)">${thrStat.count}</b> background process${thrStat.count === 1 ? '' : 'es'}${saverLevel() >= 2 ? ' (Ultra: lowest priority)' : ''}. Tap one to keep it full speed:` : 'Checking ur apps…'}</div>
-    ${thrStat.count && store.settings.slowApps !== false && saverLevel() > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px" id="slowList">${thrStat.apps.slice(0, 30).map(a => `<span class="pbtn mini" data-app="${esc(a)}" title="Keep ${esc(a)} at full speed">${esc(a)} &#10005;</span>`).join('')}</div>` : ''}
-    ${(store.settings.slowExclude || []).length ? `<div class="set" style="display:block;font-size:12px;color:var(--dim)">Never slowed: ${(store.settings.slowExclude || []).map(a => `<span class="pbtn mini" data-unskip="${esc(a)}" title="Let Orchard slow it again">${esc(a)} &#8635;</span>`).join(' ')}</div>` : ''}` : ''}
-    <div class="set">Cheaper videos on battery <span class="pbtn" id="cvT">${store.settings.cheapVideo === false ? 'OFF' : 'ON'}</span></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Sites send the H.264 video format ur graphics chip plays cheaply, and YouTube is capped at 720p (480p in Ultra). Reload a video tab for it to kick in.</div>
-    <div class="set">Cap tab frame rate on battery <span class="pbtn" id="fpsT">${store.settings.capFps === false ? 'OFF' : 'ON'}</span></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Slows animations and game loops to 30fps in Saver, 20fps in Ultra, so pages draw less. Video keeps playing normally.</div>
-    <div class="set">Auto dark pages in Ultra <span class="pbtn" id="udk">${store.settings.ultraDark === false ? 'OFF' : 'ON'}</span></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Off: Ultra won't force pages dark. The "Dark pages always" switch below still works.</div>
-    <div class="set">Dark pages always <span class="pbtn" id="dkp">${store.settings.darkPages ? 'ON' : 'OFF'}</span></div>
-    <div class="set">Rest all other tabs now <span class="pbtn" id="restNow">&#128164; Rest</span></div>
-    <div style="padding:2px 12px 4px;font-size:11px;color:var(--dim)">PER TAB</div>`;
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> is always active. Background tabs freeze after 15 seconds, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' minutes, ads are blocked and background timers are throttled.', '<b style="color:var(--ok)">Saver</b>: tabs freeze after 3 seconds and sleep after 2 minutes. Videos do not autoplay and use a lighter format (YouTube up to 720p), and websites are asked to reduce animation' + (thrStat.supported && store.settings.slowApps !== false ? '. Other apps in the background are slowed down.' : '.'), '<b style="color:var(--warn)">Ultra</b>: everything in Saver, plus background tabs sleep immediately and YouTube is limited to 480p' + (store.settings.ultraDark === false ? '' : '. Pages are shown dark, which saves power on OLED screens') + (thrStat.supported && store.settings.slowApps !== false ? '. Background apps run at the lowest priority.' : '.')][saverLevel()]}</div>
+    ${thrStat.supported ? `<div class="set">Slow down other apps on battery <span class="pbtn" id="slowT">${store.settings.slowApps === false ? 'Off' : 'On'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${store.settings.slowApps === false ? 'Off. Other apps run at full speed.' : saverLevel() === 0 ? 'Starts when you unplug. Background apps get lower priority and Windows Efficiency mode. The app in front always runs at full speed.' : thrStat.count ? `Slowing <b style="color:var(--txt)">${thrStat.count}</b> background process${thrStat.count === 1 ? '' : 'es'}${saverLevel() >= 2 ? ' (Ultra: lowest priority)' : ''}. Select an app to keep it at full speed:` : 'Checking your apps…'}</div>
+    ${thrStat.count && store.settings.slowApps !== false && saverLevel() > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px" id="slowList">${thrStat.apps.slice(0, 30).map(a => `<span class="pbtn mini" data-app="${esc(a)}" title="Keep ${esc(a)} at full speed">${esc(a)} ${ic('x', 12)}</span>`).join('')}</div>` : ''}
+    ${(store.settings.slowExclude || []).length ? `<div class="set" style="display:block;font-size:12px;color:var(--dim)">Never slowed: ${(store.settings.slowExclude || []).map(a => `<span class="pbtn mini" data-unskip="${esc(a)}" title="Let Orchard slow it again">${esc(a)} ${ic('reload', 12)}</span>`).join(' ')}</div>` : ''}` : ''}
+    <div class="set">Lighter video on battery <span class="pbtn" id="cvT">${store.settings.cheapVideo === false ? 'Off' : 'On'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Websites are asked for H.264 video, which your graphics chip decodes efficiently. YouTube is limited to 720p (480p in Ultra). Reload a video tab to apply this.</div>
+    <div class="set">Limit tab frame rate on battery <span class="pbtn" id="fpsT">${store.settings.capFps === false ? 'Off' : 'On'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Limits animations and games to 30 frames per second in Saver and 20 in Ultra. Video playback is not affected.</div>
+    <div class="set">Dark pages in Ultra <span class="pbtn" id="udk">${store.settings.ultraDark === false ? 'Off' : 'On'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">When off, Ultra does not force pages dark. The Always use dark pages setting still applies.</div>
+    <div class="set">Always use dark pages <span class="pbtn" id="dkp">${store.settings.darkPages ? 'On' : 'Off'}</span></div>
+    <div class="set">Rest all other tabs now <span class="pbtn" id="restNow">Rest</span></div>
+    <div style="padding:6px 12px 4px;font-size:12px;color:var(--dim);font-weight:600">Tabs</div>`;
   rows.forEach(({ t, cpu, mem, state }) => {
     const [el, ec] = state ? ['Zero', 'e-low'] : energy(cpu);
     const r = document.createElement('div'); r.className = 'row';
-    r.innerHTML = `<img src="${fav(t.url)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small>${state ? state + ' · saving battery' : cpu.toFixed(1) + '% CPU · ' + fmtB(mem * 1024)}</small></div><b class="${ec}" style="font-size:12px">${el}</b>${!state && t !== active && t.id !== 'ai' ? '<span class="pbtn mini" data-a="sleep">Sleep</span>' : ''}`;
+    r.innerHTML = `<img src="${fav(t.url)}" width=16 height=16 onerror="this.style.visibility='hidden'"><div class="rt"><div></div><small>${state ? (state === 'sleeping' ? 'Sleeping' : 'Frozen') + ', using no power' : cpu.toFixed(1) + '% CPU, ' + fmtB(mem * 1024)}</small></div><b class="${ec}" style="font-size:12px">${el}</b>${!state && t !== active && t.id !== 'ai' ? '<span class="pbtn mini" data-a="sleep">Sleep</span>' : ''}`;
     r.querySelector('.rt div').textContent = t.locked && !t.unlocked ? 'Locked tab' : isNewtab(t.url) ? 'New Tab' : (t.title || t.url);
     r.onclick = (e) => { if (e.target.dataset.a === 'sleep') { sleepTab(t); renderBattery(); } else if (t.id !== 'ai') { activate(t); } };
     list.appendChild(r);
   });
   $('svr2').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); renderBattery(); };
   $('dkp').onclick = () => { store.settings.darkPages = !store.settings.darkPages; save(); applySaver(); renderBattery(); };
-  $('cvT').onclick = () => { store.settings.cheapVideo = store.settings.cheapVideo === false; save(); syncThrottle(); toast(store.settings.cheapVideo === false ? 'videos back to full quality' : 'cheaper videos on battery 🎬'); renderBattery(); };
-  $('fpsT').onclick = () => { store.settings.capFps = store.settings.capFps === false; save(); applyFps(); toast(store.settings.capFps === false ? 'tab frame rate uncapped' : 'tab frame rate capped on battery 🎞️'); renderBattery(); };
-  $('udk').onclick = () => { store.settings.ultraDark = store.settings.ultraDark === false; save(); tabs.forEach(emulateFor); toast(store.settings.ultraDark === false ? 'Ultra wont force dark pages now' : 'Ultra auto dark on 🌙'); renderBattery(); };
-  if ($('slowT')) $('slowT').onclick = () => { store.settings.slowApps = store.settings.slowApps === false; save(); syncThrottle(); toast(store.settings.slowApps === false ? 'other apps back to full speed' : 'other apps get slowed when ur on battery 🐢'); renderBattery(); };
+  $('cvT').onclick = () => { store.settings.cheapVideo = store.settings.cheapVideo === false; save(); syncThrottle(); toast(store.settings.cheapVideo === false ? 'Videos play at full quality.' : 'Videos use a lighter format on battery.'); renderBattery(); };
+  $('fpsT').onclick = () => { store.settings.capFps = store.settings.capFps === false; save(); applyFps(); toast(store.settings.capFps === false ? 'Tab frame rate is no longer limited.' : 'Tab frame rate is limited on battery.'); renderBattery(); };
+  $('udk').onclick = () => { store.settings.ultraDark = store.settings.ultraDark === false; save(); tabs.forEach(emulateFor); toast(store.settings.ultraDark === false ? 'Ultra no longer forces dark pages.' : 'Ultra forces dark pages.'); renderBattery(); };
+  if ($('slowT')) $('slowT').onclick = () => { store.settings.slowApps = store.settings.slowApps === false; save(); syncThrottle(); toast(store.settings.slowApps === false ? 'Other apps run at full speed.' : 'Other apps are slowed while on battery.'); renderBattery(); };
   list.querySelectorAll('[data-app]').forEach(b => b.onclick = () => { const a = b.dataset.app.toLowerCase(); store.settings.slowExclude = [...new Set((store.settings.slowExclude || []).concat(a))]; save(); syncThrottle(); toast(b.dataset.app + ' stays full speed now'); renderBattery(); });
   list.querySelectorAll('[data-unskip]').forEach(b => b.onclick = () => { store.settings.slowExclude = (store.settings.slowExclude || []).filter(x => x !== b.dataset.unskip); save(); syncThrottle(); renderBattery(); });
-  $('restNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n + ' tab(s) resting 💤'); renderBattery(); };
+  $('restNow').onclick = () => { let n = 0; tabs.forEach(t => { if (!isShown(t) && !t.sleeping) { sleepTab(t); if (t.sleeping) n++; } }); toast(n === 1 ? '1 tab is now resting.' : n + ' tabs are now resting.'); renderBattery(); };
 }
 
 // ---- google lens ----
 let lensShot = null, lensDrag = null;
 async function startLens() {
-  if (active && active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
-  if (!active || !active.wv || !active.ready || isNewtab(active.url) || !/^https?:|^file:/.test(active.url)) { createTab('https://lens.google.com/'); toast('Google Lens opened, upload or paste a pic 🔍'); return; }
+  if (active && active.locked && !active.unlocked && lockReady()) { toast('Unlock the tab first.'); return; }
+  if (!active || !active.wv || !active.ready || isNewtab(active.url) || !/^https?:|^file:/.test(active.url)) { createTab('https://lens.google.com/'); toast('Google Lens is open. Upload or paste an image.'); return; }
   $('panel').classList.remove('show'); closeFind();
   await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
   const b = active.wv.getBoundingClientRect();
   lensShot = await window.aura.capture({ x: b.left, y: b.top, width: b.width, height: b.height });
-  if (!lensShot) { toast('couldnt screenshot this page 💔'); return; }
+  if (!lensShot) { toast('This page could not be captured.'); return; }
   $('lensImg').src = lensShot;
   $('lensSel').style.display = 'none';
   $('lens').classList.add('show');
@@ -1790,7 +1959,7 @@ async function sendLens(rect) {
   t.title = 'Google Lens'; renderTab(t);
   const go = async () => { await window.aura.lens(t.wcId, data); };
   if (t.ready && t.wcId != null) go(); else t.wv.addEventListener('dom-ready', () => { if (!t.lensSent) { t.lensSent = true; go(); } });
-  toast('searching with Lens... screenshot also copied, Ctrl+V works too');
+  toast('Searching with Google Lens. The selection is also on your clipboard.');
 }
 $('lens').addEventListener('mousedown', (e) => {
   if (e.target.closest('#lensBar')) return;
@@ -1817,19 +1986,12 @@ $('lensBtn').onclick = startLens;
 $('hideBtn').onclick = (e) => { if (e.shiftKey || picking) openPanel('hides'); else if (hideRulesFor(active && active.url).length && !e.altKey) openPanel('hides'); else startHidePicker(); };
 
 // ---- backgrounds ----
+// start page backgrounds: solid colours (keys kept so saved choices still work)
 const BG_PRESETS = {
-  aura: 'radial-gradient(ellipse at 18% 12%,#5a1712 0%,transparent 55%),radial-gradient(ellipse at 88% 92%,#21451a 0%,transparent 50%),#120c0b',
-  sunset: 'linear-gradient(160deg,#2b0f3a 0%,#7a1f4b 45%,#e0603a 100%)',
-  ocean: 'linear-gradient(160deg,#021b2e 0%,#04476b 55%,#0aa1a8 100%)',
-  forest: 'linear-gradient(160deg,#07140c 0%,#11402a 60%,#3d7a3a 100%)',
-  candy: 'linear-gradient(135deg,#ff7eb3 0%,#a46bff 50%,#4fd1ff 100%)',
-  orchard: 'linear-gradient(170deg,#7fb34a 0%,#3d6b2a 45%,#1d2e14 100%)',
-  honeycrisp: 'linear-gradient(160deg,#ffcf5a 0%,#f2752e 50%,#b8211a 100%)',
-  midnight: 'linear-gradient(180deg,#000 0%,#0b0b12 60%,#16163a 100%)',
-  lava: 'radial-gradient(ellipse at 50% 120%,#ff4d00 0%,#7a0b0b 45%,#120404 80%)',
-  mint: 'linear-gradient(135deg,#0f2027 0%,#2c5364 50%,#6dffb0 130%)',
-  black: '#000000'
+  aura: '#1e1f22', midnight: '#111318', black: '#000000', sunset: '#4a2733', honeycrisp: '#6e2a22',
+  lava: '#3a1c16', orchard: '#34502a', forest: '#1d3324', mint: '#1f3d39', ocean: '#163447', candy: '#4a3a63'
 };
+const BG_NAMES = { aura: 'Graphite', midnight: 'Midnight', black: 'Black', sunset: 'Plum', honeycrisp: 'Honeycrisp', lava: 'Ember', orchard: 'Orchard', forest: 'Forest', mint: 'Pine', ocean: 'Deep sea', candy: 'Lavender' };
 function setBg(bg) {
   store.settings.bg = bg; save();
   tabs.forEach(t => { if (t.wv && isNewtab(t.url)) t.wv.loadURL(newtabSrc()).catch(() => {}); });
@@ -1837,17 +1999,16 @@ function setBg(bg) {
 }
 function renderTheme() {
   const list = $('plist');
-  $('ptitle').textContent = 'Backgrounds';
+  $('ptitle').textContent = 'Start page background';
   const cur = store.settings.bg || { type: 'preset', value: 'aura' };
   const custom = store.customBgs || [];
-  const sw = (style, sel, attrs) => `<span ${attrs} style="width:52px;height:36px;border-radius:9px;cursor:pointer;background:${style};background-size:cover;background-position:center;border:2px solid ${sel ? '#fff' : '#ffffff22'};flex:none;position:relative"></span>`;
-  list.innerHTML = `<div style="padding:4px 12px;font-size:11px;color:var(--dim)">PRESETS</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px">${Object.entries(BG_PRESETS).map(([k, v]) => sw(v, cur.type === 'preset' && cur.value === k, `data-p="${k}" title="${k}"`)).join('')}</div>
-    <div class="set">Solid colour <input type="color" id="bgCol" value="${cur.type === 'color' ? esc(cur.value) : '#1a1030'}" style="width:52px;height:30px;border:0;background:none;cursor:pointer"></div>
-    <div class="set">Gradient <span style="display:flex;gap:6px;align-items:center"><input type="color" id="g1" value="${cur.type === 'gradient' ? esc(cur.value[0]) : '#ffb83d'}" style="width:36px;height:28px;border:0;background:none"><input type="color" id="g2" value="${cur.type === 'gradient' ? esc(cur.value[1]) : '#e8432e'}" style="width:36px;height:28px;border:0;background:none"><span class="pbtn mini" id="gGo">Use</span></span></div>
-    <div style="padding:8px 12px 4px;font-size:11px;color:var(--dim);display:flex;justify-content:space-between;align-items:center">YOUR IMAGES <span class="pbtn mini" id="bgImp">+ Import</span></div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px 10px">${custom.length ? custom.map((u, i) => sw(`url('${esc(u)}')`, cur.type === 'image' && cur.value === u, `data-i="${i}" title="click to use, right click to delete"`)).join('') : '<span style="color:var(--dim);font-size:12px">import ur own pics, png jpg webp gif</span>'}</div>
-    <div class="set">Dim image <input type="range" id="bgDim" min="0" max="80" value="${store.settings.bgDim ?? 35}"></div>`;
+  const sw = (style, sel, attrs) => `<span ${attrs} style="width:52px;height:36px;border-radius:6px;cursor:pointer;background:${style};background-size:cover;background-position:center;box-shadow:0 0 0 ${sel ? '2px var(--txt)' : '1px var(--line)'};flex:none;position:relative"></span>`;
+  list.innerHTML = `<div style="padding:4px 12px;font-size:12px;color:var(--dim);font-weight:600">Colours</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px">${Object.entries(BG_PRESETS).map(([k, v]) => sw(v, cur.type === 'preset' && cur.value === k, `data-p="${k}" title="${BG_NAMES[k] || k}"`)).join('')}</div>
+    <div class="set">Custom colour <input type="color" id="bgCol" value="${cur.type === 'color' ? esc(cur.value) : '#1e1f22'}" style="width:52px;height:30px;border:0;background:none;cursor:pointer"></div>
+    <div style="padding:8px 12px 4px;font-size:12px;color:var(--dim);font-weight:600;display:flex;justify-content:space-between;align-items:center">Your images <span class="pbtn mini" id="bgImp">Import</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 12px 10px">${custom.length ? custom.map((u, i) => sw(`url('${esc(u)}')`, cur.type === 'image' && cur.value === u, `data-i="${i}" title="Click to use, right-click to delete"`)).join('') : '<span style="color:var(--dim);font-size:12px">Import your own images (PNG, JPG, WebP or GIF).</span>'}</div>
+    <div class="set">Darken image <input type="range" id="bgDim" min="0" max="80" value="${store.settings.bgDim ?? 35}"></div>`;
   list.querySelectorAll('[data-p]').forEach(el => el.onclick = () => setBg({ type: 'preset', value: el.dataset.p }));
   list.querySelectorAll('[data-i]').forEach(el => {
     const u = custom[+el.dataset.i];
@@ -1860,19 +2021,18 @@ function renderTheme() {
     };
   });
   $('bgCol').onchange = (e) => setBg({ type: 'color', value: e.target.value });
-  $('gGo').onclick = () => setBg({ type: 'gradient', value: [$('g1').value, $('g2').value] });
   $('bgDim').onchange = (e) => { store.settings.bgDim = +e.target.value; const b = store.settings.bg; if (b && b.type === 'image') setBg({ ...b, dim: +e.target.value }); else save(); };
   $('bgImp').onclick = async () => {
     const urls = await window.aura.bgImport();
     if (!urls.length) return;
     store.customBgs = [...urls, ...(store.customBgs || [])].slice(0, 12);
     setBg({ type: 'image', value: urls[0], dim: store.settings.bgDim ?? 35 });
-    toast('background imported 🔥');
+    toast('Background imported.');
   };
 }
 
 // ---- profiles ----
-const PCOLORS = ['#e8432e', '#ffb83d', '#6cc35a', '#c0447a', '#f2752e', '#8a5a3c', '#4fa3d1', '#e4e45e'];
+const PCOLORS = ['#c94a3e', '#c98f2e', '#4f9a5f', '#8a5fb0', '#c9682e', '#7a5a43', '#3f83b8', '#8c9640'];
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 function applyProfile(p) {
   if (!p) return;
@@ -1880,7 +2040,7 @@ function applyProfile(p) {
   const guest = !!p.guest;
   document.body.classList.toggle('guestmode', guest);
   if (!guest) document.documentElement.style.setProperty('--acc', p.color);
-  $('avatar').textContent = guest ? '\uD83D\uDD76' : (p.name || '?')[0].toUpperCase();
+  if (guest) $('avatar').innerHTML = ic('guest', 16); else $('avatar').textContent = (p.name || '?')[0].toUpperCase();
   $('avatar').title = guest ? 'Guest window — nothing is saved' : 'Profile: ' + p.name + (p.email ? '\n' + p.email : '\nnot signed in to Google');
   const chip = $('guestChip'); if (chip) chip.hidden = !guest;
   document.title = (guest ? 'Guest — Orchard' : 'Orchard - ' + p.name);
@@ -1893,13 +2053,13 @@ async function renderProfiles(editing) {
   ps.forEach(p => {
     const r = document.createElement('div');
     r.className = 'row' + (p.id === me.id ? ' cur' : '');
-    r.innerHTML = `<div class="av" style="background:${esc(p.color)}">${esc((p.name || '?')[0].toUpperCase())}</div><div class="rt"><div>${esc(p.name)}</div><small>${p.email ? esc(p.email) + ' · ' : ''}${p.id === me.id ? 'this window' : 'click to open'}</small></div><span class="del" data-a="edit" title="Edit">&#9998;</span>${p.id !== 'default' ? '<span class="del" data-a="del" title="Delete">&#128465;</span>' : ''}`;
+    r.innerHTML = `<div class="av" style="background:${esc(p.color)}">${esc((p.name || '?')[0].toUpperCase())}</div><div class="rt"><div>${esc(p.name)}</div><small>${p.email ? esc(p.email) + ' · ' : ''}${p.id === me.id ? 'This window' : 'Click to open'}</small></div><span class="del" data-a="edit" title="Edit">${ic('pen', 14)}</span>${p.id !== 'default' ? '<span class="del" data-a="del" title="Delete">' + ic('trash', 14) + '</span>' : ''}`;
     r.onclick = async (e) => {
       const a = e.target.dataset.a;
       if (a === 'edit') return profileForm(p);
       if (a === 'del') {
         if (!confirm('Delete profile "' + p.name + '"? Its bookmarks, history, cookies and logins get wiped for good.')) return;
-        await window.aura.deleteProfile(p.id); toast('Profile deleted 💔'); renderProfiles(); return;
+        await window.aura.deleteProfile(p.id); toast('Profile deleted.'); renderProfiles(); return;
       }
       if (p.id !== me.id) { window.aura.openProfile(p.id); $('panel').classList.remove('show'); }
     };
@@ -1907,12 +2067,12 @@ async function renderProfiles(editing) {
   });
   const add = document.createElement('div');
   add.className = 'row';
-  add.innerHTML = '<div class="av" style="background:#2e2e48;color:var(--txt)">+</div><div class="rt"><div>Add profile</div><small>separate logins, bookmarks and history</small></div>';
+  add.innerHTML = '<div class="av" style="background:#2e2e48;color:var(--txt)">+</div><div class="rt"><div>Add profile</div><small>Separate sign-ins, bookmarks and history</small></div>';
   add.onclick = () => profileForm(null);
   list.appendChild(add);
   if (!(store.profile && store.profile.guest)) {
     const g = document.createElement('div'); g.className = 'row';
-    g.innerHTML = '<div class="av" style="background:#2a2230;color:#cfcfe6">\uD83D\uDD76</div><div class="rt"><div>Guest window</div><small>nothing saved, like incognito</small></div>';
+    g.innerHTML = '<div class="av" style="background:var(--surface2);color:var(--txt)">' + ic('guest', 16) + '</div><div class="rt"><div>Guest window</div><small>Nothing is saved</small></div>';
     g.onclick = () => { window.aura.openGuest(); $('panel').classList.remove('show'); };
     list.appendChild(g);
   }
@@ -1935,7 +2095,7 @@ function profileForm(p) {
     const name = $('pname').value.trim();
     if (!name) { $('pname').focus(); return; }
     if (p) { await window.aura.editProfile(p.id, name, color); renderProfiles(); }
-    else { await window.aura.addProfile(name, color); $('panel').classList.remove('show'); toast('Profile created, it opened in a new window 🔥'); }
+    else { await window.aura.addProfile(name, color); $('panel').classList.remove('show'); toast('Profile created. It opened in a new window.'); }
   };
   $('psave').onclick = go;
   $('pname').onkeydown = (e) => { if (e.key === 'Enter') go(); };
@@ -1985,8 +2145,8 @@ function toggleAi(force) {
   if (aiOpen) setTimeout(() => aiWv && aiWv.focus(), 100);
 }
 async function askAboutPage(mode) {
-  if (active && active.locked && !active.unlocked && lockReady()) { toast('unlock the tab first 🔒'); return; }
-  if (!active || !active.wv || !active.ready || isNewtab(active.url)) { toast('open a real page first bro 🫩'); return; }
+  if (active && active.locked && !active.unlocked && lockReady()) { toast('Unlock the tab first.'); return; }
+  if (!active || !active.wv || !active.ready || isNewtab(active.url)) { toast('Open a web page first.'); return; }
   let info = { sel: '', text: '' };
   const limit = mode === 'answer' ? 14000 : 6000;
   try {
@@ -2016,15 +2176,15 @@ async function askAboutPage(mode) {
   })()`).catch(() => false);
   let ok = false;
   for (let i = 0; i < 10 && !ok; i++) { ok = await fill(); if (!ok) await new Promise(r => setTimeout(r, 700)); }
-  if (ok) toast('page sent to the AI box, hit enter 🔥');
-  else { try { await navigator.clipboard.writeText(prompt); } catch {} toast('couldnt reach the box, copied it so just paste ✌️'); }
+  if (ok) toast('The page was sent to the assistant. Press Enter to submit.');
+  else { try { await navigator.clipboard.writeText(prompt); } catch {} toast('The assistant could not be reached. The prompt was copied so you can paste it.'); }
 }
 
 function toggleAdblock() {
   store.settings.adblock = !store.settings.adblock; save();
   $('shield').classList.toggle('off', !store.settings.adblock);
-  if (!store.settings.adblock) $('shield').innerHTML = '&#128737; off';
-  else $('shield').innerHTML = '&#128737; ' + blocked + ' blocked';
+  if (!store.settings.adblock) $('shield').innerHTML = ic('shield', 14) + ' Off';
+  else $('shield').innerHTML = ic('shield', 14) + ' ' + blocked + ' blocked';
 }
 let blocked = 0;
 
@@ -2096,7 +2256,7 @@ const openChat = () => {
   aiWhich = 'chat';
   if (!aiOpen) toggleAi(true); else loadAi('chat');
 };
-// the 💬 button now opens Google Chat (Orchard Chat stays in the ☰ menu)
+// the chat button opens Google Chat (Orchard Chat stays in the menu)
 const openGoogleChat = () => {
   if (aiOpen && aiWhich === 'gchat') { toggleAi(false); return; }
   aiWhich = 'gchat';
@@ -2120,10 +2280,10 @@ $('askMore').onclick = async (e) => {
   let hasSel = false;
   try { hasSel = !!(active && active.wv && active.ready && (await active.wv.executeJavaScript('String(getSelection()).trim().length')) > 0); } catch {}
   showMenu(e, [
-    ['&#9889; Answer quickly' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answer')],
-    ['&#9989; Answer only (just the answers)' + (hasSel ? ' (highlighted)' : ''), () => askAboutPage('answeronly')],
-    ['&#128161; Explain this page/question', () => askAboutPage('summary')],
-    hasSel ? ['&#128161; Explain the highlighted bit', () => askAboutPage('explain')] : null
+    ['Answer quickly' + (hasSel ? ' (selection)' : ''), () => askAboutPage('answer')],
+    ['Answer only' + (hasSel ? ' (selection)' : ''), () => askAboutPage('answeronly')],
+    ['Explain this page or question', () => askAboutPage('summary')],
+    hasSel ? ['Explain the selection', () => askAboutPage('explain')] : null
   ]);
 };
 $('aiPick').onchange = (e) => { if (!['chat', 'mail', 'gchat'].includes(e.target.value)) { store.settings.ai = e.target.value; save(); } aiWcId = null; loadAi(e.target.value); };
@@ -2172,7 +2332,7 @@ function localMatches(q) {
       const k = sq.toLowerCase();
       if (seenSearch.has(k) || (words.length && !hits(k))) continue;
       seenSearch.add(k);
-      out.push({ kind: 'past', text: sq, sub: 'u searched this', go: sq, s: score(e) + 5 });
+      out.push({ kind: 'past', text: sq, sub: 'Previous search', go: sq, s: score(e) + 5 });
       continue;
     }
     const hay = (e.title + ' ' + e.url).toLowerCase();
@@ -2191,13 +2351,13 @@ function localMatches(q) {
 function omniRender() {
   const box = $('omni');
   if (!omniItems.length) { box.hidden = true; return; }
-  const ICON = { search: '&#128269;', sugg: '&#128269;', past: '&#128339;', hist: '', bm: '&#11088;', url: '&#127760;' };
+  const ICON = { search: 'search', sugg: 'search', past: 'clock', hist: 'globe', bm: 'star', url: 'globe' };
   box.innerHTML = '';
   omniItems.forEach((it, i) => {
     const d = document.createElement('div');
     d.className = 'oi' + (i === omniSel ? ' sel' : '');
-    const ic = it.kind === 'hist' ? `<img src="${fav(it.url)}" onerror="this.replaceWith(document.createTextNode('\u{1F310}'))">` : ICON[it.kind];
-    d.innerHTML = `<span class="oic">${ic}</span><span class="ot"></span><span class="os"></span>${it.kind === 'hist' || it.kind === 'past' ? '<span class="ox" title="Remove from history">&#10005;</span>' : ''}`;
+    const oic = it.kind === 'hist' ? `<img src="${fav(it.url)}" onerror="this.style.visibility='hidden'">` : ic(ICON[it.kind], 15);
+    d.innerHTML = `<span class="oic">${oic}</span><span class="ot"></span><span class="os"></span>${it.kind === 'hist' || it.kind === 'past' ? '<span class="ox" title="Remove from history">' + ic('x', 13) + '</span>' : ''}`;
     d.querySelector('.ot').textContent = it.text;
     d.querySelector('.os').textContent = it.sub ? (it.kind === 'hist' || it.kind === 'bm' ? ' — ' : ' · ') + it.sub : '';
     d.onmousedown = (e) => {
@@ -2215,7 +2375,7 @@ function omniRender() {
 function forget(it) {
   if (it.kind === 'past') store.history = store.history.filter(h => (searchQueryOf(h.url) || '').toLowerCase() !== it.text.toLowerCase());
   else store.history = store.history.filter(h => h.url !== it.url);
-  save(); toast('removed from history'); omniUpdate(true);
+  save(); toast('Removed from history.'); omniUpdate(true);
 }
 function omniClose() { $('omni').hidden = true; omniItems = []; }
 function omniGo(it, newTab) {
@@ -2290,8 +2450,8 @@ window.aura.on('tool', (name) => {
   if (map[name]) map[name]();
 });
 window.aura.on('shortcut', (s) => handleKey(s.key, s.ctrl, s.shift, s.alt));
-window.aura.on('blocked', (n) => { blocked = n; if (store.settings.adblock) $('shield').innerHTML = '&#128737; ' + n + ' blocked'; });
-window.aura.on('download', (d) => toast(d.state === 'completed' ? 'Downloaded ' + d.name + ' 🔥' : 'Download failed 💔'));
+window.aura.on('blocked', (n) => { blocked = n; if (store.settings.adblock) $('shield').innerHTML = ic('shield', 14) + ' ' + n + ' blocked'; });
+window.aura.on('download', (d) => toast(d.state === 'completed' ? 'Downloaded ' + d.name + '.' : 'Download failed.'));
 let lastUnlock = 0;
 // leaving Orchard (another app) relocks unlocked tabs; a short grace period after unlocking avoids false blurs
 window.aura.on('win-blur', () => { if (Date.now() - lastUnlock < 1500 || document.hasFocus()) return; relockAll(); });
@@ -2304,24 +2464,26 @@ window.aura.on('lock-sync', (s) => {
 });
 function showUpdate(u) {
   const p = $('updPill'); p.hidden = false;
-  p.innerHTML = '&#11014; Update ' + esc(u.version);
-  p.title = (u.notes ? 'New: ' + u.notes + '\n' : '') + 'Click to restart into it';
+  p.textContent = 'Restart to update';
+  p.title = 'Orchard ' + u.version + ' is ready. Click to restart.';
+  p.title = (u.notes ? 'What is new: ' + u.notes + '\n' : '') + 'Click to restart and update.';
 }
-window.aura.on('update-ready', (u) => { showUpdate(u); toast('Orchard ' + u.version + ' downloaded, click the green button to restart 🔥'); });
+window.aura.on('update-ready', (u) => { showUpdate(u); toast('Orchard ' + u.version + ' has been downloaded. Restart to finish updating.'); });
 window.aura.appVersion().then(v => { if (v.pending) showUpdate(v.pending); });
 window.aura.on('profile-changed', (p) => applyProfile(p));
 window.aura.on('power', (b) => { onBattery = b; applySaver(); });
-window.aura.on('max-state', (m) => $('mx').innerHTML = m ? '&#10697;' : '&#9744;');
+window.aura.on('max-state', (m) => $('mx').innerHTML = m ? ic('restore', 14) : ic('max', 14));
 
 window.aura.on('attach-tab', (u) => { const t = createTab(u || undefined); window.aura.win('focus'); });
 window.aura.getStore().then(async (s) => {
   store = s;
   store.settings = store.settings || { engine: 'google', adblock: true };
   $('shield').classList.toggle('off', !store.settings.adblock);
-  if (!store.settings.adblock) $('shield').innerHTML = '&#128737; off';
+  if (!store.settings.adblock) $('shield').innerHTML = ic('shield', 14) + ' Off';
   if (store.settings.sleepMins === undefined) store.settings.sleepMins = 5;
   applyProfile(store.profile);
   applyToolbar();
+  applyVTabs();
 
   $('aiPick').value = store.settings.ai || 'gemini';
   blocked = store.blocked || 0;

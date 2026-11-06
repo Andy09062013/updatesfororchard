@@ -67,7 +67,7 @@ contextBridge.exposeInMainWorld('aura', {
   bgImport: () => ipcRenderer.invoke('bg-import'),
   bgDelete: (u) => ipcRenderer.send('bg-delete', u),
   on: (ch, fn) => {
-    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open', 'cal-due', 'note-click', 'throttle-status', 'pw-offer', 'page-menu'];
+    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open', 'cal-due', 'note-click', 'throttle-status', 'pw-offer', 'page-menu', 'dl-origin'];
     if (ok.includes(ch)) ipcRenderer.on(ch, (e, d) => fn(d));
   }
 });

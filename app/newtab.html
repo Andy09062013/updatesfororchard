@@ -5,93 +5,102 @@
 <title>New Tab</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{height:100vh;background:radial-gradient(ellipse at 18% 12%,#5a1712 0%,transparent 55%),radial-gradient(ellipse at 88% 92%,#21451a 0%,transparent 50%),#120c0b;color:#f6ece8;font-family:"Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
-#clock{font-size:84px;font-weight:200;letter-spacing:2px;text-shadow:0 2px 20px #0008}
-#greet{text-shadow:0 1px 8px #000a}
-#greet{color:#c9b3ab;margin:4px 0 34px;font-size:16px}
-h1{display:flex;align-items:center;gap:14px;font-size:44px;font-weight:900;letter-spacing:8px;color:#ffb83d;margin-bottom:6px;text-shadow:0 2px 18px #0006}
-h1 img{width:54px;height:54px;filter:drop-shadow(0 4px 10px #0008)}
-form{width:min(620px,88vw)}
-input{width:100%;padding:16px 24px;border-radius:30px;border:1px solid #3a2622;background:#1b1211cc;color:#fff;font-size:17px;outline:0;backdrop-filter:blur(10px);transition:.2s}
-input:focus{border-color:#e8432e;box-shadow:0 0 0 4px #e8432e33,0 10px 40px #e8432e22}
-#tools{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:22px;width:min(720px,92vw)}
-#tools a{flex-direction:row;gap:7px;padding:8px 14px;border-radius:20px;background:#1b1211cc;border:1px solid #3a2622;color:#f6ece8;font-size:13px;backdrop-filter:blur(8px)}
-#tools a:hover{border-color:#e8432e;transform:translateY(-2px)}
-#tools i{font-style:normal}
-#tag{color:#9ccf7f;font-size:13px;letter-spacing:.18em;text-transform:uppercase;margin:-2px 0 8px;text-shadow:0 1px 8px #000a}
-#eco{display:flex;flex-direction:row;gap:10px;align-items:center;margin:0 0 18px;padding:8px 16px;border-radius:22px;background:#6cc35a1c;border:1px solid #6cc35a55;color:#e8f5e0;font-size:13px;backdrop-filter:blur(8px)}
-#eco:hover{border-color:#6cc35a;transform:none;background:#6cc35a2a}
-#eco b{color:#8fe07a}
-#eco.ultra{background:#ffb83d1f;border-color:#ffb83d66}
-#eco.ultra b{color:#ffcf6a}
-#links{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:14px;justify-content:center;width:min(720px,90vw);margin-top:26px}
-a{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px;border-radius:14px;color:#cfcfe6;text-decoration:none;font-size:12px;transition:.15s}
-a:hover{background:#ffffff12;transform:translateY(-3px)}
-a .ic{width:46px;height:46px;border-radius:50%;background:#241816;display:grid;place-items:center}
-a img{width:24px;height:24px}
-a span{max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root{--txt:#e8e9eb;--dim:#a3a6ac;--line:#ffffff1f;--field:#00000040;--acc:#c94a3e;--ease:cubic-bezier(.2,.8,.2,1)}
+body{height:100vh;background:#1e1f22;color:var(--txt);font:14px/1.4 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;-webkit-font-smoothing:antialiased}
+main{width:min(640px,88vw);display:flex;flex-direction:column;align-items:center}
+#mark{color:var(--acc);margin-bottom:18px;display:grid}
+#clock{font-size:64px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+#greet{color:var(--dim);margin:10px 0 28px;font-size:15px}
+form{width:100%}
+.field{display:flex;align-items:center;gap:12px;height:48px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--field);transition:border-color .14s var(--ease)}
+.field:focus-within{border-color:var(--acc)}
+.field svg{color:var(--dim);flex:none}
+input{flex:1;min-width:0;background:none;border:0;outline:0;color:#fff;font:inherit;font-size:16px}
+input::placeholder{color:#8b8e94}
+#eco{display:flex;align-items:center;gap:14px;margin-top:14px;font-size:12.5px;color:var(--dim);text-decoration:none;padding:4px 8px;border-radius:6px}
+#eco:hover{color:var(--txt);background:#ffffff0d}
+#eco span{display:flex;align-items:center;gap:6px}
+#eco b{font-weight:600;color:#7cc28a}
+#eco.ultra b{color:#e0b25a}
+#eco i{width:1px;height:12px;background:var(--line)}
+#tools{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin-top:22px}
+#tools a{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:6px;color:var(--txt);text-decoration:none;font-size:13px;transition:background .14s var(--ease)}
+#tools a svg{color:var(--dim)}
+#tools a:hover{background:#ffffff12}
+#links{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:min(720px,90vw);margin-top:30px}
+#links a{width:92px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 4px;border-radius:8px;color:var(--txt);text-decoration:none;font-size:12px;transition:background .14s var(--ease)}
+#links a:hover{background:#ffffff12}
+#links .ic{width:44px;height:44px;border-radius:10px;background:#ffffff14;display:grid;place-items:center;font-weight:600}
+#links img{width:22px;height:22px}
+#links span{max-width:84px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d4d6da}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<h1><img src="apple-logo.png" alt="">ORCHARD</h1>
-<div id="tag">the battery saving browser</div>
+<main>
+<div id="mark" title="Orchard"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 7.6c-1.7-1.3-5.2-1.4-6.7 1.5-1.7 3.3-.3 9.1 2.8 11.7 1.3 1.1 2.4.9 3.9.3 1.5.6 2.6.8 3.9-.3 3.1-2.6 4.5-8.4 2.8-11.7-1.5-2.9-5-2.8-6.7-1.5z"/><path d="M12.3 7.3c.1-1.7.7-3 1.7-3.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13.6 4.9c1.1-1.6 3-2.2 4.6-1.8-.4 1.7-2 3.1-4.6 1.8z"/></svg></div>
 <div id="clock"></div>
 <div id="greet"></div>
-<a id="eco" href="orchard://tool/battery"></a>
-<form id="f"><input id="q" placeholder="search something or paste a link" autocomplete="off"></form>
+<form id="f"><label class="field"><span id="sicon"></span><input id="q" placeholder="Search the web or enter an address" autocomplete="off"></label></form>
+<a id="eco" href="orchard://tool/battery" title="Battery and power use"></a>
 <div id="tools">
-  <a href="orchard://tool/mail"><i>&#9993;</i>Mail</a>
-  <a href="orchard://tool/gchat"><i>&#128172;</i>Google Chat</a>
-  <a href="orchard://tool/ai"><i>&#10022;</i>Ask AI</a>
-  <a href="orchard://tool/lens"><i>&#128269;</i>Lens</a>
-  <a href="orchard://tool/battery"><i>&#128267;</i>Battery</a>
-  <a href="orchard://tool/speed"><i>&#128246;</i>Speed test</a>
-  <a href="orchard://tool/theme"><i>&#127912;</i>Background</a>
-  <a href="orchard://tool/menu"><i>&#9776;</i>All features</a>
+  <a href="orchard://tool/mail" data-ic="mail">Mail</a>
+  <a href="orchard://tool/gchat" data-ic="chat">Google Chat</a>
+  <a href="orchard://tool/ai" data-ic="assistant">AI assistant</a>
+  <a href="orchard://tool/lens" data-ic="lens">Google Lens</a>
+  <a href="orchard://tool/speed" data-ic="speed">Speed test</a>
+  <a href="orchard://tool/theme" data-ic="palette">Background</a>
+  <a href="orchard://tool/menu" data-ic="menu">All features</a>
 </div>
 <div id="links"></div>
+</main>
 <script>
+const ICONS = {
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  mail: '<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m3.5 7 8.5 6.5L20.5 7"/>',
+  chat: '<path d="M4 5.5h16v11H9.5L4 20.5z"/>',
+  assistant: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M14.5 4.5v15"/><path d="M17 9h1.5M17 12h1.5"/>',
+  lens: '<path d="M3.5 8.5v-3a2 2 0 0 1 2-2h3"/><path d="M15.5 3.5h3a2 2 0 0 1 2 2v3"/><path d="M20.5 15.5v3a2 2 0 0 1-2 2h-3"/><path d="M8.5 20.5h-3a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.2"/>',
+  speed: '<path d="M4.5 17.5a8.5 8.5 0 1 1 15 0"/><path d="m12 13 4-4.5"/><circle cx="12" cy="13.5" r="1.3" fill="currentColor"/>',
+  palette: '<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2a1.7 1.7 0 0 1 1.3-2.8h2a3.9 3.9 0 0 0 3.9-3.9c0-4.2-3.8-7.4-8.5-7.4z"/>',
+  menu: '<path d="M4 6.5h16M4 12h16M4 17.5h16"/>',
+  battery: '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="M6 10.5v3"/>',
+  batteryCharging: '<rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3"/><path d="m11.5 9-2 3h3l-2 3"/>'
+};
+const ic = (n, s) => `<svg width="${s || 16}" height="${s || 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`;
+document.querySelectorAll('[data-ic]').forEach(a => a.insertAdjacentHTML('afterbegin', ic(a.dataset.ic, 16)));
+document.getElementById('sicon').innerHTML = ic('search', 18);
+
 let cfg = { e: 'https://www.google.com/search?q=', bm: [] };
 try { cfg = JSON.parse(decodeURIComponent(location.hash.slice(1))); } catch {}
 const PRE = {
-  aura: 'radial-gradient(ellipse at 18% 12%,#5a1712 0%,transparent 55%),radial-gradient(ellipse at 88% 92%,#21451a 0%,transparent 50%),#120c0b',
-  sunset: 'linear-gradient(160deg,#2b0f3a 0%,#7a1f4b 45%,#e0603a 100%)',
-  ocean: 'linear-gradient(160deg,#021b2e 0%,#04476b 55%,#0aa1a8 100%)',
-  forest: 'linear-gradient(160deg,#07140c 0%,#11402a 60%,#3d7a3a 100%)',
-  candy: 'linear-gradient(135deg,#ff7eb3 0%,#a46bff 50%,#4fd1ff 100%)',
-  orchard: 'linear-gradient(170deg,#7fb34a 0%,#3d6b2a 45%,#1d2e14 100%)',
-  honeycrisp: 'linear-gradient(160deg,#ffcf5a 0%,#f2752e 50%,#b8211a 100%)',
-  midnight: 'linear-gradient(180deg,#000 0%,#0b0b12 60%,#16163a 100%)',
-  lava: 'radial-gradient(ellipse at 50% 120%,#ff4d00 0%,#7a0b0b 45%,#120404 80%)',
-  mint: 'linear-gradient(135deg,#0f2027 0%,#2c5364 50%,#6dffb0 130%)',
-  black: '#000000'
+  aura: '#1e1f22', midnight: '#111318', black: '#000000', sunset: '#4a2733', honeycrisp: '#6e2a22',
+  lava: '#3a1c16', orchard: '#34502a', forest: '#1d3324', mint: '#1f3d39', ocean: '#163447', candy: '#4a3a63'
 };
 window.addEventListener('hashchange', () => location.reload());
 const bg = cfg.bg || { type: 'preset', value: 'aura' };
 const hexOk = (c) => /^#[0-9a-f]{6}$/i.test(c);
 if (bg.type === 'preset' && PRE[bg.value]) document.body.style.background = PRE[bg.value];
 else if (bg.type === 'color' && hexOk(bg.value)) document.body.style.background = bg.value;
-else if (bg.type === 'gradient' && Array.isArray(bg.value) && bg.value.every(hexOk)) document.body.style.background = 'linear-gradient(135deg,' + bg.value[0] + ',' + bg.value[1] + ')';
+else if (bg.type === 'gradient' && Array.isArray(bg.value) && hexOk(bg.value[0])) document.body.style.background = bg.value[0];
 else if (bg.type === 'image' && /^file:\/\//.test(bg.value)) {
   const dim = Math.max(0, Math.min(80, bg.dim == null ? 35 : +bg.dim)) / 100;
   document.body.style.background = 'linear-gradient(rgba(0,0,0,' + dim + '),rgba(0,0,0,' + dim + ')),url("' + bg.value.replace(/["\\]/g, '') + '") center/cover no-repeat #000';
 }
 function tick() {
   const d = new Date();
-  document.getElementById('clock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('clock').textContent = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const h = d.getHours();
-  document.getElementById('greet').textContent = h < 5 ? 'go to sleep bro' : h < 12 ? 'good morning' : h < 18 ? 'good afternoon' : 'good evening';
+  document.getElementById('greet').textContent = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 }
 tick(); setInterval(tick, 1000);
 const eco = cfg.eco || null, ecoEl = document.getElementById('eco');
 if (eco) {
   const mode = ['Eco', 'Saver', 'Ultra saver'][eco.lvl] || 'Eco';
-  const parts = [];
-  parts.push('&#127811; <b>' + mode + '</b>');
-  if (eco.pct != null) parts.push((eco.chg ? '&#9889; ' : '&#128267; ') + eco.pct + '%');
-  parts.push(eco.rest + ' tab' + (eco.rest === 1 ? '' : 's') + ' resting');
-  parts.push(eco.ads + ' ads blocked');
-  ecoEl.innerHTML = parts.join(' &middot; ');
+  const parts = ['<span>' + ic(eco.chg ? 'batteryCharging' : 'battery', 15) + '<b>' + mode + '</b>' + (eco.pct != null ? ' ' + eco.pct + '%' : '') + '</span>'];
+  parts.push('<span>' + eco.rest + (eco.rest === 1 ? ' tab resting' : ' tabs resting') + '</span>');
+  parts.push('<span>' + eco.ads + (eco.ads === 1 ? ' ad blocked' : ' ads blocked') + '</span>');
+  ecoEl.innerHTML = parts.join('<i></i>');
   if (eco.lvl >= 2) ecoEl.classList.add('ultra');
 } else ecoEl.remove();
 document.getElementById('f').onsubmit = (e) => {
@@ -107,10 +116,10 @@ const L = document.getElementById('links');
   const a = document.createElement('a');
   a.href = b.u;
   let host = ''; try { host = new URL(b.u).hostname; } catch {}
-  a.innerHTML = '<div class="ic"><img src="https://www.google.com/s2/favicons?sz=64&domain=' + host + '"></div><span></span>';
+  a.innerHTML = '<div class="ic"><img src="https://www.google.com/s2/favicons?sz=64&domain=' + host + '" alt=""></div><span></span>';
   a.querySelector('span').textContent = b.t;
   const img = a.querySelector('img');
-  img.onerror = () => { img.replaceWith(Object.assign(document.createElement('b'), { textContent: (b.t || '?')[0].toUpperCase() })); };
+  img.onerror = () => { img.replaceWith(document.createTextNode((b.t || '?')[0].toUpperCase())); };
   L.appendChild(a);
 });
 const qEl = document.getElementById('q');

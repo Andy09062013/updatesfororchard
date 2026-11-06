@@ -99,8 +99,8 @@
   raf = requestAnimationFrame(tick);
 
   var t = document.createElement('div');
-  t.textContent = '⚓ Unanchored on — run it again to stop';
-  t.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483647;background:#1b1211;color:#ffb83d;font:600 13px system-ui,sans-serif;padding:8px 14px;border-radius:10px;box-shadow:0 8px 24px #0007;pointer-events:none;transition:opacity .4s';
+  t.textContent = 'Unanchored is on. Run it again to turn it off.';
+  t.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483647;background:#2b2d31;color:#e8e9eb;border:1px solid #3a3c41;font:500 13px system-ui,sans-serif;padding:8px 14px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);pointer-events:none;transition:opacity .4s';
   document.documentElement.appendChild(t);
   setTimeout(function () { t.style.opacity = '0'; }, 2500);
   setTimeout(function () { if (t.parentNode) t.remove(); }, 3100);

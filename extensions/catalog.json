@@ -4,13 +4,13 @@
       "id": "unanchored",
       "name": "Unanchored",
       "category": "fun",
-      "icon": "⚓",
+      "icon": "anchor",
       "version": "1.0.0",
       "file": "unanchored.js",
       "inject": true,
-      "description": "Floating bars, buttons and popups fall with gravity. Drag them, throw them, bounce them off the edges, and they still work when u tap them. Run it again to put everything back.",
-      "size": 6043,
-      "sha256": "df7868e4968220e501cb0a113ef11064e61421096f794710b815c32d724528cf"
+      "description": "Floating bars, buttons and pop-ups fall as if affected by gravity. You can drag and throw them, and they remain clickable. Run it again to restore the page.",
+      "size": 6081,
+      "sha256": "fa86ad34aab0a41357122e700eb6006c8c1b08cb0856eb8ed41e59d1da44accf"
     }
   ]
 }
