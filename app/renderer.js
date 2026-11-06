@@ -340,7 +340,6 @@ function renderTab(t) {
   let icon;
   const masked = t.locked && !t.unlocked && lockReady();
   if (masked) icon = '<span class="ticon">' + ic('lock', 14) + '</span>';
-  else if (t.sleeping) icon = '<span class="ticon" title="Sleeping to save battery">' + ic('moon', 14) + '</span>';
   else if (t.loading && !t.frozen) icon = '<span class="spin"></span>';
   else if (t.icon || !isNewtab(t.url)) icon = `<img src="${t.icon || fav(t.url)}" onerror="this.style.visibility='hidden'">`;
   else icon = '<span class="ticon">' + APPLE_MARK + '</span>';

@@ -1,6 +1,6 @@
 {
-  "version": "3.0.1",
-  "notes": "Tab icons now stay at full brightness in both horizontal and vertical tabs, including resting tabs and in Ultra mode.",
+  "version": "3.0.2",
+  "notes": "Resting tabs now show their normal site icon instead of a sleep icon.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -41,7 +41,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "3f8729b0cb7cadf26aaceee8cb8635f5ca5e0537c2497ed5474545637c51a097"
+      "sha256": "d399422a8734fa814e2eaaf39d09ba89af99a54fe870b5e00b08cc3394a96525"
     },
     {
       "path": "preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "fba71ba28fab320bfdab30e381a52e4a9bfb4e866906a484418ae63e2929293f"
+      "sha256": "907f1a2807db8aa4162c50ed4945823be974a8ad0b82cd7e4d77267040090449"
     },
     {
       "path": "throttle.ps1",
