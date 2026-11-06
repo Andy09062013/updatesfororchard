@@ -812,9 +812,12 @@ window.aura.on('chat-event', (ev) => {
   if (ev.t === 'unread') chatBadge(Math.max(0, +ev.n || 0));
   if (ev.t === 'notify') {
     if (store.settings.chatNotify === false) return;
-    const looking = aiOpen && aiWhich === 'chat' && ev.open && document.hasFocus();
-    if (looking) return;
-    if (document.hasFocus()) showNote(ev); else window.aura.nativeNote(ev);
+    // already reading that conversation in the side panel: nothing to show
+    if (aiOpen && aiWhich === 'chat' && ev.open) return;
+    // always show the card inside Orchard; the main process adds a Windows
+    // notification only when the Orchard window is not focused
+    showNote(ev);
+    window.aura.nativeNote(ev);
   }
 });
 window.aura.on('chat-open', (id) => openChatTo(id));

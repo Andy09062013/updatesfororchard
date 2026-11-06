@@ -287,6 +287,7 @@ ipcMain.on('chat-native-note', (e, n) => {
   try {
     if (!Notification.isSupported()) return;
     const w = BrowserWindow.fromWebContents(e.sender);
+    if (w && !w.isDestroyed() && w.isFocused() && !w.isMinimized()) return; // the in-browser card is enough
     const note = new Notification({ title: String(n.title || 'Codeline').slice(0, 80), body: ((n.group && n.from) ? n.from + ': ' : '') + String(n.text || '').slice(0, 200), icon: path.join(__dirname, 'icon.png'), silent: false });
     note.on('click', () => { if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send('chat-open', String(n.chat || '')); } });
     note.show();
