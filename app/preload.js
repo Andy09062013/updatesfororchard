@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('aura', {
   notify: (n) => ipcRenderer.send('native-note', n),
   nativeNote: (n) => ipcRenderer.send('chat-native-note', n),
   chatOpen: (id) => ipcRenderer.send('chat-open-id', id),
+  chatVisible: (id, v) => ipcRenderer.send('chat-visible', id, v),
+  defaultBrowser: { status: () => ipcRenderer.invoke('default-browser-status'), set: () => ipcRenderer.invoke('default-browser-set') },
   ext: {
     catalog: () => ipcRenderer.invoke('ext-catalog'),
     list: () => ipcRenderer.invoke('ext-list'),

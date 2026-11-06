@@ -1,6 +1,6 @@
 {
-  "version": "3.1.1",
-  "notes": "Chat notifications now always appear inside the browser window, even while you are using a web page. A Windows notification is added only when Orchard is not the active window.",
+  "version": "3.2.0",
+  "notes": "Make Orchard your default browser: Orchard asks once, and Settings has a Make default button that opens the Windows setting for it. Links clicked in other apps now open as tabs in the Orchard window you already have open. Chat notifications: a Send a test button in Settings, and messages are no longer marked as read while the chat panel is closed.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,11 +29,11 @@
     },
     {
       "path": "index.html",
-      "sha256": "8e939b40e31f1e0284ee52ac56694f475c2780844f9edb909c6d22f6c1c49d4c"
+      "sha256": "2fcceb5351678fe36f508b72e4314aa0fdb1ee69fdd21bbe1fb3cdb7e7e227bb"
     },
     {
       "path": "main.js",
-      "sha256": "d0114fce3541908cfc67adbd31f224627eadd45bfff69c2e037659c981a93ca4"
+      "sha256": "2ff310bfb84a5cc8cf6462d0e6acc4c6aed797d1ee57cacafe7f6b3083da351c"
     },
     {
       "path": "newtab.html",
@@ -41,11 +41,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "11b9b62f0f46fb7e3be9c071b886b2b87dadffc0e8435112a3819c8e6f01954a"
+      "sha256": "98ddc319c7833d63935f42fb200195dccebd69b098678ab6508af648d6d4eb3f"
     },
     {
       "path": "preload.js",
-      "sha256": "3f5fd38dd68ceff7f8616e5694d003505d562c2d760649c9baf405f9bafbb97b"
+      "sha256": "18bd8ca55fe4ea800595feb9e9e063980203bf1ac1eead96bf4f992dc0f23bf1"
     },
     {
       "path": "pw-preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "64b3257a140a1628f738879bf98f8420ce3b613f61fa25fb50d6e426e1e55bfa"
+      "sha256": "01085394b0c1a060fab43e286a7114e3875866db607146988de3296bc9d34d59"
     },
     {
       "path": "throttle.ps1",

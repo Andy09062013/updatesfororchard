@@ -12,6 +12,38 @@ try {
   const oldDir = path.join(app.getPath('appData'), 'Aura Browser');
   if (fs.existsSync(oldDir)) app.setPath('userData', oldDir);
 } catch {}
+
+// ---------- one Orchard at a time: links opened from other apps become tabs here ----------
+const RELAUNCH_FLAG = '--orchard-relaunch';
+const lockReady = new Promise((resolve) => {
+  if (app.requestSingleInstanceLock()) return resolve(true);
+  if (!process.argv.includes(RELAUNCH_FLAG)) { app.quit(); return resolve(false); }
+  // restarted for an update: the previous copy may still be closing, so wait for it
+  let tries = 0;
+  const iv = setInterval(() => {
+    if (app.requestSingleInstanceLock()) { clearInterval(iv); resolve(true); }
+    else if (++tries > 40) { clearInterval(iv); app.quit(); resolve(false); }
+  }, 150);
+});
+function urlFromArgs(argv) {
+  for (const a of (argv || []).slice(1)) {
+    if (typeof a !== 'string' || a.startsWith('-')) continue;
+    if (/^(https?|file):\/\//i.test(a)) return a;
+    if (/\.(html?|xhtml|pdf|svg|txt)$/i.test(a)) { try { if (fs.existsSync(a)) return pathToFileURL(path.resolve(a)).href; } catch {} }
+  }
+  return null;
+}
+let lastFocusedWin = null;
+app.on('browser-window-focus', (e, w) => { lastFocusedWin = w; });
+app.on('second-instance', (e, argv) => {
+  const alive = (w) => w && !w.isDestroyed();
+  const w = [BrowserWindow.getFocusedWindow(), lastFocusedWin, BrowserWindow.getAllWindows()[0]].find(alive);
+  const url = urlFromArgs(argv);
+  if (!w) { createWindow('default', url ? { url } : {}); return; }
+  if (url) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send('open-tab', { url, bg: false }); return; }
+  const pid = winProfile.get(w.webContents.id);
+  createWindow(pid && pid !== 'guest' ? pid : 'default'); // launching Orchard again opens a new window, like Chrome
+});
 const dataDir = app.getPath('userData');
 if (process.platform === 'win32') { try { app.setAppUserModelId('Orchard.Browser'); } catch {} }
 const profilesFile = path.join(dataDir, 'profiles.json');
@@ -184,7 +216,8 @@ function windowFor(profileId) {
   return null;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (!(await lockReady)) return;
   Menu.setApplicationMenu(null);
   // look like normal chrome so google/gemini logins dont freak out
   app.userAgentFallback = app.userAgentFallback.replace(/\s?(Electron|aura-browser|AuraBrowser|orchard-browser|Orchard)\/\S+/gi, '');
@@ -194,6 +227,9 @@ app.whenReady().then(() => {
   if (!reopen.length) reopen = [getProfile(lastUsed) ? lastUsed : profiles[0].id];
   const win = createWindow(reopen[0]);
   reopen.slice(1).forEach(id => createWindow(id));
+  // started by clicking a link in another app: open it as a tab once the window is ready
+  const startUrl = urlFromArgs(process.argv);
+  if (startUrl) win.webContents.once('did-finish-load', () => setTimeout(() => { if (!win.isDestroyed()) win.webContents.send('open-tab', { url: startUrl, bg: false }); }, 1500));
   if (process.env.AURA_SHOT) {
     if (process.env.AURA_TEST) setTimeout(() => win.webContents.executeJavaScript(process.env.AURA_TEST).catch(e => console.log('TESTERR', e)), 2500);
     app.on('browser-window-created', (e, w) => w.webContents.on('console-message', (ev) => { const m = ev.message || ''; if (m.startsWith('T:')) console.log(m); }));
@@ -224,7 +260,7 @@ app.on('web-contents-created', (e, contents) => {
       const msg = (ev && typeof ev.message === 'string') ? ev.message : message;
       if (typeof msg !== 'string' || !msg.startsWith('%ORCHARD%')) return;
       let url = ''; try { url = contents.getURL(); } catch {}
-      if (!CHAT_URLS.some(u => url.startsWith(u))) return;
+      if (!CHAT_URLS.some(u => url.startsWith(u)) && !url.startsWith('https://claude.ai/')) return;
       try { const d = JSON.parse(msg.slice(9)); if (d && (d.t === 'notify' || d.t === 'unread')) { chatContents.add(contents); sendTo(contents.hostWebContents, 'chat-event', { t: d.t, n: d.n, chat: String(d.chat || '').slice(0, 80), title: String(d.title || '').slice(0, 80), from: String(d.from || '').slice(0, 60), text: String(d.text || '').slice(0, 200), group: !!d.group, open: !!d.open }); } } catch {}
     });
     // orchard://tool/<name> links on the new tab page open browser features
@@ -639,7 +675,7 @@ app.whenReady().then(() => {
 });
 ipcMain.handle('update-check', () => checkForUpdate());
 ipcMain.handle('app-version', () => ({ version: MY_VERSION, pending: pendingUpdate }));
-ipcMain.on('update-restart', () => { thrShutdown().then(() => { app.relaunch(); app.exit(0); }); });
+ipcMain.on('update-restart', () => { thrShutdown().then(() => { app.relaunch({ args: process.argv.slice(1).filter(a => a !== RELAUNCH_FLAG).concat([RELAUNCH_FLAG]) }); app.exit(0); }); });
 
 // ---------- Orchard Mail: Gmail through Google's official desktop sign-in ----------
 // Sign-in happens in the user's normal browser (Chrome) with a loopback redirect +
@@ -1097,3 +1133,51 @@ ipcMain.handle('pw-reveal', (e, origin, user) => { const c = pwLoad(profileOf(e)
 ipcMain.handle('pw-delete', (e, origin, user) => { const id = profileOf(e), c = pwLoad(id); c.list = c.list.filter(it => !(it.origin === origin && it.user === user)); pwSave(id); return true; });
 
 app.on('window-all-closed', () => app.quit());
+
+// ---------- chat panel visibility -> Codeline (so hidden chat does not mark messages read) ----------
+ipcMain.on('chat-visible', async (e, wcId, visible) => {
+  const wc = webContents.fromId(+wcId);
+  if (!wc || wc.isDestroyed()) return;
+  for (const f of wc.mainFrame.framesInSubtree) {
+    try { await f.executeJavaScript(`typeof window.__orchardVisible === 'function' && (window.__orchardVisible(${visible ? 'true' : 'false'}), true)`); } catch {}
+  }
+});
+
+// ---------- default browser (Windows) ----------
+// Windows does not let apps make themselves the default. Orchard registers itself as a browser
+// (so it appears in Windows' list), then opens Windows' own settings page for it.
+const regRun = (args) => new Promise((res) => require('child_process').execFile('reg', args, { windowsHide: true }, (err, out) => res(err ? null : String(out))));
+async function registerBrowser() {
+  if (process.platform !== 'win32') return false;
+  const exe = process.execPath, cmd = `"${exe}" "%1"`, icon = `"${exe}",0`;
+  const C = 'HKCU\\Software\\Classes', K = 'HKCU\\Software\\Clients\\StartMenuInternet\\Orchard';
+  const set = (key, name, val) => regRun(['add', key, ...(name === null ? ['/ve'] : ['/v', name]), '/t', 'REG_SZ', '/d', val, '/f']);
+  const steps = [
+    [C + '\\OrchardURL', null, 'Orchard URL'], [C + '\\OrchardURL', 'URL Protocol', ''],
+    [C + '\\OrchardURL\\DefaultIcon', null, icon], [C + '\\OrchardURL\\shell\\open\\command', null, cmd],
+    [C + '\\OrchardHTML', null, 'Orchard HTML Document'], [C + '\\OrchardHTML\\DefaultIcon', null, icon], [C + '\\OrchardHTML\\shell\\open\\command', null, cmd],
+    [K, null, 'Orchard'], [K + '\\DefaultIcon', null, icon], [K + '\\shell\\open\\command', null, `"${exe}"`],
+    [K + '\\Capabilities', 'ApplicationName', 'Orchard'], [K + '\\Capabilities', 'ApplicationDescription', 'The battery saving browser'], [K + '\\Capabilities', 'ApplicationIcon', icon],
+    [K + '\\Capabilities\\URLAssociations', 'http', 'OrchardURL'], [K + '\\Capabilities\\URLAssociations', 'https', 'OrchardURL'],
+    [K + '\\Capabilities\\FileAssociations', '.html', 'OrchardHTML'], [K + '\\Capabilities\\FileAssociations', '.htm', 'OrchardHTML'],
+    [K + '\\Capabilities\\StartMenu', 'StartMenuInternet', 'Orchard'],
+    ['HKCU\\Software\\RegisteredApplications', 'Orchard', 'Software\\Clients\\StartMenuInternet\\Orchard\\Capabilities'],
+  ];
+  for (const [k, n, v] of steps) await set(k, n, v);
+  return true;
+}
+async function isDefaultBrowser() {
+  if (process.platform !== 'win32') return null;
+  const out = await regRun(['query', 'HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice', '/v', 'ProgId']);
+  return !!(out && /OrchardURL/i.test(out));
+}
+ipcMain.handle('default-browser-status', async () => ({ supported: process.platform === 'win32', isDefault: await isDefaultBrowser() }));
+ipcMain.handle('default-browser-set', async () => {
+  if (process.platform !== 'win32') return false;
+  await registerBrowser();
+  shell.openExternal('ms-settings:defaultapps?registeredAppUser=Orchard').catch(() => shell.openExternal('ms-settings:defaultapps'));
+  return true;
+});
+// keep the registration pointing at the current Orchard.exe (what browser installers do)
+app.whenReady().then(() => setTimeout(() => { lockReady.then(ok => { if (ok) registerBrowser(); }); }, 8000));
+

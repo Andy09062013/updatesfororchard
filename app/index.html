@@ -84,6 +84,9 @@ body.tearing{cursor:copy}
 .bmi{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:var(--r);color:var(--txt);cursor:pointer;white-space:nowrap;font-size:12px}
 .bmi:hover{background:#ffffff12}
 .bmi img{width:14px;height:14px}
+#dbBar{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--line2);font-size:12.5px}
+#dbBar .dbic{color:var(--dim);display:grid}
+#dbBar .dbt{flex:1}
 #progress{height:2px;background:var(--acc);width:0;transition:width .3s var(--ease),opacity .4s}
 
 /* ---- page area ---- */
@@ -146,6 +149,7 @@ body.vtabs.vcol #newtab::after{display:none}
 .row.cur{background:#ffffff0a}
 .set{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 12px}
 .set select{max-width:62%;min-width:0}
+.set .pbtn{white-space:nowrap;flex:none}
 select,.pbtn{background:var(--field);color:var(--txt);border:1px solid var(--line);border-radius:var(--r);padding:5px 10px;font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .pbtn:hover{border-color:#55585f;background:#202125}
 .pbtn.ok{background:var(--acc);border-color:var(--acc);color:#fff}

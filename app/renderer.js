@@ -249,6 +249,36 @@ function dragStepV(e) {
   }
 }
 
+// ---- default browser (Windows) ----
+async function makeDefaultBrowser() {
+  const ok = await window.aura.defaultBrowser.set();
+  if (ok) toast('Windows settings are open. Select Set default next to Orchard.');
+  hideDefaultBar();
+}
+async function fillDefaultBrowserRow() {
+  let s; try { s = await window.aura.defaultBrowser.status(); } catch { return; }
+  const box = $('dbBox'); if (!box || !s || !s.supported) return;
+  box.hidden = false;
+  if (s.isDefault) { $('dbTxt').textContent = 'Orchard is your default browser'; $('dbSet').remove(); }
+  else $('dbSet').onclick = makeDefaultBrowser;
+}
+function hideDefaultBar() { const b = $('dbBar'); if (b) b.remove(); }
+async function maybeAskDefaultBrowser() {
+  if (store.settings.dbNoAsk || Date.now() < (store.settings.dbAskAfter || 0) || guestMode()) return;
+  let s; try { s = await window.aura.defaultBrowser.status(); } catch { return; }
+  if (!s || !s.supported || s.isDefault || $('dbBar')) return;
+  const bar = document.createElement('div'); bar.id = 'dbBar';
+  bar.innerHTML = `<span class="dbic">${ic('globe', 16)}</span><span class="dbt">Orchard is not your default browser.</span><span class="pbtn ok mini" data-a="set">Make default</span><span class="pbtn mini" data-a="later">Not now</span><span class="pbtn mini" data-a="never">Do not ask again</span>`;
+  bar.onclick = (e) => {
+    const a = e.target.dataset.a; if (!a) return;
+    if (a === 'set') makeDefaultBrowser();
+    else { if (a === 'never') store.settings.dbNoAsk = true; else store.settings.dbAskAfter = Date.now() + 7 * 864e5; save(); hideDefaultBar(); }
+  };
+  $('bm').after(bar);
+}
+function guestMode() { return document.body.classList.contains('guestmode'); }
+setTimeout(maybeAskDefaultBrowser, 5000);
+
 // ---- vertical tabs, like Chrome ----
 function applyVTabs() {
   const on = !!store.settings.vtabs;
@@ -775,7 +805,8 @@ function ensureChat() {
   if (store.partition) chatWv.setAttribute('partition', store.partition);
   chatWv.setAttribute('allowpopups', '');
   chatWv.setAttribute('src', AIS.chat);
-  chatWv.addEventListener('dom-ready', () => { try { chatWcId = chatWv.getWebContentsId(); } catch {} });
+  // Codeline loads a moment after the page, so tell it again whether the panel is showing
+  chatWv.addEventListener('dom-ready', () => { try { chatWcId = chatWv.getWebContentsId(); } catch {} placeChat(); setTimeout(placeChat, 4000); setTimeout(placeChat, 10000); });
   $('chatHold').appendChild(chatWv);
 }
 function placeChat() {
@@ -783,7 +814,7 @@ function placeChat() {
   hold.classList.toggle('show', on);
   if (on) { const r = $('sbody').getBoundingClientRect(); Object.assign(hold.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); setTimeout(() => chatWv && chatWv.focus(), 80); }
   else Object.assign(hold.style, { left: '-20px', top: '-20px', width: '2px', height: '2px' });
-  if (chatWcId != null) window.aura.freeze(chatWcId, !on && (store.settings.chatNotify === false || saverLevel() >= 2));
+  if (chatWcId != null) { window.aura.freeze(chatWcId, !on && (store.settings.chatNotify === false || saverLevel() >= 2)); window.aura.chatVisible(chatWcId, on); }
 }
 try { new ResizeObserver(() => { if (aiOpen && aiWhich === 'chat') placeChat(); }).observe($('sbody')); } catch {}
 window.addEventListener('resize', () => placeChat());
@@ -1037,7 +1068,8 @@ function renderSettings() {
   const sw = (on, id) => `<span class="sw${on ? ' on' : ''}" id="${id}"></span>`;
   const sel = (id, opts) => `<select id="${id}">${opts}</select>`;
   list.innerHTML =
-    hd('Search')
+    `<div id="dbBox" hidden>${hd('Default browser')}<div class="set"><span id="dbTxt">Orchard is not your default browser</span><span class="pbtn ok" id="dbSet">Make default</span></div></div>`
+    + hd('Search')
     + `<div class="set">Search engine ${sel('eng', Object.keys(ENGINES).map(k => `<option value="${k}" ${S.engine === k ? 'selected' : ''}>${({ google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing', brave: 'Brave Search' })[k] || k}</option>`).join(''))}</div>`
     + `<div class="set">Search suggestions ${sw(S.suggest !== false, 'sgT')}</div>`
     + hd('Battery')
@@ -1054,6 +1086,7 @@ function renderSettings() {
     + hd('Assistant, chat and mail')
     + `<div class="set">Assistant in side panel ${sel('aiDef', [['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
     + `<div class="set">Chat notifications ${sw(S.chatNotify !== false, 'cnT')}</div>`
+    + `<div class="set">Check notifications <span class="pbtn" id="cnTest">Send a test</span></div>`
     + `<div class="set">Orchard Mail <span class="pbtn" id="mailOpen">Open</span></div>`
     + hd('Tab lock')
     + `<div class="set">Tab lock password <span style="display:flex;gap:6px">${S.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>`
@@ -1091,6 +1124,8 @@ function renderSettings() {
   if ($('pwMng')) $('pwMng').onclick = () => openPanel('passwords');
   toggle('askDl', () => !!store.settings.askDownload, (v) => { store.settings.askDownload = v; save(); });
   toggle('vtT', () => !!store.settings.vtabs, (v) => setVTabs(v));
+  if ($('cnTest')) $('cnTest').onclick = () => showNote({ chat: '', title: 'Test notification', from: 'Orchard', text: 'Chat notifications will appear here.' });
+  fillDefaultBrowserRow();
   toggle('cvT2', () => store.settings.cheapVideo !== false, (v) => { store.settings.cheapVideo = v; save(); syncThrottle(); });
   toggle('slowT2', () => store.settings.slowApps !== false, (v) => { store.settings.slowApps = v; save(); syncThrottle(); });
   $('battOpen').onclick = () => openPanel('battery');
