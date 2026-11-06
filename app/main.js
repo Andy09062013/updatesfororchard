@@ -61,6 +61,19 @@ const sendTo = (wc, ch, d) => { if (wc && !wc.isDestroyed()) wc.send(ch, d); };
 const setUp = new Set();
 const downloads = new Map();
 let dlId = 0;
+// download history, shared across every window and kept between runs
+const dlFile = path.join(dataDir, 'downloads.json');
+const dlHistory = new Map();
+try { JSON.parse(fs.readFileSync(dlFile, 'utf8')).forEach(d => dlHistory.set(d.id, d)); if (dlHistory.size) dlId = Math.max(...dlHistory.keys()); } catch {}
+let dlSaveT = null;
+function saveDlHistory() { clearTimeout(dlSaveT); dlSaveT = setTimeout(() => { try { fs.writeFileSync(dlFile, JSON.stringify([...dlHistory.values()].slice(-100))); } catch {} }, 400); }
+// record a download update and push it to every open window so they stay in sync
+function emitDl(d) {
+  dlHistory.set(d.id, d);
+  while (dlHistory.size > 120) dlHistory.delete(dlHistory.keys().next().value);
+  saveDlHistory();
+  BrowserWindow.getAllWindows().forEach(w => { try { w.webContents.send('dl', d); } catch {} });
+}
 // "report.pdf" -> "report (1).pdf" if it's already there (or being downloaded right now), like Chrome
 const reservedDl = new Set();
 function uniqueDownloadPath(name) {
@@ -79,9 +92,9 @@ function setupSession(id) {
   const profId = id;
   const ses = sessionFor(id);
   try {
-    const vp = path.join(__dirname, 'video-preload.js'), pw = path.join(__dirname, 'pw-preload.js');
-    if (typeof ses.registerPreloadScript === 'function') { ses.registerPreloadScript({ type: 'frame', id: 'orchard-video', filePath: vp }); ses.registerPreloadScript({ type: 'frame', id: 'orchard-pw', filePath: pw }); }
-    else ses.setPreloads([...ses.getPreloads(), vp, pw]);
+    const vp = path.join(__dirname, 'video-preload.js'), pw = path.join(__dirname, 'pw-preload.js'), fp = path.join(__dirname, 'fps-preload.js');
+    if (typeof ses.registerPreloadScript === 'function') { ses.registerPreloadScript({ type: 'frame', id: 'orchard-video', filePath: vp }); ses.registerPreloadScript({ type: 'frame', id: 'orchard-pw', filePath: pw }); ses.registerPreloadScript({ type: 'frame', id: 'orchard-fps', filePath: fp }); }
+    else ses.setPreloads([...ses.getPreloads(), vp, pw, fp]);
   } catch {}
   ses.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, cb) => {
     if (storeFor(id).settings.adblock) {
@@ -107,11 +120,11 @@ function setupSession(id) {
       item.setSavePath(savePath);
     }
     const info = (state) => ({ id, name: path.basename(item.getSavePath() || savePath || item.getFilename()), url: item.getURL(), received: item.getReceivedBytes(), total: item.getTotalBytes(), state, paused: item.isPaused(), path: item.getSavePath() || savePath, time: Date.now() });
-    sendTo(host, 'dl', info('progressing'));
+    emitDl(info('progressing'));
     item.once('done', () => reservedDl.delete(savePath));
     let last = 0;
-    item.on('updated', (ev, state) => { if (Date.now() - last > 250) { last = Date.now(); sendTo(host, 'dl', info(state)); } });
-    item.once('done', (ev, state) => { sendTo(host, 'dl', info(state)); sendTo(host, 'download', { name: item.getFilename(), state, path: item.getSavePath() }); });
+    item.on('updated', (ev, state) => { if (Date.now() - last > 250) { last = Date.now(); emitDl(info(state)); } });
+    item.once('done', (ev, state) => { emitDl(info(state)); sendTo(host, 'download', { name: item.getFilename(), state, path: item.getSavePath() }); });
   });
 }
 
@@ -394,6 +407,7 @@ ipcMain.on('emulate', (e, id, o) => {
 ipcMain.handle('on-battery', () => { try { return powerMonitor.isOnBatteryPower(); } catch { return false; } });
 ipcMain.on('show-file', (e, p) => shell.showItemInFolder(p));
 ipcMain.on('open-file', (e, p) => shell.openPath(p));
+ipcMain.handle('dl-history', () => [...dlHistory.values()].sort((a, b) => a.id - b.id));
 ipcMain.on('dl-action', (e, id, a) => {
   const it = downloads.get(id);
   if (!it) return;

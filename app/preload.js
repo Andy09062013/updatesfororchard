@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('aura', {
   deleteProfile: (id) => ipcRenderer.invoke('profile-delete', id),
   openFile: (p) => ipcRenderer.send('open-file', p),
   dlAction: (id, a) => ipcRenderer.send('dl-action', id, a),
+  dlHistory: () => ipcRenderer.invoke('dl-history'),
   metrics: (list) => ipcRenderer.invoke('metrics', list),
   speedStart: () => ipcRenderer.send('speed-start'),
   speedStop: () => ipcRenderer.send('speed-stop'),

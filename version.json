@@ -1,6 +1,6 @@
 {
-  "version": "2.6.1",
-  "notes": "Fixed the Unanchored extension not loading (it saved as the wrong file type), and it now also drops absolutely-positioned floating UI so it works on more sites",
+  "version": "2.7.0",
+  "notes": "Click anywhere on a finished download to open it, downloads now sync across every window and survive restarts, tabs cap their frame rate on battery (30fps Saver / 20fps Ultra) to save more power, and Ultra's auto dark pages can be turned off",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -16,6 +16,10 @@
       "sha256": "9da6f9d188af809aae3af929fc349eb4ace15898a7c9b1598cecf124f82ed1d7"
     },
     {
+      "path": "fps-preload.js",
+      "sha256": "4918ab8e6a5a63e14a29aa4f3fed4e76580b49ea6411afe0578ecd85021f273b"
+    },
+    {
       "path": "icon.ico",
       "sha256": "27cff1c7d671e67697f78a0298dde6cba0ff9f364237d5135a535e63c6c64c27"
     },
@@ -29,7 +33,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "740a1645da1ca0f83f3447fbb1d2677d8181c9145ff19bff343f1118e2b37c6b"
+      "sha256": "38b999d37d0414019c903a65cd3877c880f94b44b7a6e15a639bc865cadda2b7"
     },
     {
       "path": "newtab.html",
@@ -37,11 +41,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "5ff47a72b7e881bbede148806cf65906795774c2a903beb7075e3de7d000aa84"
+      "sha256": "79302c32bb2f7fe7709b506dd8c4fd5ce7e2a7578c56319dca6e2a4a7745ee7d"
     },
     {
       "path": "preload.js",
-      "sha256": "34f9c7ff15a6415bc0639e2d4b36ef81b8b9eb81e3631a47fab35e01f3606b3e"
+      "sha256": "ba54c78cd68a81ab41dc0f6bd026b71446fc22b870b973d6bc6e66ea6228d3c4"
     },
     {
       "path": "pw-preload.js",
@@ -49,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "c1ba38f3c26384b8ece72e9fbc0c5540287cb41727439c39d0e5360453edcaad"
+      "sha256": "ac3d95dfa84ea6ae8c0fef1d2011cbf88524c80817862e38adf792c59085a69d"
     },
     {
       "path": "throttle.ps1",

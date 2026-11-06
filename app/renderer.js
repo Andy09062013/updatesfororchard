@@ -37,7 +37,7 @@ function makeWebview(t, url) {
   wv.addEventListener('focus', () => { if (t !== active && isShown(t)) activate(t); });
   t.wv = wv; t.ready = false; t.loading = true; t.frozen = false; t.sleeping = false;
 
-  wv.addEventListener('dom-ready', () => { t.ready = true; try { t.wcId = wv.getWebContentsId(); } catch {} emulateFor(t); t.hideKey = null; applyHides(t); if (t === active) updateNav(); else if (!isShown(t)) scheduleFreeze(t); });
+  wv.addEventListener('dom-ready', () => { t.ready = true; try { t.wcId = wv.getWebContentsId(); } catch {} emulateFor(t); sendFps(t); t.hideKey = null; applyHides(t); if (t === active) updateNav(); else if (!isShown(t)) scheduleFreeze(t); });
   wv.addEventListener('did-start-loading', () => { t.loading = true; renderTab(t); if (t === active) progress(30); });
   wv.addEventListener('did-stop-loading', () => { t.loading = false; renderTab(t); if (t === active) { progress(100); updateNav(); } });
   wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
@@ -218,7 +218,7 @@ function saverActive() { return saverLevel() > 0; }
 function emulateFor(t) {
   if (!t || !t.ready || t.wcId == null || t.frozen) return;
   const lvl = saverLevel();
-  window.aura.emulate(t.wcId, { reducedMotion: lvl >= 1, dark: lvl >= 2 || !!store.settings.darkPages });
+  window.aura.emulate(t.wcId, { reducedMotion: lvl >= 1, dark: (lvl >= 2 && store.settings.ultraDark !== false) || !!store.settings.darkPages });
 }
 function freeze(t, f) {
   if (!t.wv || !t.ready || t.wcId == null || t.frozen === f) return;
@@ -264,11 +264,16 @@ function updateSaverUI() {
 }
 let thrStat = { supported: false, active: false, count: 0, apps: [] };
 function syncThrottle() { window.aura.videoMode({ on: store.settings.cheapVideo !== false, level: saverLevel() }); window.aura.throttle({ on: store.settings.slowApps !== false, level: saverLevel(), exclude: store.settings.slowExclude || [] }); }
+// cap each tab's frame rate on battery (30fps Saver, 20fps Ultra) to cut GPU/CPU work
+function fpsCap() { if (store.settings.capFps === false) return 0; const lvl = saverLevel(); return lvl >= 2 ? 20 : lvl === 1 ? 30 : 0; }
+function sendFps(t) { try { if (t && t.wv && t.ready) t.wv.send('orchard-fps', fpsCap()); } catch {} }
+function applyFps() { const c = fpsCap(); tabs.forEach(t => { try { if (t.wv && t.ready) t.wv.send('orchard-fps', c); } catch {} }); }
 window.aura.on('throttle-status', (s) => { thrStat = s || thrStat; if (panelIs('battery')) renderBattery(); });
 window.aura.throttleStatus().then(s => { thrStat = s || thrStat; });
 function applySaver() {
   const lvl = saverLevel();
   syncThrottle();
+  applyFps();
   updateSaverUI();
   tabs.forEach(t => { if (!isShown(t) && t.ready) scheduleFreeze(t); emulateFor(t); });
   if (lvl >= 2 && lastLvl < 2 && lastLvl !== -1) { tabs.forEach(t => { if (!isShown(t)) sleepTab(t); }); toast('Ultra saver on 🥶 background tabs asleep, pages calmed down'); }
@@ -1580,15 +1585,23 @@ function renderDownloads() {
       <div class="rt"><div></div><small>${esc(status)}</small>${d.state === 'progressing' ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}</div>
       <div style="display:flex;gap:4px;flex-direction:column">${d.state === 'completed' ? '<span class="pbtn mini" data-a="open">Open</span><span class="pbtn mini" data-a="show">Folder</span>' : d.state === 'progressing' ? `<span class="pbtn mini" data-a="${d.paused ? 'resume' : 'pause'}">${d.paused ? 'Resume' : 'Pause'}</span><span class="pbtn mini" data-a="cancel">Cancel</span>` : ''}</div>`;
     r.querySelector('.rt div').textContent = d.name;
+    if (d.state === 'completed') { r.style.cursor = 'pointer'; r.title = 'Click to open ' + d.name; }
     r.onclick = (e) => {
       const a = e.target.dataset.a;
       if (a === 'open') window.aura.openFile(d.path);
       else if (a === 'show') window.aura.showFile(d.path);
       else if (a) window.aura.dlAction(d.id, a);
+      else if (d.state === 'completed') window.aura.openFile(d.path); // click anywhere on the row opens it
     };
     list.appendChild(r);
   });
 }
+// load downloads shared from other windows / past runs so every window matches
+window.aura.dlHistory().then(list => {
+  (list || []).forEach(d => { if (!dls.has(d.id)) dls.set(d.id, d); });
+  updateDlBtn();
+  if (panelIs('downloads')) renderDownloads();
+}).catch(() => {});
 window.aura.on('dl', (d) => {
   const prev = dls.get(d.id);
   if (!prev && d.state === 'progressing') toast('⬇ downloading ' + d.name);
@@ -1664,13 +1677,17 @@ async function renderBattery() {
       <div><span>Orchard CPU</span><b>${totalCpu.toFixed(1)}%</b><span>of your PC</span></div>
       <div><span>Energy</span><b class="${tc}">${tl}</b><span>${fmtB(m.total.mem * 1024)} RAM</span></div></div>
     <div class="set">Battery saver <select id="svr2">${SAVER_OPTS}</select></div>
-    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> (always on): background tabs freeze after 15s, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' min, ads blocked, background timers throttled.', '<b style="color:var(--leaf)">Saver</b>: tabs freeze after 3s and sleep after 2 min, videos never autoplay and use cheaper formats (YouTube max 720p), websites told to cut animations, Orchard\'s own animations off' + (thrStat.supported && store.settings.slowApps !== false ? ', other apps in the background slowed down.' : '.'), '<b style="color:#ffb83d">Ultra</b>: everything in Saver, plus every background tab sleeps right away, YouTube drops to 480p, pages go dark (saves power on OLED screens)' + (thrStat.supported && store.settings.slowApps !== false ? ' and background apps drop to the lowest priority.' : '.')][saverLevel()]}</div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${['<b style="color:var(--txt)">Eco</b> (always on): background tabs freeze after 15s, unused tabs sleep after ' + (store.settings.sleepMins || 5) + ' min, ads blocked, background timers throttled.', '<b style="color:var(--leaf)">Saver</b>: tabs freeze after 3s and sleep after 2 min, videos never autoplay and use cheaper formats (YouTube max 720p), websites told to cut animations, Orchard\'s own animations off' + (thrStat.supported && store.settings.slowApps !== false ? ', other apps in the background slowed down.' : '.'), '<b style="color:#ffb83d">Ultra</b>: everything in Saver, plus every background tab sleeps right away, YouTube drops to 480p' + (store.settings.ultraDark === false ? '' : ', pages go dark (saves power on OLED screens)') + (thrStat.supported && store.settings.slowApps !== false ? ' and background apps drop to the lowest priority.' : '.')][saverLevel()]}</div>
     ${thrStat.supported ? `<div class="set">Slow down other apps on battery <span class="pbtn" id="slowT">${store.settings.slowApps === false ? 'OFF' : 'ON'}</span></div>
     <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6">${store.settings.slowApps === false ? 'Off. Other apps run at full speed.' : saverLevel() === 0 ? 'Kicks in when u unplug. Background apps get lower priority and Windows Efficiency mode, the app in front always stays full speed.' : thrStat.count ? `&#128034; Slowing <b style="color:var(--txt)">${thrStat.count}</b> background process${thrStat.count === 1 ? '' : 'es'}${saverLevel() >= 2 ? ' (Ultra: lowest priority)' : ''}. Tap one to keep it full speed:` : 'Checking ur apps…'}</div>
     ${thrStat.count && store.settings.slowApps !== false && saverLevel() > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 10px" id="slowList">${thrStat.apps.slice(0, 30).map(a => `<span class="pbtn mini" data-app="${esc(a)}" title="Keep ${esc(a)} at full speed">${esc(a)} &#10005;</span>`).join('')}</div>` : ''}
     ${(store.settings.slowExclude || []).length ? `<div class="set" style="display:block;font-size:12px;color:var(--dim)">Never slowed: ${(store.settings.slowExclude || []).map(a => `<span class="pbtn mini" data-unskip="${esc(a)}" title="Let Orchard slow it again">${esc(a)} &#8635;</span>`).join(' ')}</div>` : ''}` : ''}
     <div class="set">Cheaper videos on battery <span class="pbtn" id="cvT">${store.settings.cheapVideo === false ? 'OFF' : 'ON'}</span></div>
     <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Sites send the H.264 video format ur graphics chip plays cheaply, and YouTube is capped at 720p (480p in Ultra). Reload a video tab for it to kick in.</div>
+    <div class="set">Cap tab frame rate on battery <span class="pbtn" id="fpsT">${store.settings.capFps === false ? 'OFF' : 'ON'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Slows animations and game loops to 30fps in Saver, 20fps in Ultra, so pages draw less. Video keeps playing normally.</div>
+    <div class="set">Auto dark pages in Ultra <span class="pbtn" id="udk">${store.settings.ultraDark === false ? 'OFF' : 'ON'}</span></div>
+    <div class="set" style="display:block;font-size:12px;color:var(--dim);line-height:1.6;padding-top:0">Off: Ultra won't force pages dark. The "Dark pages always" switch below still works.</div>
     <div class="set">Dark pages always <span class="pbtn" id="dkp">${store.settings.darkPages ? 'ON' : 'OFF'}</span></div>
     <div class="set">Rest all other tabs now <span class="pbtn" id="restNow">&#128164; Rest</span></div>
     <div style="padding:2px 12px 4px;font-size:11px;color:var(--dim)">PER TAB</div>`;
@@ -1685,6 +1702,8 @@ async function renderBattery() {
   $('svr2').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); renderBattery(); };
   $('dkp').onclick = () => { store.settings.darkPages = !store.settings.darkPages; save(); applySaver(); renderBattery(); };
   $('cvT').onclick = () => { store.settings.cheapVideo = store.settings.cheapVideo === false; save(); syncThrottle(); toast(store.settings.cheapVideo === false ? 'videos back to full quality' : 'cheaper videos on battery 🎬'); renderBattery(); };
+  $('fpsT').onclick = () => { store.settings.capFps = store.settings.capFps === false; save(); applyFps(); toast(store.settings.capFps === false ? 'tab frame rate uncapped' : 'tab frame rate capped on battery 🎞️'); renderBattery(); };
+  $('udk').onclick = () => { store.settings.ultraDark = store.settings.ultraDark === false; save(); tabs.forEach(emulateFor); toast(store.settings.ultraDark === false ? 'Ultra wont force dark pages now' : 'Ultra auto dark on 🌙'); renderBattery(); };
   if ($('slowT')) $('slowT').onclick = () => { store.settings.slowApps = store.settings.slowApps === false; save(); syncThrottle(); toast(store.settings.slowApps === false ? 'other apps back to full speed' : 'other apps get slowed when ur on battery 🐢'); renderBattery(); };
   list.querySelectorAll('[data-app]').forEach(b => b.onclick = () => { const a = b.dataset.app.toLowerCase(); store.settings.slowExclude = [...new Set((store.settings.slowExclude || []).concat(a))]; save(); syncThrottle(); toast(b.dataset.app + ' stays full speed now'); renderBattery(); });
   list.querySelectorAll('[data-unskip]').forEach(b => b.onclick = () => { store.settings.slowExclude = (store.settings.slowExclude || []).filter(x => x !== b.dataset.unskip); save(); syncThrottle(); renderBattery(); });
