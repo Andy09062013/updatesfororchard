@@ -37,19 +37,19 @@ svg{flex:none;pointer-events:none}
 body.tearing .tab.dragging{opacity:.4}
 body.tearing{cursor:copy}
 .tab img,.tab .spin{width:16px;height:16px;flex:none}
-.tab .ticon{width:16px;height:16px;display:grid;place-items:center;color:var(--dim);flex:none}
+.tab .ticon{width:16px;height:16px;display:grid;place-items:center;color:var(--txt);flex:none}
 .spin{border:2px solid var(--line);border-top-color:var(--txt);border-radius:50%;animation:s .8s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
 .tab .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tab .x{width:20px;height:20px;border-radius:4px;display:grid;place-items:center;color:var(--dim);opacity:0;flex:none}
+.tab .x{width:20px;height:20px;border-radius:4px;display:grid;place-items:center;color:var(--txt);opacity:0;flex:none}
 .tab:hover .x,.tab.active .x{opacity:1}
 .tab .x:hover{background:#ffffff1a;color:var(--txt)}
-.tab .badge{display:grid;place-items:center;color:var(--dim);flex:none}
+.tab .badge{display:grid;place-items:center;color:var(--txt);flex:none}
 .tab .chg{display:grid;place-items:center;flex:none;color:var(--warn)}
 .tab.charged{box-shadow:inset 0 0 0 1px #d6a24366}
 .tab.super{box-shadow:inset 0 0 0 1px var(--warn)}
 .tab.super .chg{color:#ecbd62}
-#newtab{-webkit-app-region:no-drag;width:28px;height:28px;margin:0 4px 3px;flex:none;border-radius:var(--r);display:grid;place-items:center;color:var(--dim);cursor:pointer}
+#newtab{-webkit-app-region:no-drag;width:28px;height:28px;margin:0 4px 3px;flex:none;border-radius:var(--r);display:grid;place-items:center;color:var(--txt);cursor:pointer}
 #newtab:hover{background:var(--tabH);color:var(--txt)}
 #winbtns{display:flex;-webkit-app-region:no-drag;align-self:flex-start}
 #winbtns div{width:46px;height:34px;display:grid;place-items:center;color:var(--dim)}
@@ -103,7 +103,7 @@ body.vtabs #vside{display:flex;flex-direction:column;width:var(--vw,240px);flex:
 body.vtabs.vdrag #vside{transition:none}
 #vhead{display:flex;align-items:center;gap:6px;padding:8px 8px 6px 12px;-webkit-app-region:drag;min-height:40px}
 #vhead #logo{padding:0;flex:1;min-width:0;overflow:hidden;white-space:nowrap}
-#vcol{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:var(--r);display:grid;place-items:center;color:var(--dim);cursor:pointer;flex:none;transition:transform var(--med) var(--ease)}
+#vcol{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:var(--r);display:grid;place-items:center;color:var(--txt);cursor:pointer;flex:none;transition:transform var(--med) var(--ease)}
 #vcol:hover{background:#ffffff12;color:var(--txt)}
 #vgrip{position:absolute;top:0;bottom:0;right:-3px;width:6px;cursor:ew-resize;z-index:3;-webkit-app-region:no-drag}
 #vgrip:hover,body.vdrag #vgrip{background:linear-gradient(90deg,transparent 2px,var(--acc) 2px,var(--acc) 3px,transparent 3px)}
@@ -182,8 +182,8 @@ select,.pbtn{background:var(--field);color:var(--txt);border:1px solid var(--lin
 #batt.on{border-color:#5aa46980;background:var(--okSoft)}
 #batt.ultra{border-color:#d6a24380;background:var(--warnSoft)}
 #batt.ultra b{color:var(--warn)}
-body.ultra .tab:not(.active){filter:grayscale(.5)}
-.tab.sleep:not(.active){opacity:.55}
+/* resting tabs: only the title fades, icons stay full brightness */
+.tab.sleep:not(.active) .t{opacity:.6}
 #updPill{color:#fff;background:var(--ok);font-weight:600;margin-left:4px}
 #updPill:hover{filter:brightness(1.08)}
 #guestChip{font-size:11.5px;font-weight:600;color:var(--txt);border:1px solid var(--line);border-radius:var(--r);padding:3px 9px;margin-left:4px;white-space:nowrap}

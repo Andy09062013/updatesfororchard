@@ -1,6 +1,6 @@
 {
-  "version": "3.0.0",
-  "notes": "A redesigned interface: calmer graphite colours with one solid accent, line icons instead of emojis, and clearer wording throughout. Animations are smoother and now stay on in battery saver modes. New: right-click an image to save or copy it, vertical tabs (Settings > Appearance), and tabs that only open to start a download now close automatically.",
+  "version": "3.0.1",
+  "notes": "Tab icons now stay at full brightness in both horizontal and vertical tabs, including resting tabs and in Ultra mode.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "873c1fda9822984e4bdc328203d94c22836d998482d64689035e1f98911513bb"
+      "sha256": "ef58a71d855f6a9d8ac5f458890dfcdbf91614ded2cda1677c8db11615127a36"
     },
     {
       "path": "main.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "cf158bb8dc3a275b8f4f477bc478498351f35e87f5b8011a4ba4661c9274967a"
+      "sha256": "3f8729b0cb7cadf26aaceee8cb8635f5ca5e0537c2497ed5474545637c51a097"
     },
     {
       "path": "preload.js",
