@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('aura', {
   openFile: (p) => ipcRenderer.send('open-file', p),
   dlAction: (id, a) => ipcRenderer.send('dl-action', id, a),
   dlHistory: () => ipcRenderer.invoke('dl-history'),
+  dragFile: (p) => ipcRenderer.send('drag-file', p),
+  charge: (id, level) => ipcRenderer.send('charge', id, level),
   metrics: (list) => ipcRenderer.invoke('metrics', list),
   speedStart: () => ipcRenderer.send('speed-start'),
   speedStop: () => ipcRenderer.send('speed-stop'),

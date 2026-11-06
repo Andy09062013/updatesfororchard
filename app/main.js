@@ -408,6 +408,25 @@ ipcMain.handle('on-battery', () => { try { return powerMonitor.isOnBatteryPower(
 ipcMain.on('show-file', (e, p) => shell.showItemInFolder(p));
 ipcMain.on('open-file', (e, p) => shell.openPath(p));
 ipcMain.handle('dl-history', () => [...dlHistory.values()].sort((a, b) => a.id - b.id));
+
+// drag a finished download out of Orchard into a folder / another app
+const dragIcon = (() => { try { const i = nativeImage.createFromPath(path.join(__dirname, 'icon.png')); return i.isEmpty() ? null : i.resize({ width: 28, height: 28 }); } catch { return null; } })();
+ipcMain.on('drag-file', (e, filePath) => {
+  try { if (filePath && fs.existsSync(filePath)) e.sender.startDrag({ file: filePath, icon: dragIcon || nativeImage.createEmpty() }); } catch {}
+});
+
+// Charge / Supercharge a tab: keep it full speed and (level 2) give it priority
+function setTabPriority(pid, level) {
+  if (process.platform !== 'win32' || !pid) return;
+  const cls = level >= 2 ? 'AboveNormal' : 'Normal';
+  try { require('child_process').spawn('powershell.exe', ['-NoProfile', '-Command', `try{(Get-Process -Id ${pid}).PriorityClass='${cls}'}catch{}`], { windowsHide: true, stdio: 'ignore' }); } catch {}
+}
+ipcMain.on('charge', (e, wcId, level) => {
+  const wc = webContents.fromId(wcId);
+  if (!wc || wc.isDestroyed()) return;
+  try { wc.setBackgroundThrottling(level >= 1 ? false : true); } catch {}
+  try { setTabPriority(wc.getOSProcessId(), level); } catch {}
+});
 ipcMain.on('dl-action', (e, id, a) => {
   const it = downloads.get(id);
   if (!it) return;

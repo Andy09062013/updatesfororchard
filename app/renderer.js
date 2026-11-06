@@ -37,7 +37,7 @@ function makeWebview(t, url) {
   wv.addEventListener('focus', () => { if (t !== active && isShown(t)) activate(t); });
   t.wv = wv; t.ready = false; t.loading = true; t.frozen = false; t.sleeping = false;
 
-  wv.addEventListener('dom-ready', () => { t.ready = true; try { t.wcId = wv.getWebContentsId(); } catch {} emulateFor(t); sendFps(t); t.hideKey = null; applyHides(t); if (t === active) updateNav(); else if (!isShown(t)) scheduleFreeze(t); });
+  wv.addEventListener('dom-ready', () => { t.ready = true; try { t.wcId = wv.getWebContentsId(); } catch {} emulateFor(t); sendFps(t); if (t.charge) { try { window.aura.charge(t.wcId, t.charge); } catch {} } t.hideKey = null; applyHides(t); if (t === active) updateNav(); else if (!isShown(t)) scheduleFreeze(t); });
   wv.addEventListener('did-start-loading', () => { t.loading = true; renderTab(t); if (t === active) progress(30); });
   wv.addEventListener('did-stop-loading', () => { t.loading = false; renderTab(t); if (t === active) { progress(100); updateNav(); } });
   wv.addEventListener('page-title-updated', (e) => { t.title = e.title; renderTab(t); saveSession(); if (!isNewtab(t.url)) addHistory(t); });
@@ -156,6 +156,30 @@ async function endTabDrag(e) {
 document.addEventListener('pointerup', endTabDrag);
 document.addEventListener('pointercancel', () => endTabDrag(null));
 
+// drag files from your computer onto Orchard's chrome to open them in tabs.
+// (drops onto the actual web page go to the page itself, so site uploads still work)
+function fileUrlFromPath(p) {
+  let u = String(p).replace(/\\/g, '/');
+  if (!/^\//.test(u)) u = '/' + u;
+  return 'file://' + encodeURI(u).replace(/[?#]/g, m => '%' + m.charCodeAt(0).toString(16).toUpperCase());
+}
+function hasFiles(e) { try { return [...(e.dataTransfer.types || [])].includes('Files'); } catch { return false; } }
+window.addEventListener('dragover', (e) => { if (hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } }, false);
+window.addEventListener('drop', (e) => {
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files || !files.length) return;
+  e.preventDefault();
+  let opened = 0;
+  [...files].forEach((f) => {
+    if (!f.path) return;
+    const url = fileUrlFromPath(f.path);
+    if (opened === 0 && active && isNewtab(active.url) && active.wv) active.wv.loadURL(url).catch(() => {});
+    else createTab(url, opened > 0);
+    opened++;
+  });
+  if (opened) toast(opened > 1 ? ('opening ' + opened + ' files 📂') : ('opening ' + (files[0].name || 'file') + ' 📂'));
+}, false);
+
 function renderTab(t) {
   let icon;
   const masked = t.locked && !t.unlocked && lockReady();
@@ -165,10 +189,13 @@ function renderTab(t) {
   else if (t.icon || !isNewtab(t.url)) icon = `<img src="${t.icon || fav(t.url)}" onerror="this.style.visibility='hidden'">`;
   else icon = '<img src="apple-logo.png" alt="">';
   const title = masked ? 'Locked tab' : isNewtab(t.url) ? 'New Tab' : (t.title || t.url);
-  t.el.innerHTML = icon + '<span class="t"></span>' + (t.locked && !masked ? '<span title="locked tab, unlocked for now" style="font-size:11px">&#128275;</span>' : '') + (t.audio ? '<span title="playing audio">&#128266;</span>' : '') + '<span class="x">&#10005;</span>';
+  const chg = t.charge >= 1 ? `<span class="chg" title="${t.charge === 2 ? 'supercharged' : 'charged'}">${t.charge === 2 ? '&#128640;' : '&#9889;'}</span>` : '';
+  t.el.innerHTML = icon + '<span class="t"></span>' + chg + (t.locked && !masked ? '<span title="locked tab, unlocked for now" style="font-size:11px">&#128275;</span>' : '') + (t.audio ? '<span title="playing audio">&#128266;</span>' : '') + '<span class="x">&#10005;</span>';
   t.el.querySelector('.t').textContent = title;
-  t.el.title = title + (t.sleeping ? ' (sleeping)' : t.frozen ? ' (frozen)' : '');
+  t.el.title = title + (t.charge === 2 ? ' (supercharged)' : t.charge === 1 ? ' (charged)' : '') + (t.sleeping ? ' (sleeping)' : t.frozen ? ' (frozen)' : '');
   t.el.classList.toggle('sleep', !!(t.sleeping || t.frozen));
+  t.el.classList.toggle('charged', t.charge === 1);
+  t.el.classList.toggle('super', t.charge === 2);
 }
 
 // ---- session restore ----
@@ -178,7 +205,7 @@ function saveSession(now) {
   clearTimeout(sessT);
   const doSave = () => {
     store.session = {
-      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title, locked: !!t.locked, notes: (t.notes || []).map(n => ({ x: n.x, y: n.y, text: n.text, c: n.c })) })),
+      tabs: tabs.filter(t => t.url && !isNewtab(t.url)).map(t => ({ url: t.url, title: t.title, locked: !!t.locked, charge: t.charge || 0, notes: (t.notes || []).map(n => ({ x: n.x, y: n.y, text: n.text, c: n.c })) })),
       active: Math.max(0, tabs.filter(t => t.url && !isNewtab(t.url)).indexOf(active))
     };
     save();
@@ -194,6 +221,7 @@ function restoreSession() {
     const t = createTab(x.url, true, i !== s.active);
     if (x.title) t.title = x.title;
     if (x.locked) t.locked = true;
+    if (x.charge) t.charge = x.charge;
     if (Array.isArray(x.notes) && x.notes.length) t.notes = x.notes.map(n => ({ id: 'n' + Math.random().toString(36).slice(2), x: +n.x || 20, y: +n.y || 20, text: String(n.text || ''), c: +n.c || 0 }));
     renderTab(t);
   });
@@ -218,7 +246,20 @@ function saverActive() { return saverLevel() > 0; }
 function emulateFor(t) {
   if (!t || !t.ready || t.wcId == null || t.frozen) return;
   const lvl = saverLevel();
-  window.aura.emulate(t.wcId, { reducedMotion: lvl >= 1, dark: (lvl >= 2 && store.settings.ultraDark !== false) || !!store.settings.darkPages });
+  const boost = t.charge >= 1; // charged tabs keep full motion + their own colours
+  window.aura.emulate(t.wcId, { reducedMotion: !boost && lvl >= 1, dark: (!boost && lvl >= 2 && store.settings.ultraDark !== false) || !!store.settings.darkPages });
+}
+// apply a tab's charge level: tell main, update fps, visuals, wake it if resting
+function applyCharge(t) {
+  if (t.charge >= 1) { if (t.sleeping) wake(t); if (t.frozen) freeze(t, false); }
+  try { if (t.ready && t.wcId != null) window.aura.charge(t.wcId, t.charge || 0); } catch {}
+  sendFps(t); emulateFor(t); renderTab(t);
+}
+function setCharge(t, level) {
+  t.charge = level;
+  applyCharge(t);
+  saveSession();
+  toast(level === 2 ? 'tab supercharged — max fps + priority 🚀' : level === 1 ? 'tab charged — full speed on battery ⚡' : 'charge off, back to normal');
 }
 function freeze(t, f) {
   if (!t.wv || !t.ready || t.wcId == null || t.frozen === f) return;
@@ -227,12 +268,12 @@ function freeze(t, f) {
 function audible(t) { try { return t.audio || (t.ready && t.wv.isCurrentlyAudible()); } catch { return false; } }
 function scheduleFreeze(t) {
   clearTimeout(t.freezeT);
-  if (store.settings.freeze === false) return;
+  if (store.settings.freeze === false || t.charge >= 1) return;
   const lvl = saverLevel();
   t.freezeT = setTimeout(() => { if (!isShown(t) && !audible(t)) freeze(t, true); }, lvl >= 2 ? 1000 : lvl === 1 ? 3000 : 15000);
 }
 function sleepTab(t) {
-  if (isShown(t) || t.sleeping || audible(t) || !t.wv) return;
+  if (isShown(t) || t.sleeping || audible(t) || !t.wv || t.charge >= 1) return;
   clearTimeout(t.freezeT);
   t.wv.remove(); t.wv = null; t.ready = false; t.frozen = false; t.sleeping = true; t.loading = false;
   renderTab(t); updateSaverUI();
@@ -266,8 +307,9 @@ let thrStat = { supported: false, active: false, count: 0, apps: [] };
 function syncThrottle() { window.aura.videoMode({ on: store.settings.cheapVideo !== false, level: saverLevel() }); window.aura.throttle({ on: store.settings.slowApps !== false, level: saverLevel(), exclude: store.settings.slowExclude || [] }); }
 // cap each tab's frame rate on battery (30fps Saver, 20fps Ultra) to cut GPU/CPU work
 function fpsCap() { if (store.settings.capFps === false) return 0; const lvl = saverLevel(); return lvl >= 2 ? 20 : lvl === 1 ? 30 : 0; }
-function sendFps(t) { try { if (t && t.wv && t.ready) t.wv.send('orchard-fps', fpsCap()); } catch {} }
-function applyFps() { const c = fpsCap(); tabs.forEach(t => { try { if (t.wv && t.ready) t.wv.send('orchard-fps', c); } catch {} }); }
+function tabFps(t) { return (t && t.charge >= 1) ? 0 : fpsCap(); } // charged/supercharged tabs never capped
+function sendFps(t) { try { if (t && t.wv && t.ready) t.wv.send('orchard-fps', tabFps(t)); } catch {} }
+function applyFps() { tabs.forEach(sendFps); }
 window.aura.on('throttle-status', (s) => { thrStat = s || thrStat; if (panelIs('battery')) renderBattery(); });
 window.aura.throttleStatus().then(s => { thrStat = s || thrStat; });
 function applySaver() {
@@ -1372,6 +1414,9 @@ function tabMenu(e, t) {
     [t.locked ? '&#128275; Remove lock' : '&#128274; Lock tab', () => toggleLock(t)],
     t.locked && t.unlocked ? ['Lock now', () => { t.unlocked = false; renderTab(t); layoutViews(); updateNav(); }] : null,
     null,
+    (t.charge >= 1) ? ['&#9889; Remove charge', () => setCharge(t, 0)] : ['&#9889; Charge tab (full speed on battery)', () => setCharge(t, 1)],
+    (t.charge === 2) ? ['Back to just charged', () => setCharge(t, 1)] : ['&#128640; Supercharge (max fps + priority)', () => setCharge(t, 2)],
+    null,
     ['Close tab', () => closeTab(t)]
   ];
   showMenu(e, items);
@@ -1585,7 +1630,11 @@ function renderDownloads() {
       <div class="rt"><div></div><small>${esc(status)}</small>${d.state === 'progressing' ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}</div>
       <div style="display:flex;gap:4px;flex-direction:column">${d.state === 'completed' ? '<span class="pbtn mini" data-a="open">Open</span><span class="pbtn mini" data-a="show">Folder</span>' : d.state === 'progressing' ? `<span class="pbtn mini" data-a="${d.paused ? 'resume' : 'pause'}">${d.paused ? 'Resume' : 'Pause'}</span><span class="pbtn mini" data-a="cancel">Cancel</span>` : ''}</div>`;
     r.querySelector('.rt div').textContent = d.name;
-    if (d.state === 'completed') { r.style.cursor = 'pointer'; r.title = 'Click to open ' + d.name; }
+    if (d.state === 'completed') {
+      r.style.cursor = 'pointer'; r.title = 'Click to open, or drag out to a folder — ' + d.name;
+      r.draggable = true;
+      r.addEventListener('dragstart', (e) => { e.preventDefault(); window.aura.dragFile(d.path); });
+    }
     r.onclick = (e) => {
       const a = e.target.dataset.a;
       if (a === 'open') window.aura.openFile(d.path);
