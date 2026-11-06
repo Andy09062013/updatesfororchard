@@ -1,6 +1,6 @@
 {
-  "version": "3.0.2",
-  "notes": "Resting tabs now show their normal site icon instead of a sleep icon.",
+  "version": "3.1.0",
+  "notes": "Chat now opens Codeline in the side panel (chat button, Alt+C, start page and menu). New Codeline messages show a notification and an unread count on the chat button; click a notification to open that conversation.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,19 +29,19 @@
     },
     {
       "path": "index.html",
-      "sha256": "ef58a71d855f6a9d8ac5f458890dfcdbf91614ded2cda1677c8db11615127a36"
+      "sha256": "81dd36b3273809d9cbb27674854eeea772896f5ec7bb302a3795f8be44ce21a3"
     },
     {
       "path": "main.js",
-      "sha256": "e127dcaedf87f5f91031ab19fdd4552cdf0b4cda9b9242ef5dcda5763d838fc3"
+      "sha256": "8d3747f59c5688dee1b4be8a80f78993dd2db3beb6d1492b1e0d1fc058e6a920"
     },
     {
       "path": "newtab.html",
-      "sha256": "cc39e632b11504e907446c84d15162a8a3773d7b92cae62a092e2e286593ca96"
+      "sha256": "52ee6e1e1caaed1f7152525d0259131255cd5591e06e25ec28b23e6a1de2d374"
     },
     {
       "path": "package.json",
-      "sha256": "d399422a8734fa814e2eaaf39d09ba89af99a54fe870b5e00b08cc3394a96525"
+      "sha256": "0d0d886650e2ae1f2ece6c5e736f48066dcdcd44e7eb2379d5f22cb472ad0c04"
     },
     {
       "path": "preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "907f1a2807db8aa4162c50ed4945823be974a8ad0b82cd7e4d77267040090449"
+      "sha256": "2dbb24d895fd4a4209d058b194800f061acd19cfbf4ff90289420647f5934107"
     },
     {
       "path": "throttle.ps1",

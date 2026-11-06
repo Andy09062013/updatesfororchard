@@ -219,12 +219,12 @@ app.on('web-contents-created', (e, contents) => {
       sendTo(contents.hostWebContents, 'open-tab', { url, bg: disposition === 'background-tab' });
       return { action: 'deny' };
     });
-    // Orchard Chat talks to the browser through specially marked console lines (chat artifact only)
+    // The chat (Codeline) talks to the browser through specially marked console lines (chat artifact only)
     contents.on('console-message', (ev, level, message) => {
       const msg = (ev && typeof ev.message === 'string') ? ev.message : message;
       if (typeof msg !== 'string' || !msg.startsWith('%ORCHARD%')) return;
       let url = ''; try { url = contents.getURL(); } catch {}
-      if (!url.startsWith(CHAT_URL)) return;
+      if (!CHAT_URLS.some(u => url.startsWith(u))) return;
       try { const d = JSON.parse(msg.slice(9)); if (d && (d.t === 'notify' || d.t === 'unread')) { chatContents.add(contents); sendTo(contents.hostWebContents, 'chat-event', { t: d.t, n: d.n, chat: String(d.chat || '').slice(0, 80), title: String(d.title || '').slice(0, 80), from: String(d.from || '').slice(0, 60), text: String(d.text || '').slice(0, 200), group: !!d.group, open: !!d.open }); } } catch {}
     });
     // orchard://tool/<name> links on the new tab page open browser features
@@ -277,15 +277,17 @@ ipcMain.on('win', (e, a) => {
   else if (a === 'focus') { if (win.isMinimized()) win.restore(); win.focus(); }
 });
 
-// ---------- Orchard Chat bridge ----------
-const CHAT_URL = process.env.ORCHARD_CHAT_URL || 'https://claude.ai/artifact/28878hcboZzAuyHNtgbMAQ';
+// ---------- chat bridge (Codeline) ----------
+const CHAT_URL = process.env.ORCHARD_CHAT_URL || 'https://claude.ai/artifact/RrmU2fmMyL4opSTTW2SL8u';
+// claude.ai may show the same artifact under its long id
+const CHAT_URLS = [CHAT_URL, 'https://claude.ai/artifact/c94e2cfc-3fae-4a88-baf1-5136fcbf9c0e'];
 const chatContents = new Set();
 const { Notification } = require('electron');
 ipcMain.on('chat-native-note', (e, n) => {
   try {
     if (!Notification.isSupported()) return;
     const w = BrowserWindow.fromWebContents(e.sender);
-    const note = new Notification({ title: String(n.title || 'Orchard Chat').slice(0, 80), body: ((n.group && n.from) ? n.from + ': ' : '') + String(n.text || '').slice(0, 200), icon: path.join(__dirname, 'icon.png'), silent: false });
+    const note = new Notification({ title: String(n.title || 'Codeline').slice(0, 80), body: ((n.group && n.from) ? n.from + ': ' : '') + String(n.text || '').slice(0, 200), icon: path.join(__dirname, 'icon.png'), silent: false });
     note.on('click', () => { if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send('chat-open', String(n.chat || '')); } });
     note.show();
   } catch {}

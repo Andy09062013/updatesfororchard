@@ -767,7 +767,7 @@ function renderHides() {
   if ($('hideClr')) $('hideClr').onclick = () => { delete store.hideRules[h]; save(); tabs.filter(x => hostOf(x.url) === h).forEach(x => { applyHides(x); if (x.wv && x.ready) x.wv.reload(); }); renderHides(); };
 }
 
-// ---- Orchard Chat: one persistent webview + notifications bottom right ----
+// ---- Chat (Codeline): one persistent webview + notifications bottom right ----
 let chatWv = null, chatWcId = null, chatUnread = 0;
 function ensureChat() {
   if (chatWv) return;
@@ -795,7 +795,7 @@ function showNote(n) {
   let hsh = 0; for (const ch of String(n.chat)) hsh = (hsh * 31 + ch.charCodeAt(0)) | 0;
   d.innerHTML = '<div class="nav"></div><div class="nb"><div class="nt"><span class="ntt"></span><small>now</small></div><div class="nm"></div></div><span class="nx" title="Dismiss">' + ic('x', 14) + '</span>';
   const av = d.querySelector('.nav'); av.style.background = NOTE_COLORS[Math.abs(hsh) % NOTE_COLORS.length]; av.textContent = (n.group ? n.title : n.from || n.title || '?').trim().charAt(0).toUpperCase() || '?';
-  d.querySelector('.ntt').textContent = n.title || 'Orchard Chat';
+  d.querySelector('.ntt').textContent = n.title || 'Codeline';
   d.querySelector('.nm').textContent = (n.group ? (n.from || 'Someone') + ': ' : '') + (n.text || 'Sent a message');
   const kill = () => { d.style.transition = 'opacity .2s'; d.style.opacity = 0; setTimeout(() => d.remove(), 200); };
   d.onclick = (e) => { kill(); if (!e.target.classList.contains('nx')) openChatTo(n.chat); };
@@ -818,7 +818,9 @@ window.aura.on('chat-event', (ev) => {
   }
 });
 window.aura.on('chat-open', (id) => openChatTo(id));
-// Orchard Chat background notifier only runs once the user actually opens Orchard Chat
+// After chat has been opened once, it starts quietly in the background on later launches so
+// notifications arrive. It is frozen in Ultra and can be switched off in Settings.
+setTimeout(() => { if (store.settings.chatUsed && store.settings.chatNotify !== false && saverLevel() < 2) { ensureChat(); placeChat(); } }, 6000);
 
 // ---- Orchard Mail (Gmail via Google's official sign-in in Chrome) ----
 const M = window.aura.mail;
@@ -979,7 +981,7 @@ const TOOLBAR = [
   ['extBtn', 'puzzle', 'Extensions', ''],
   ['setBtn', 'gear', 'Settings', 'Still available from the menu'],
   ['mailBtn', 'mail', 'Orchard Mail', ''],
-  ['chatBtn', 'chat', 'Google Chat', ''],
+  ['chatBtn', 'chat', 'Chat', ''],
   ['aiBtn', 'assistant', 'AI assistant', ''],
   ['avatar', 'user', 'Profile', ''],
   ['hideBtn', 'hide', 'Hide elements (address bar)', ''],
@@ -1048,7 +1050,7 @@ function renderSettings() {
     + `<div class="set">Rest all other tabs now <span class="pbtn" id="slpNow">Rest</span></div>`
     + hd('Assistant, chat and mail')
     + `<div class="set">Assistant in side panel ${sel('aiDef', [['gemini', 'Gemini'], ['chatgpt', 'ChatGPT'], ['claude', 'Claude']].map(([k, l]) => `<option value="${k}" ${(S.ai || 'gemini') === k ? 'selected' : ''}>${l}</option>`).join(''))}</div>`
-    + `<div class="set">Orchard Chat notifications ${sw(S.chatNotify !== false, 'cnT')}</div>`
+    + `<div class="set">Chat notifications ${sw(S.chatNotify !== false, 'cnT')}</div>`
     + `<div class="set">Orchard Mail <span class="pbtn" id="mailOpen">Open</span></div>`
     + hd('Tab lock')
     + `<div class="set">Tab lock password <span style="display:flex;gap:6px">${S.lockHash ? '<span class="pbtn" id="pwChg">Change</span><span class="pbtn" id="pwRst">Reset</span>' : '<span class="pbtn" id="pwSet">Set</span>'}</span></div>`
@@ -1525,8 +1527,7 @@ const FEATURES = [
   ['split', 'Vertical tabs', 'Show tabs in a sidebar on the left.', 'Settings', () => setVTabs(!store.settings.vtabs)],
   ['Communication and assistants'],
   ['mail', 'Orchard Mail', 'Read your Gmail in the side panel. Sign in through Chrome.', 'Alt+M', () => openMail()],
-  ['chat', 'Google Chat', 'Open Google Chat in the side panel.', 'Alt+C', () => openGoogleChat()],
-  ['chat', 'Orchard Chat', 'Built-in chat. Invite people by email.', '', () => openChat()],
+  ['chat', 'Chat', 'Codeline chat in the side panel. Friends join with your code.', 'Alt+C', () => openChat()],
   ['assistant', 'AI assistant', 'Gemini, ChatGPT or Claude in the side panel.', 'Alt+G', () => toggleAi(true)],
   ['bolt', 'Answer quickly', 'Answer the questions on this page briefly.', '', () => askAboutPage('answer')],
   ['check', 'Answer only', 'Give only the answers, with no explanation.', '', () => askAboutPage('answeronly')],
@@ -1738,7 +1739,7 @@ function openPanel(kind) {
     list.innerHTML = `
       <div class="set">Search engine <select id="eng">${Object.keys(ENGINES).map(k => `<option value="${k}" ${store.settings.engine === k ? 'selected' : ''}>${({ google: 'Google', duckduckgo: 'DuckDuckGo', bing: 'Bing', brave: 'Brave Search' })[k] || k}</option>`).join('')}</select></div>
       <div class="set"><span>Orchard <b id="verTxt">v…</b></span><span class="pbtn" id="updChk">Check for updates</span></div>
-      <div class="set">Orchard Chat notifications <span class="pbtn" id="cnT">${store.settings.chatNotify === false ? 'Off' : 'On'}</span></div>
+      <div class="set">Chat notifications <span class="pbtn" id="cnT">${store.settings.chatNotify === false ? 'Off' : 'On'}</span></div>
       <div class="set">Search suggestions <span class="pbtn" id="sgT">${store.settings.suggest === false ? 'Off' : 'On'}</span></div>
       <div class="set">Start page background <span class="pbtn" id="thm">Change</span></div>
       <div class="set">Reopen tabs on startup <span class="pbtn" id="rst">${store.settings.restore === false ? 'Off' : 'On'}</span></div>
@@ -2102,7 +2103,7 @@ function profileForm(p) {
 }
 
 // ---- AI side panel (Gemini / ChatGPT / Claude) ----
-const AIS = { gemini: 'https://gemini.google.com/app', chatgpt: 'https://chatgpt.com/', claude: 'https://claude.ai/new', chat: 'https://claude.ai/artifact/28878hcboZzAuyHNtgbMAQ', gchat: 'https://chat.google.com/' };
+const AIS = { gemini: 'https://gemini.google.com/app', chatgpt: 'https://chatgpt.com/', claude: 'https://claude.ai/new', chat: 'https://claude.ai/artifact/RrmU2fmMyL4opSTTW2SL8u', gchat: 'https://chat.google.com/' };
 let aiWhich = null;
 let aiWv = null, aiOpen = false, aiWcId = null;
 function sideWidth(w) {
@@ -2126,7 +2127,7 @@ function loadAi(which) {
 }
 function markSideBtns() {
   $('aiBtn').classList.toggle('on', aiOpen && !['chat', 'mail', 'gchat'].includes(aiWhich));
-  $('chatBtn').classList.toggle('on', aiOpen && aiWhich === 'gchat');
+  $('chatBtn').classList.toggle('on', aiOpen && aiWhich === 'chat');
   $('mailBtn').classList.toggle('on', aiOpen && aiWhich === 'mail');
   document.querySelectorAll('#aipills span').forEach(s => s.classList.toggle('on', s.dataset.ai === aiWhich));
   $('aipills').classList.toggle('off', ['chat', 'mail', 'gchat'].includes(aiWhich));
@@ -2205,7 +2206,7 @@ function handleKey(k, ctrl, shift, alt) {
   else if (ctrl && k === 'w') active && closeTab(active);
   else if (ctrl && k === 'n') { if (shift) window.aura.openGuest(); else window.aura.newWindow(); }
   else if (alt && k === 'g') toggleAi();
-  else if (alt && k === 'c') openGoogleChat();
+  else if (alt && k === 'c') openChat();
   else if (alt && k === 'f') openPanel('menu');
   else if (alt && k === 'h') startHidePicker();
   else if (alt && k === 'm') openMail();
@@ -2252,16 +2253,17 @@ $('avatar').onclick = () => openPanel('profiles');
 $('aiBtn').onclick = () => { if (aiOpen && (aiWhich === 'chat' || aiWhich === 'mail' || aiWhich === 'gchat')) { aiWcId = null; loadAi(store.settings.ai && !['chat','mail','gchat'].includes(store.settings.ai) ? store.settings.ai : 'gemini'); } else toggleAi(); };
 const openChat = () => {
   if (aiOpen && aiWhich === 'chat') { toggleAi(false); return; }
+  if (!store.settings.chatUsed) { store.settings.chatUsed = true; save(); }
   aiWhich = 'chat';
   if (!aiOpen) toggleAi(true); else loadAi('chat');
 };
-// the chat button opens Google Chat (Orchard Chat stays in the menu)
+// Google Chat is no longer linked in the interface; kept so older links still work
 const openGoogleChat = () => {
   if (aiOpen && aiWhich === 'gchat') { toggleAi(false); return; }
   aiWhich = 'gchat';
   if (!aiOpen) toggleAi(true); else loadAi('gchat');
 };
-$('chatBtn').onclick = openGoogleChat;
+$('chatBtn').onclick = openChat;
 const openMail = () => {
   if (aiOpen && aiWhich === 'mail') { toggleAi(false); return; }
   aiWhich = 'mail';
@@ -2445,7 +2447,7 @@ document.addEventListener('keydown', (e) => { if (handleKey(e.key.toLowerCase(),
 window.aura.on('open-tab', (d) => typeof d === 'string' ? createTab(d) : createTab(d.url, d.bg));
 window.aura.on('tool', (name) => {
   if (name.startsWith('omnibox')) { const q = decodeURIComponent(name.split('/')[1] || ''); omniHandoff = true; $('url').focus(); $('url').value = q; omniTyped = q; omniUpdate(); const n = $('url'); n.setSelectionRange(q.length, q.length); return; }
-  const map = { mail: () => openMail(), chat: () => openGoogleChat(), gchat: () => openGoogleChat(), orchardchat: () => openChat(), ai: () => toggleAi(true), lens: () => startLens(), battery: () => openPanel('battery'), speed: () => openPanel('speed'), downloads: () => openPanel('downloads'), menu: () => openPanel('menu'), theme: () => openPanel('theme'), profiles: () => openPanel('profiles'), history: () => openPanel('history') };
+  const map = { mail: () => openMail(), chat: () => openChat(), gchat: () => openChat(), orchardchat: () => openChat(), ai: () => toggleAi(true), lens: () => startLens(), battery: () => openPanel('battery'), speed: () => openPanel('speed'), downloads: () => openPanel('downloads'), menu: () => openPanel('menu'), theme: () => openPanel('theme'), profiles: () => openPanel('profiles'), history: () => openPanel('history') };
   if (map[name]) map[name]();
 });
 window.aura.on('shortcut', (s) => handleKey(s.key, s.ctrl, s.shift, s.alt));
