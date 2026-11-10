@@ -1,6 +1,6 @@
 {
-  "version": "3.3.1",
-  "notes": "Fixed tabs coming back wrong after a restart. Each window now keeps its own tabs, so two windows no longer reopen with the same page. New windows open with a fresh tab instead of copying your existing tabs, and closing one of several windows forgets that window, as in Chrome.",
+  "version": "3.3.2",
+  "notes": "Right-click menus now close when you click anywhere outside them, including on the web page, or press Esc.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "2fcceb5351678fe36f508b72e4314aa0fdb1ee69fdd21bbe1fb3cdb7e7e227bb"
+      "sha256": "101670d3749c485c58c4a3dbf761168124a28e7328077b2ff6718477ae63e28d"
     },
     {
       "path": "main.js",
@@ -41,7 +41,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "e8bb52336918722bbb891e1a06df0bec4725470741a56d2fd12726d01c4dfffb"
+      "sha256": "071b4b5d7f6bf63530aabff5d8c2371b5049d85c21984860e45fbedcf92dcf61"
     },
     {
       "path": "preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "e652aa3eeb516a962f9f288f1cfd98ceaf4b0686096f96bf005e861085c86f82"
+      "sha256": "b30e8076ec9b33601bfd51c0b2759dea71b72af4a39c0716b8145f1c601d7438"
     },
     {
       "path": "throttle.ps1",

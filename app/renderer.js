@@ -1643,12 +1643,21 @@ function showMenu(e, items) {
     m.appendChild(d); lastSep = false;
   });
   if (m.lastChild && m.lastChild.tagName === 'HR') m.lastChild.remove();
+  // invisible layer behind the menu: clicks on the web page never reach Orchard's document,
+  // so without this the menu could not be dismissed by clicking the page
+  const bd = document.createElement('div'); bd.id = 'ctxBack';
+  bd.addEventListener('mousedown', (ev) => { ev.preventDefault(); closeMenu(); });
+  bd.addEventListener('contextmenu', (ev) => { ev.preventDefault(); closeMenu(); });
+  bd.addEventListener('wheel', () => closeMenu(), { passive: true });
+  document.body.appendChild(bd);
   document.body.appendChild(m);
   const w = m.offsetWidth, h = m.offsetHeight;
   m.style.left = Math.min(e.clientX, innerWidth - w - 6) + 'px';
   m.style.top = Math.min(e.clientY, innerHeight - h - 6) + 'px';
+  m.tabIndex = -1; m.style.outline = 'none'; m.focus({ preventScroll: true }); // so Esc reaches Orchard, not the page
 }
-function closeMenu() { const m = $('ctx'); if (m) m.remove(); }
+function closeMenu() { const m = $('ctx'); if (m) m.remove(); const b = $('ctxBack'); if (b) b.remove(); }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('ctx')) { e.preventDefault(); closeMenu(); } }, true);
 document.addEventListener('mousedown', (e) => { if (!e.target.closest('#ctx')) closeMenu(); });
 window.addEventListener('blur', closeMenu);
 
