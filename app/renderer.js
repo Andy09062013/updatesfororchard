@@ -1109,13 +1109,16 @@ function renderSettings() {
     + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Choose which buttons appear in the toolbar. The menu button is always shown.</div>`
     + TOOLBAR.map(([id, icn, label]) => `<div class="set"><span style="display:flex;gap:10px;align-items:center"><span style="color:var(--dim);display:grid">${ic(icn, 16)}</span>${label}</span>${sw((S.toolbar || {})[id] !== false, 'tb_' + id)}</div>`).join('')
     + `<div class="set"><span></span><span class="pbtn" id="tbReset">Show all buttons</span></div>`
-    + hd('ABOUT & UPDATES')
+    + hd('About and updates')
     + `<div class="set">Orchard <b id="verTxt">v…</b></div>`
+    + `<div class="set">Update automatically ${sw(S.autoUpdate !== false, 'auT')}</div>`
+    + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">New versions download in the background and install themselves while you are away from the keyboard. Turn this off to install them yourself with the button below.</div>`
     + `<div class="set">Updates <span class="pbtn" id="updChk">Check for updates</span></div>`
     + `<div class="set" style="color:var(--dim);font-size:11px;line-height:1.7;display:block">Shortcuts: Ctrl+T new tab · Ctrl+W close · Ctrl+Shift+T reopen · Ctrl+L address bar · Ctrl+Tab next tab · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+F find · Ctrl+N new window · Alt+G AI · Alt+C chat · Alt+M mail · Alt+K calculator · Alt+E calendar · Alt+H hide elements · Alt+F menu · F11 fullscreen · F12 devtools</div>`;
   const toggle = (id, get, set2) => { const el = $(id); if (el) el.onclick = () => { const v = !get(); set2(v); el.classList.toggle('on', v); }; };
   $('eng').onchange = (e) => { store.settings.engine = e.target.value; save(); };
   toggle('sgT', () => store.settings.suggest !== false, (v) => { store.settings.suggest = v; save(); });
+  toggle('auT', () => store.settings.autoUpdate !== false, (v) => { store.settings.autoUpdate = v; save(); window.aura.setAutoUpdate(v); toast(v ? 'Orchard will update automatically when you are away.' : 'Automatic updates are off. Use Restart to update.'); });
   $('svr').onchange = (e) => { store.settings.saver = e.target.value; save(); applySaver(); };
   $('slp').onchange = (e) => { store.settings.sleepMins = +e.target.value; save(); sleepCheck(); };
   toggle('frz', () => store.settings.freeze !== false, (v) => { store.settings.freeze = v; save(); if (!v) tabs.forEach(t => freeze(t, false)); else applySaver(); });
@@ -2507,8 +2510,16 @@ function showUpdate(u) {
   p.title = 'Orchard ' + u.version + ' is ready. Click to restart.';
   p.title = (u.notes ? 'What is new: ' + u.notes + '\n' : '') + 'Click to restart and update.';
 }
-window.aura.on('update-ready', (u) => { showUpdate(u); toast('Orchard ' + u.version + ' has been downloaded. Restart to finish updating.'); });
+window.aura.on('update-ready', (u) => {
+  showUpdate(u);
+  if (store.settings.autoUpdate === false) toast('Orchard ' + u.version + ' has been downloaded. Restart to finish updating.');
+  else toast('Orchard ' + u.version + ' downloaded. It will update on its own when you step away, or click Restart to update now.');
+});
 window.aura.appVersion().then(v => { if (v.pending) showUpdate(v.pending); });
+// let the main process save the current tabs before an automatic update restart
+window.aura.on('save-session', () => { try { saveSession(true); } catch {} });
+// tell the main process whether automatic updates are allowed (default on)
+window.aura.setAutoUpdate(store.settings.autoUpdate !== false);
 window.aura.on('profile-changed', (p) => applyProfile(p));
 window.aura.on('power', (b) => { onBattery = b; applySaver(); });
 window.aura.on('max-state', (m) => $('mx').innerHTML = m ? ic('restore', 14) : ic('max', 14));

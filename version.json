@@ -1,6 +1,6 @@
 {
-  "version": "3.2.0",
-  "notes": "Make Orchard your default browser: Orchard asks once, and Settings has a Make default button that opens the Windows setting for it. Links clicked in other apps now open as tabs in the Orchard window you already have open. Chat notifications: a Send a test button in Settings, and messages are no longer marked as read while the chat panel is closed.",
+  "version": "3.3.0",
+  "notes": "Orchard now installs updates by itself. A downloaded update is applied automatically while you are away from the keyboard, so you no longer have to click Restart. This can be turned off in Settings under About and updates, where the Restart button is still available.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "2ff310bfb84a5cc8cf6462d0e6acc4c6aed797d1ee57cacafe7f6b3083da351c"
+      "sha256": "bd0abec45712ef8de429bd0ceefef3f26c8454e900c3dfa2c716254b80bebe1d"
     },
     {
       "path": "newtab.html",
@@ -41,11 +41,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "98ddc319c7833d63935f42fb200195dccebd69b098678ab6508af648d6d4eb3f"
+      "sha256": "f61ec1ab108f769cc1a74db2bae3a345db47a30b8ba23b85edeab79140f39844"
     },
     {
       "path": "preload.js",
-      "sha256": "18bd8ca55fe4ea800595feb9e9e063980203bf1ac1eead96bf4f992dc0f23bf1"
+      "sha256": "a800dafe73010d631e7cd8cb4ee97c0cde58bf3a1816b0aae5059dd4522b5290"
     },
     {
       "path": "pw-preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "01085394b0c1a060fab43e286a7114e3875866db607146988de3296bc9d34d59"
+      "sha256": "e652aa3eeb516a962f9f288f1cfd98ceaf4b0686096f96bf005e861085c86f82"
     },
     {
       "path": "throttle.ps1",

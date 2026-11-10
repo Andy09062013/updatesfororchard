@@ -64,12 +64,13 @@ contextBridge.exposeInMainWorld('aura', {
   checkUpdate: () => ipcRenderer.invoke('update-check'),
   appVersion: () => ipcRenderer.invoke('app-version'),
   restartUpdate: () => ipcRenderer.send('update-restart'),
+  setAutoUpdate: (on) => ipcRenderer.send('auto-update', on),
   tearTab: (d) => ipcRenderer.invoke('tear-tab', d),
   initialTab: () => ipcRenderer.invoke('initial-tab'),
   bgImport: () => ipcRenderer.invoke('bg-import'),
   bgDelete: (u) => ipcRenderer.send('bg-delete', u),
   on: (ch, fn) => {
-    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open', 'cal-due', 'note-click', 'throttle-status', 'pw-offer', 'page-menu', 'dl-origin'];
+    const ok = ['open-tab', 'shortcut', 'blocked', 'download', 'max-state', 'power', 'profile-changed', 'dl', 'speed', 'attach-tab', 'win-blur', 'tool', 'update-ready', 'lock-sync', 'chat-event', 'chat-open', 'cal-due', 'note-click', 'throttle-status', 'pw-offer', 'page-menu', 'dl-origin', 'save-session'];
     if (ok.includes(ch)) ipcRenderer.on(ch, (e, d) => fn(d));
   }
 });

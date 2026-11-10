@@ -664,6 +664,7 @@ async function checkForUpdate() {
     fs.renameSync(staging, current);
     pendingUpdate = { version: man.version, notes: String(man.notes || '').slice(0, 500) };
     broadcast('update-ready', pendingUpdate);
+    armAutoUpdate();
     return { status: 'ready', ...pendingUpdate };
   } catch (e) {
     return { status: 'error', error: String(e && e.message || e) };
@@ -671,11 +672,36 @@ async function checkForUpdate() {
 }
 app.whenReady().then(() => {
   setTimeout(() => checkForUpdate().catch(() => {}), 8000);
-  setInterval(() => checkForUpdate().catch(() => {}), 4 * 3600 * 1000);
+  // check more often so a new version is picked up within the hour, not only every 4h
+  setInterval(() => checkForUpdate().catch(() => {}), 45 * 60 * 1000);
 });
 ipcMain.handle('update-check', () => checkForUpdate());
 ipcMain.handle('app-version', () => ({ version: MY_VERSION, pending: pendingUpdate }));
-ipcMain.on('update-restart', () => { thrShutdown().then(() => { app.relaunch({ args: process.argv.slice(1).filter(a => a !== RELAUNCH_FLAG).concat([RELAUNCH_FLAG]) }); app.exit(0); }); });
+function relaunchForUpdate() {
+  thrShutdown().then(() => { app.relaunch({ args: process.argv.slice(1).filter(a => a !== RELAUNCH_FLAG).concat([RELAUNCH_FLAG]) }); app.exit(0); });
+}
+ipcMain.on('update-restart', relaunchForUpdate);
+
+// ---------- automatic update: apply a downloaded update while the user is away ----------
+let autoUpdate = true, autoTimer = null, autoApplying = false;
+ipcMain.on('auto-update', (e, on) => { autoUpdate = on !== false; armAutoUpdate(); });
+function anyAudible() { try { return webContents.getAllWebContents().some(wc => { try { return !wc.isDestroyed() && wc.isCurrentlyAudible(); } catch { return false; } }); } catch { return false; } }
+function anyFullScreen() { return BrowserWindow.getAllWindows().some(w => { try { return w.isFullScreen(); } catch { return false; } }); }
+function armAutoUpdate() {
+  clearInterval(autoTimer); autoTimer = null;
+  if (!autoUpdate || !pendingUpdate) return;
+  // wait for a quiet moment: the computer has been idle a few minutes and nothing is playing
+  autoTimer = setInterval(() => {
+    if (autoApplying || !pendingUpdate) { clearInterval(autoTimer); return; }
+    if (!autoUpdate) { clearInterval(autoTimer); autoTimer = null; return; }
+    let idle = 0; try { idle = powerMonitor.getSystemIdleTime(); } catch {}
+    if (idle >= 180 && !anyAudible() && !anyFullScreen()) {
+      autoApplying = true; clearInterval(autoTimer);
+      broadcast('save-session');      // let each window flush its tabs first
+      setTimeout(relaunchForUpdate, 600);
+    }
+  }, 30 * 1000);
+}
 
 // ---------- Orchard Mail: Gmail through Google's official desktop sign-in ----------
 // Sign-in happens in the user's normal browser (Chrome) with a loopback redirect +
