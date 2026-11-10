@@ -1,6 +1,6 @@
 {
-  "version": "3.3.0",
-  "notes": "Orchard now installs updates by itself. A downloaded update is applied automatically while you are away from the keyboard, so you no longer have to click Restart. This can be turned off in Settings under About and updates, where the Restart button is still available.",
+  "version": "3.3.1",
+  "notes": "Fixed tabs coming back wrong after a restart. Each window now keeps its own tabs, so two windows no longer reopen with the same page. New windows open with a fresh tab instead of copying your existing tabs, and closing one of several windows forgets that window, as in Chrome.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -33,7 +33,7 @@
     },
     {
       "path": "main.js",
-      "sha256": "bd0abec45712ef8de429bd0ceefef3f26c8454e900c3dfa2c716254b80bebe1d"
+      "sha256": "33f4b524dac15b66fb47b646fbda8f1fc893a67786861052bdaedaf2fb4557fd"
     },
     {
       "path": "newtab.html",
@@ -41,7 +41,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "f61ec1ab108f769cc1a74db2bae3a345db47a30b8ba23b85edeab79140f39844"
+      "sha256": "e8bb52336918722bbb891e1a06df0bec4725470741a56d2fd12726d01c4dfffb"
     },
     {
       "path": "preload.js",

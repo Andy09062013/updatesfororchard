@@ -164,7 +164,12 @@ function setupSession(id) {
 
 // ---------- windows ----------
 const openFile = path.join(dataDir, 'open-windows.json');
-function rememberOpen() { try { fs.writeFileSync(openFile, JSON.stringify([...winProfile.values()].filter(x => x !== 'guest'))); } catch {} }
+// each window keeps its own tab session (sid), so two windows never overwrite each other's tabs
+const winSid = new Map(); // window webContents id -> session id
+const newSid = () => 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+let appQuitting = false;
+app.on('before-quit', () => { appQuitting = true; });
+function rememberOpen() { try { fs.writeFileSync(openFile, JSON.stringify([...winProfile.entries()].filter(([, p]) => p !== 'guest').map(([wc, p]) => ({ p, s: winSid.get(wc) })))); } catch {} }
 const winProfile = new Map(); // window webContents id -> profile id
 let firstWin = null;
 const initialTabs = new Map(); // window webContents id -> url for torn-off tabs
@@ -184,12 +189,19 @@ function createWindow(profileId, opts = {}) {
   });
   const wcId = win.webContents.id;
   winProfile.set(wcId, p.id);
+  winSid.set(wcId, opts.sid || newSid());
   if (opts.url !== undefined) initialTabs.set(wcId, opts.url);
   rememberOpen();
   // closing one of several windows forgets it, closing the last one keeps the list so it all reopens
-  win.on('close', () => { if (BrowserWindow.getAllWindows().length > 1) { winProfile.delete(wcId); rememberOpen(); } });
+  // closing one of several windows on purpose forgets it (and its tabs); quitting Orchard keeps every window
+  win.on('close', () => {
+    if (appQuitting || BrowserWindow.getAllWindows().length <= 1) return;
+    const sid = winSid.get(wcId), st = stores[p.id];
+    winProfile.delete(wcId); rememberOpen();
+    if (st && st.sessions && sid && st.sessions[sid]) { delete st.sessions[sid]; saveStore(p.id); }
+  });
   win.on('closed', () => {
-    winProfile.delete(wcId);
+    winProfile.delete(wcId); winSid.delete(wcId);
     if (p.id === 'guest' && ![...winProfile.values()].includes('guest')) {
       delete stores['guest']; setUp.delete('guest');
       try { const s = session.fromPartition('guest-incognito'); s.clearStorageData(); s.clearCache(); } catch {}
@@ -223,10 +235,12 @@ app.whenReady().then(async () => {
   app.userAgentFallback = app.userAgentFallback.replace(/\s?(Electron|aura-browser|AuraBrowser|orchard-browser|Orchard)\/\S+/gi, '');
   const lastUsed = (() => { try { return fs.readFileSync(path.join(dataDir, 'last-profile'), 'utf8').trim(); } catch { return 'default'; } })();
   let reopen = [];
-  try { reopen = JSON.parse(fs.readFileSync(openFile, 'utf8')).filter(id => getProfile(id)); } catch {}
-  if (!reopen.length) reopen = [getProfile(lastUsed) ? lastUsed : profiles[0].id];
-  const win = createWindow(reopen[0]);
-  reopen.slice(1).forEach(id => createWindow(id));
+  try { reopen = JSON.parse(fs.readFileSync(openFile, 'utf8')).map(x => typeof x === 'string' ? { p: x } : x).filter(x => x && getProfile(x.p)); } catch {}
+  if (!reopen.length) reopen = [{ p: getProfile(lastUsed) ? lastUsed : profiles[0].id }];
+  const win = createWindow(reopen[0].p, { sid: reopen[0].s });
+  reopen.slice(1).forEach(x => createWindow(x.p, { sid: x.s }));
+  // forget sessions of windows that no longer exist
+  setTimeout(() => { const live = new Set(winSid.values()); for (const id of Object.keys(stores)) { const st = stores[id]; if (!st || !st.sessions) continue; let ch = false; for (const k of Object.keys(st.sessions)) if (!live.has(k)) { delete st.sessions[k]; ch = true; } if (ch) saveStore(id); } }, 15000);
   // started by clicking a link in another app: open it as a tab once the window is ready
   const startUrl = urlFromArgs(process.argv);
   if (startUrl) win.webContents.once('did-finish-load', () => setTimeout(() => { if (!win.isDestroyed()) win.webContents.send('open-tab', { url: startUrl, bg: false }); }, 1500));
@@ -282,14 +296,29 @@ ipcMain.handle('store-get', (e) => {
   const id = profileOf(e);
   const pr = getProfile(id);
   const email = (typeof ms === 'function' && ms(id).refresh && ms(id).email) || '';
-  return { ...storeFor(id), profile: pr ? { ...pr, email } : pr, partition: partitionFor(id), blocked: blockedCount[id] || 0 };
+  const st = storeFor(id), sid = winSid.get(e.sender.id);
+  let session = null;
+  if (st.sessions && sid && st.sessions[sid]) session = st.sessions[sid];
+  // first run after updating: the old shared session goes to the first window only
+  else if (!st.sessions && st.session && [...winProfile.values()].filter(x => x === id).length <= 1) session = st.session;
+  else if (!st.sessions && st.session && sid === firstSidFor(id)) session = st.session;
+  return { ...st, session, profile: pr ? { ...pr, email } : pr, partition: partitionFor(id), blocked: blockedCount[id] || 0 };
 });
+function firstSidFor(id) { for (const [wc, p] of winProfile) if (p === id) return winSid.get(wc); return null; }
 ipcMain.on('store-set', (e, data) => {
   const id = profileOf(e);
   const evChanged = JSON.stringify((storeFor(id).events) || []) !== JSON.stringify(data.events || []);
   setImmediate(() => { if (evChanged) calPlan(id); });
   const { profile, partition, blocked, ...rest } = data;
   const prev = storeFor(id);
+  // a window only ever writes its own tabs: never another window's (stale) copy
+  const sid = winSid.get(e.sender.id);
+  delete rest.sessions;
+  if ('session' in rest) {
+    // a window that was closed on purpose has already been forgotten: drop its last save
+    if (sid && winProfile.has(e.sender.id)) rest.sessions = { ...(prev.sessions || {}), [sid]: rest.session };
+    delete rest.session;
+  }
   const ps = prev.settings || {}, ns = rest.settings || {};
   // the tab lock password lives on the profile: a window with an older copy never overwrites a newer one
   if ((ps.lockVer || 0) > (ns.lockVer || 0)) {
