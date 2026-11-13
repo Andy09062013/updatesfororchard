@@ -68,6 +68,8 @@ const ICONS = {
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.8h.01"/>',
   restore: '<path d="M9 9h10v10H9z"/><path d="M6 15H5V5h10v1"/>',
   chevR: '<path d="m9.5 6 6 6-6 6"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/>',
+  camera: '<rect x="3" y="6.5" width="13" height="11" rx="2"/><path d="m16 10.5 5-3v9l-5-3"/>',
   anchor: '<circle cx="12" cy="5.5" r="2"/><path d="M12 7.5v13"/><path d="M8 11h8"/><path d="M4.5 13a7.5 7.5 0 0 0 15 0"/>',
   leaf: '<path d="M5 19c0-8 5-13.5 14.5-14.5C19 14 13.5 19 5 19z"/><path d="M5 19 13 11"/>',
   apple: '<path d="M12 7.5c-1.7-1.3-5.5-1.4-6.8 2-1.3 3.5.6 9 3.5 10.3 1.2.5 2.2 0 3.3 0s2.1.5 3.3 0c2.9-1.3 4.8-6.8 3.5-10.3-1.3-3.4-5.1-3.3-6.8-2z"/><path d="M12 7.5c0-2 .8-3.5 2.5-4.3"/>',
@@ -125,7 +127,7 @@ function makeWebview(t, url) {
   const nav = (e) => { t.url = e.url; t.icon = null; if (t === active) { updateNav(); } renderTab(t); saveSession(); };
   wv.addEventListener('ipc-message', (e) => { if (e.channel === 'orchard-context') showPageMenu(t, e.args[0]); });
   wv.addEventListener('did-navigate', nav);
-  wv.addEventListener('did-navigate', () => { t.committed = true; });
+  wv.addEventListener('did-navigate', () => { t.committed = true; if (t.capturing) { t.capturing = false; renderTab(t); sendFps(t); scheduleFreeze(t); } });
   wv.addEventListener('did-navigate-in-page', (e) => { if (e.isMainFrame) nav(e); });
   wv.addEventListener('found-in-page', (e) => { $('findRes').textContent = e.result.matches ? e.result.activeMatchOrdinal + '/' + e.result.matches : '0/0'; });
   wv.addEventListener('media-started-playing', () => { t.audio = true; renderTab(t); });
@@ -247,6 +249,58 @@ function dragStepV(e) {
       break;
     }
   }
+}
+
+// ---- microphone and camera permission prompts ----
+const permQueue = [];
+const tabByWc = (id) => tabs.find(x => { try { return x.wv && x.wv.getWebContentsId() === id; } catch { return false; } });
+const hostLabel = (o) => o === 'file://' ? 'This file' : String(o).replace(/^https?:\/\//, '');
+window.aura.on('perm-ask', (d) => { permQueue.push(d); if (permQueue.length === 1) showPermPrompt(); });
+window.aura.on('perm-cancel', (id) => {
+  const i = permQueue.findIndex(x => x.id === id); if (i < 0) return;
+  permQueue.splice(i, 1);
+  if (i === 0) { closePermPrompt(); if (permQueue.length) showPermPrompt(); }
+});
+window.aura.on('media-on', (wcId) => {
+  const t = tabByWc(wcId); if (!t) return;
+  t.capturing = true; clearTimeout(t.freezeT);
+  if (t.frozen) freeze(t, false);
+  sendFps(t); renderTab(t);
+});
+function closePermPrompt() { const p = $('permBox'); if (p) p.remove(); }
+function showPermPrompt() {
+  closePermPrompt();
+  const d = permQueue[0]; if (!d) return;
+  const t = tabByWc(d.wcId);
+  if (t && t !== active && !isShown(t)) activate(t); // show the page that is asking
+  const what = d.kinds.length === 2 ? 'your microphone and camera' : d.kinds[0] === 'camera' ? 'your camera' : 'your microphone';
+  const box = document.createElement('div'); box.id = 'permBox';
+  box.innerHTML = `<div class="ph">${ic(d.kinds.includes('camera') ? 'camera' : 'mic', 18)}<div><b></b><small>wants to use ${what}.</small></div></div><div class="pa"><span class="pbtn" data-a="block">Block</span><span class="pbtn ok" data-a="allow">Allow</span></div>`;
+  box.querySelector('b').textContent = hostLabel(d.origin);
+  box.onclick = (e) => {
+    const a = e.target.dataset.a; if (!a) return;
+    window.aura.permAnswer(d.id, a === 'allow');
+    if (a === 'block') toast('Blocked. You can change this in Settings under Site permissions.');
+    permQueue.shift(); closePermPrompt(); if (permQueue.length) showPermPrompt();
+  };
+  const r = $('urlwrap').getBoundingClientRect();
+  box.style.left = Math.max(8, r.left) + 'px'; box.style.top = (r.bottom + 6) + 'px';
+  document.body.appendChild(box);
+}
+async function fillPermList() {
+  const box = $('permList'); if (!box) return;
+  let list = []; try { list = await window.aura.permList(); } catch {}
+  if (!list.length) { box.innerHTML = '<div class="set" style="color:var(--dim);font-size:12px">No sites have asked to use your microphone or camera yet.</div>'; return; }
+  const word = (v) => v === 'allow' ? 'Allowed' : v === 'block' ? 'Blocked' : '';
+  box.innerHTML = '';
+  list.forEach(p => {
+    const r = document.createElement('div'); r.className = 'set';
+    const bits = [p.microphone ? 'Microphone: ' + word(p.microphone) : '', p.camera ? 'Camera: ' + word(p.camera) : ''].filter(Boolean).join(', ');
+    r.innerHTML = '<span style="min-width:0"><span class="po"></span><small style="display:block;color:var(--dim);font-size:12px"></small></span><span class="pbtn mini">Reset</span>';
+    r.querySelector('.po').textContent = hostLabel(p.origin); r.querySelector('small').textContent = bits;
+    r.querySelector('.pbtn').onclick = () => { window.aura.permReset(p.origin); toast('The site will ask again next time.'); fillPermList(); };
+    box.appendChild(r);
+  });
 }
 
 // ---- default browser (Windows) ----
@@ -375,7 +429,7 @@ function renderTab(t) {
   else icon = '<span class="ticon">' + APPLE_MARK + '</span>';
   const title = masked ? 'Locked tab' : isNewtab(t.url) ? 'New Tab' : (t.title || t.url);
   const chg = t.charge >= 1 ? `<span class="chg" title="${t.charge === 2 ? 'Supercharged' : 'Charged'}">${ic(t.charge === 2 ? 'boltFill' : 'bolt', 13)}</span>` : '';
-  t.el.innerHTML = icon + '<span class="t"></span>' + chg + (t.locked && !masked ? '<span class="badge" title="Locked tab, currently unlocked">' + ic('unlock', 13) + '</span>' : '') + (t.audio ? '<span class="badge" title="Playing audio">' + ic('volume', 14) + '</span>' : '') + '<span class="x" title="Close tab">' + ic('x', 14) + '</span>';
+  t.el.innerHTML = icon + '<span class="t"></span>' + chg + (t.locked && !masked ? '<span class="badge" title="Locked tab, currently unlocked">' + ic('unlock', 13) + '</span>' : '') + (t.capturing ? '<span class="badge rec" title="Using your microphone or camera">' + ic('mic', 13) + '</span>' : '') + (t.audio ? '<span class="badge" title="Playing audio">' + ic('volume', 14) + '</span>' : '') + '<span class="x" title="Close tab">' + ic('x', 14) + '</span>';
   t.el.querySelector('.t').textContent = title;
   t.el.title = title + (t.charge === 2 ? ' (supercharged)' : t.charge === 1 ? ' (charged)' : '') + (t.sleeping ? ' (sleeping)' : t.frozen ? ' (frozen)' : '');
   t.el.classList.toggle('sleep', !!(t.sleeping || t.frozen));
@@ -453,12 +507,12 @@ function freeze(t, f) {
 function audible(t) { try { return t.audio || (t.ready && t.wv.isCurrentlyAudible()); } catch { return false; } }
 function scheduleFreeze(t) {
   clearTimeout(t.freezeT);
-  if (store.settings.freeze === false || t.charge >= 1) return;
+  if (store.settings.freeze === false || t.charge >= 1 || t.capturing) return;
   const lvl = saverLevel();
-  t.freezeT = setTimeout(() => { if (!isShown(t) && !audible(t)) freeze(t, true); }, lvl >= 2 ? 1000 : lvl === 1 ? 3000 : 15000);
+  t.freezeT = setTimeout(() => { if (!isShown(t) && !audible(t) && !t.capturing) freeze(t, true); }, lvl >= 2 ? 1000 : lvl === 1 ? 3000 : 15000);
 }
 function sleepTab(t) {
-  if (isShown(t) || t.sleeping || audible(t) || !t.wv || t.charge >= 1) return;
+  if (isShown(t) || t.sleeping || audible(t) || !t.wv || t.charge >= 1 || t.capturing) return;
   clearTimeout(t.freezeT);
   t.wv.remove(); t.wv = null; t.ready = false; t.frozen = false; t.sleeping = true; t.loading = false;
   renderTab(t); updateSaverUI();
@@ -492,7 +546,7 @@ let thrStat = { supported: false, active: false, count: 0, apps: [] };
 function syncThrottle() { window.aura.videoMode({ on: store.settings.cheapVideo !== false, level: saverLevel() }); window.aura.throttle({ on: store.settings.slowApps !== false, level: saverLevel(), exclude: store.settings.slowExclude || [] }); }
 // cap each tab's frame rate on battery (30fps Saver, 20fps Ultra) to cut GPU/CPU work
 function fpsCap() { if (store.settings.capFps === false) return 0; const lvl = saverLevel(); return lvl >= 2 ? 20 : lvl === 1 ? 30 : 0; }
-function tabFps(t) { return (t && t.charge >= 1) ? 0 : fpsCap(); } // charged/supercharged tabs never capped
+function tabFps(t) { return (t && (t.charge >= 1 || t.capturing)) ? 0 : fpsCap(); } // charged/supercharged tabs never capped
 function sendFps(t) { try { if (t && t.wv && t.ready) t.wv.send('orchard-fps', tabFps(t)); } catch {} }
 function applyFps() { tabs.forEach(sendFps); }
 window.aura.on('throttle-status', (s) => { thrStat = s || thrStat; if (panelIs('battery')) renderBattery(); });
@@ -1101,6 +1155,7 @@ function renderSettings() {
     + `<div class="set">Start page background <span class="pbtn" id="thm">Change</span></div>`
     + `<div class="set">Open tabs vertically ${sw(!!S.vtabs, 'vtT')}</div>`
     + `<div class="set" style="color:var(--dim);font-size:12px;display:block;line-height:1.5">Shows tabs in a sidebar on the left. Use the arrow to collapse it and drag its edge to resize it.</div>`
+    + hd('Site permissions') + `<div id="permList"></div>`
     + hd('Privacy')
     + `<div class="set">Ad blocker ${sw(!!S.adblock, 'adT')}</div>`
     + `<div class="set">Hidden elements <span class="pbtn" id="hidesOpen">Manage</span></div>`
@@ -1129,6 +1184,7 @@ function renderSettings() {
   toggle('vtT', () => !!store.settings.vtabs, (v) => setVTabs(v));
   if ($('cnTest')) $('cnTest').onclick = () => showNote({ chat: '', title: 'Test notification', from: 'Orchard', text: 'Chat notifications will appear here.' });
   fillDefaultBrowserRow();
+  fillPermList();
   toggle('cvT2', () => store.settings.cheapVideo !== false, (v) => { store.settings.cheapVideo = v; save(); syncThrottle(); });
   toggle('slowT2', () => store.settings.slowApps !== false, (v) => { store.settings.slowApps = v; save(); syncThrottle(); });
   $('battOpen').onclick = () => openPanel('battery');

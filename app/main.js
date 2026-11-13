@@ -92,6 +92,56 @@ const hostOf = (wc) => { try { return wc && (wc.hostWebContents || wc); } catch 
 const sendTo = (wc, ch, d) => { if (wc && !wc.isDestroyed()) wc.send(ch, d); };
 
 const setUp = new Set();
+
+// ---------- site permissions: microphone and camera ask first, like Chrome ----------
+// Without a handler Electron silently grants every site the mic. Now a site asks once,
+// the answer is remembered per site (per profile; guest answers are never saved), and
+// a tab that is using the mic or camera is kept awake so calls do not drop.
+const PERM_FILE = path.join(dataDir, 'site-permissions.json');
+let sitePerms = {}; try { sitePerms = JSON.parse(fs.readFileSync(PERM_FILE, 'utf8')) || {}; } catch {}
+const guestPerms = {};
+const permsFor = (pid) => pid === 'guest' ? guestPerms : (sitePerms[pid] = sitePerms[pid] || {});
+const savePerms = () => { try { fs.writeFileSync(PERM_FILE, JSON.stringify(sitePerms)); } catch {} };
+const originOf = (u) => { try { const x = new URL(u); return x.protocol === 'file:' ? 'file://' : x.origin; } catch { return ''; } };
+const permAsks = new Map(); let permSeq = 0;
+function mediaOn(wc) { try { if (wc && !wc.isDestroyed()) sendTo(hostOf(wc), 'media-on', wc.id); } catch {} }
+function setupPermissions(ses, pid) {
+  ses.setPermissionRequestHandler((wc, permission, cb, details) => {
+    if (permission !== 'media') return cb(true); // everything else behaves as before
+    const origin = originOf((details && details.requestingUrl) || (wc && wc.getURL()) || '');
+    const mt = (details && details.mediaTypes) || [];
+    const kinds = [];
+    if (mt.includes('audio') || !mt.length) kinds.push('microphone');
+    if (mt.includes('video')) kinds.push('camera');
+    const saved = permsFor(pid)[origin] || {};
+    if (kinds.some(k => saved[k] === 'block')) return cb(false);
+    if (kinds.every(k => saved[k] === 'allow')) { mediaOn(wc); return cb(true); }
+    const host = hostOf(wc);
+    if (!host || host.isDestroyed()) return cb(false);
+    const id = ++permSeq;
+    permAsks.set(id, { cb, wc, pid, origin, kinds });
+    sendTo(host, 'perm-ask', { id, origin, kinds, wcId: wc.id });
+    // unanswered for a minute: block this time only
+    setTimeout(() => { const a = permAsks.get(id); if (a) { permAsks.delete(id); a.cb(false); sendTo(host, 'perm-cancel', id); } }, 60000);
+  });
+  ses.setPermissionCheckHandler((wc, permission, origin, details) => {
+    if (permission !== 'media') return true;
+    const saved = permsFor(pid)[originOf(origin || (details && details.requestingUrl) || '')] || {};
+    const k = details && details.mediaType === 'video' ? 'camera' : 'microphone';
+    return saved[k] !== 'block'; // not decided yet: let the site ask
+  });
+}
+ipcMain.on('perm-answer', (e, id, allow) => {
+  const a = permAsks.get(id); if (!a) return;
+  permAsks.delete(id);
+  const p = permsFor(a.pid); p[a.origin] = p[a.origin] || {};
+  a.kinds.forEach(k => { p[a.origin][k] = allow ? 'allow' : 'block'; });
+  if (a.pid !== 'guest') savePerms();
+  if (allow) mediaOn(a.wc);
+  a.cb(!!allow);
+});
+ipcMain.handle('perm-list', (e) => Object.entries(permsFor(profileOf(e))).map(([origin, v]) => ({ origin, ...v })));
+ipcMain.on('perm-reset', (e, origin) => { const pid = profileOf(e); delete permsFor(pid)[origin]; if (pid !== 'guest') savePerms(); });
 const downloads = new Map();
 let dlId = 0;
 // download history, shared across every window and kept between runs
@@ -124,6 +174,7 @@ function setupSession(id) {
   setUp.add(id);
   const profId = id;
   const ses = sessionFor(id);
+  setupPermissions(ses, id);
   try {
     const vp = path.join(__dirname, 'video-preload.js'), pw = path.join(__dirname, 'pw-preload.js'), fp = path.join(__dirname, 'fps-preload.js');
     if (typeof ses.registerPreloadScript === 'function') { ses.registerPreloadScript({ type: 'frame', id: 'orchard-video', filePath: vp }); ses.registerPreloadScript({ type: 'frame', id: 'orchard-pw', filePath: pw }); ses.registerPreloadScript({ type: 'frame', id: 'orchard-fps', filePath: fp }); }

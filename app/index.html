@@ -156,6 +156,13 @@ select,.pbtn{background:var(--field);color:var(--txt);border:1px solid var(--lin
 .pbtn.ok:hover{background:var(--accH);border-color:var(--accH)}
 .mini{font-size:11.5px;padding:3px 8px}
 #ctxBack{position:fixed;inset:0;z-index:49;background:transparent}
+#permBox{position:fixed;z-index:56;width:340px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rL);box-shadow:var(--shadow);padding:14px;animation:popIn var(--fast) var(--ease)}
+#permBox .ph{display:flex;gap:12px;align-items:flex-start}
+#permBox .ph svg{color:var(--txt);margin-top:2px}
+#permBox b{display:block;font-weight:600;overflow-wrap:anywhere}
+#permBox small{color:var(--dim);font-size:12.5px}
+#permBox .pa{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.tab .badge.rec{color:var(--acc)}
 #ctx{position:fixed;z-index:50;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:var(--rL);padding:4px;box-shadow:var(--shadow)}
 #ctx .ci{padding:7px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:10px}
 #ctx .ci:hover{background:#ffffff10}

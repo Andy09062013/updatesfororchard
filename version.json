@@ -1,6 +1,6 @@
 {
-  "version": "3.3.2",
-  "notes": "Right-click menus now close when you click anywhere outside them, including on the web page, or press Esc.",
+  "version": "3.4.0",
+  "notes": "Microphone and camera for calls: websites now ask before using your microphone or camera, and Orchard remembers your choice for each site (Settings, Site permissions). A tab that is using your microphone or camera shows a microphone icon and is never frozen or put to sleep, so calls keep going when you switch tabs.",
   "minElectron": "45.0.0",
   "files": [
     {
@@ -29,11 +29,11 @@
     },
     {
       "path": "index.html",
-      "sha256": "101670d3749c485c58c4a3dbf761168124a28e7328077b2ff6718477ae63e28d"
+      "sha256": "d888c76691770ecfee40f3537a256a234514a0b1012e9fd52d0ba93b0665da9e"
     },
     {
       "path": "main.js",
-      "sha256": "33f4b524dac15b66fb47b646fbda8f1fc893a67786861052bdaedaf2fb4557fd"
+      "sha256": "5526de089db09d3e17f97e8b82df1f1f8d19e05e19ca563fdaac649c5281bb9b"
     },
     {
       "path": "newtab.html",
@@ -41,11 +41,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "071b4b5d7f6bf63530aabff5d8c2371b5049d85c21984860e45fbedcf92dcf61"
+      "sha256": "2ac505e76a8a1833e6855928e9188afa3671ac8384bc76ce90eeeee7bd0cef57"
     },
     {
       "path": "preload.js",
-      "sha256": "a800dafe73010d631e7cd8cb4ee97c0cde58bf3a1816b0aae5059dd4522b5290"
+      "sha256": "4b9afd72881e033ebf576cbe2f9ad79bb24ea87e8d0925ecee4bcf2ef3656a39"
     },
     {
       "path": "pw-preload.js",
@@ -53,7 +53,7 @@
     },
     {
       "path": "renderer.js",
-      "sha256": "b30e8076ec9b33601bfd51c0b2759dea71b72af4a39c0716b8145f1c601d7438"
+      "sha256": "a55fc79d73c72f44ade44e09bb7696b4e427ec8aeef95d6de74f100c9322633a"
     },
     {
       "path": "throttle.ps1",
