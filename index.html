@@ -255,7 +255,7 @@ const CLASSES={
     ctrl:[['light','Light attack (3-hit combo)'],['heavy','Heavy attack'],['block','Block (hold), press just before impact to parry']]},
   mage:{name:'Mage',hp:85,speed:6.6,mana:120,ult:'Divine Ascension',desc:'A healer who mends allies from afar and shields the party, with a costly fireball for defence.',
     skills:[{id:'mend',k:'LMB',n:'Mending Ray',cost:12,cd:.6},{id:'fireball',k:'RMB',n:'Fireball',cost:30,cd:.8},{id:'sanct',k:'Q',n:'Sanctuary',cost:35,cd:12},{id:'burst',k:'E',n:'Healing Burst',cost:30,cd:8},{id:'ward',k:'F',n:'Arcane Ward',cost:30,cd:16}],
-    ctrl:[['light','Mending Ray, small heal on the targeted ally (12 mana)'],['heavy','Fireball (30 mana)'],['q','Sanctuary, healing circle placed at the targeted ally (35 mana)'],['e','Healing Burst, large instant heal around you (30 mana)'],['f','Arcane Ward, nearby allies take reduced damage (30 mana)']]},
+    ctrl:[['light','Mending Ray, small heal on the targeted ally (12 mana)'],['heavy','Fireball (30 mana)'],['q','Sanctuary, healing circle placed at the targeted ally (35 mana)'],['e','Healing Burst, large instant heal around you (30 mana)'],['f','Arcane Ward, allies take reduced damage; nearby enemies are damaged and stunned (30 mana)']]},
   archer:{name:'Archer',hp:105,speed:7.4,ult:'Cataclysm Arrow',desc:'A ranged hunter with unlimited arrows. Rapid shots, heavy charged arrows and devastating volleys.',
     skills:[{id:'shot',k:'LMB',n:'Shot',cd:.5},{id:'charged',k:'RMB',n:'Charged Shot',cd:.55},{id:'triple',k:'Q',n:'Triple Shot',cd:4.5},{id:'rain',k:'E',n:'Arrow Rain',cd:12},{id:'vault',k:'F',n:'Vault Shot',cd:7}],
     ctrl:[['light','Shoot arrow'],['heavy','Hold to charge (0.7s), full charge deals massive damage'],['q','Triple Shot, three heavy arrows at once'],['e','Arrow Rain on the target area'],['f','Vault Shot, backflip away and fire a heavy arrow (invulnerable)']]},
@@ -1137,7 +1137,7 @@ function tryActions(mx,mz,ml){
     if(gameTime-buf.q<.32&&ready('sanct')){buf.q=-9;useSkill('sanct');SFX.cast();const tg=allyTarget();
       startCast({dur:.8,at:.5,pose:'raise',move:.2,face:false,healFx:true,fn:()=>{const t2=allyTarget(tg.id);emit('zone',{z:{kind:'heal',x:t2.x,z:t2.z,r:6,dur:6,rate:10}});gainUlt(10);}});return true;}
     if(gameTime-buf.e<.32&&ready('burst')){buf.e=-9;useSkill('burst');SFX.cast();startCast({dur:.65,at:.4,pose:'raise',move:.3,face:false,healFx:true,fn:()=>{emit('healburst',{x:P.x,z:P.z,r:13,amt:32});gainUlt(10);}});return true;}
-    if(gameTime-buf.f<.32&&ready('ward')){buf.f=-9;useSkill('ward');SFX.cast();startCast({dur:.6,at:.38,pose:'both',move:.3,face:false,fn:()=>{emit('ward',{x:P.x,z:P.z,r:13,dur:5});gainUlt(8);}});return true;}
+    if(gameTime-buf.f<.32&&ready('ward')){buf.f=-9;useSkill('ward');SFX.cast();startCast({dur:.6,at:.38,pose:'both',move:.3,face:false,fn:()=>{emit('ward',{x:P.x,z:P.z,r:13,dur:5});gainUlt(8);aoeHit(P.x,P.z,7,18,10,false,true);ringFx(P.x,P.z,0x9fd8ff,6,.4);}});return true;}
     buf.light=buf.heavy=buf.q=buf.e=buf.f=-9;
   }else if(P.cls==='berserker'){
     if(consume('light')){P.state='cleave';P.combo=0;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();return true;}
@@ -1191,7 +1191,7 @@ function nearestMinionId(){let best=null,bd=1e9;mins.forEach(m=>{const d=Math.hy
 function aoeHit(x,z,r,dmg,poise,heavy,stun){
   let hit=false;
   if(B&&!B.dead&&!B.air&&BM&&Math.hypot(B.x-x,B.z-z)-B.r<r){hitBoss(dmg,poise,heavy,B.x,BM.root.position.y+2.5,B.z,false,stun);hit=true;}
-  mins.forEach(m=>{if(Math.hypot(m.x-x,m.z-z)-m.r<r){hitMinion(m,dmg,heavy,true);hit=true;}});
+  mins.forEach(m=>{if(Math.hypot(m.x-x,m.z-z)-m.r<r){hitMinion(m,dmg,heavy,true);hit=true;if(stun&&NET.isHost&&mins.has(m.id)){m.st='move';m.t=Math.max(m.t,1.5);}}});
   return hit;
 }
 const ULT_DUR={sword:1.75,mage:1.2,archer:.9,rogue:1.85,berserker:1.6,warlock:.9};
