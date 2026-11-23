@@ -1,0 +1,166 @@
+// Hollow Crown multiplayer server: serves the game page and runs lobbies + game relay over WebSocket.
+const HTML: string = await Bun.file(new URL("./index.html", import.meta.url)).text();
+
+type Player = { id: string; name: string; cls: string; ready: boolean; ws: any };
+type Room = {
+  code: string;
+  host: string;
+  public: boolean;
+  state: "lobby" | "playing";
+  settings: { boss: string; arena: string; diff: string };
+  players: Map<string, Player>;
+};
+
+const CLASSES = ["sword", "mage", "archer"];
+const BOSSES: Record<string, string> = { varkhul: "keep", sylvara: "frost", ignar: "forge" };
+const ARENAS = ["keep", "frost", "forge"];
+const DIFFS = ["easy", "normal", "hard", "nightmare"];
+const MAX = 5;
+const rooms = new Map<string, Room>();
+
+function makeCode(): string {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  for (;;) {
+    let c = "";
+    for (let i = 0; i < 5; i++) c += A[Math.floor(Math.random() * A.length)];
+    if (!rooms.has(c)) return c;
+  }
+}
+const clean = (s: any, n = 16) => String(s ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, n) || "Adventurer";
+const cls = (c: any) => (CLASSES.includes(c) ? c : "sword");
+
+function view(r: Room) {
+  return {
+    code: r.code, host: r.host, public: r.public, state: r.state, settings: r.settings,
+    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, ready: p.ready })),
+  };
+}
+function send(ws: any, m: any) { try { ws.send(JSON.stringify(m)); } catch {} }
+function bcast(r: Room, m: any, except?: string) {
+  const s = JSON.stringify(m);
+  for (const p of r.players.values()) if (p.id !== except) { try { p.ws.send(s); } catch {} }
+}
+function pushLobby(r: Room) { bcast(r, { t: "lobby", room: view(r) }); }
+
+function leave(ws: any) {
+  const code = ws.data.room;
+  if (!code) return;
+  ws.data.room = null;
+  const r = rooms.get(code);
+  if (!r) return;
+  r.players.delete(ws.data.id);
+  if (r.players.size === 0) { rooms.delete(code); return; }
+  bcast(r, { t: "left", id: ws.data.id });
+  if (r.host === ws.data.id) {
+    r.host = r.players.keys().next().value as string;
+    const h = r.players.get(r.host);
+    if (h) h.ready = false;
+    bcast(r, { t: "host", id: r.host });
+  }
+  pushLobby(r);
+}
+
+function join(ws: any, r: Room, name: string, c: string) {
+  if (ws.data.room) leave(ws);
+  const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), ready: false, ws };
+  r.players.set(p.id, p);
+  ws.data.room = r.code;
+  pushLobby(r);
+}
+
+function handle(ws: any, m: any) {
+  const r = ws.data.room ? rooms.get(ws.data.room) : undefined;
+  switch (m.t) {
+    case "list": {
+      const list = [...rooms.values()]
+        .filter((x) => x.public && x.state === "lobby" && x.players.size < MAX)
+        .slice(0, 30)
+        .map((x) => ({ code: x.code, hostName: x.players.get(x.host)?.name ?? "Unknown", count: x.players.size, boss: x.settings.boss, diff: x.settings.diff }));
+      send(ws, { t: "lobbies", list });
+      break;
+    }
+    case "create": {
+      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, state: "lobby", settings: { boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
+      rooms.set(room.code, room);
+      join(ws, room, m.name, m.cls);
+      break;
+    }
+    case "join": {
+      const room = rooms.get(String(m.code || "").toUpperCase());
+      if (!room) return send(ws, { t: "error", msg: "No lobby was found with that code." });
+      if (room.state !== "lobby") return send(ws, { t: "error", msg: "That expedition is already in progress." });
+      if (room.players.size >= MAX) return send(ws, { t: "error", msg: "That lobby is full (5 players maximum)." });
+      join(ws, room, m.name, m.cls);
+      break;
+    }
+    case "leave": leave(ws); break;
+    case "set": {
+      if (!r) return;
+      const p = r.players.get(ws.data.id);
+      if (!p) return;
+      if (m.cls !== undefined && r.state === "lobby") p.cls = cls(m.cls);
+      if (m.ready !== undefined) p.ready = !!m.ready;
+      pushLobby(r);
+      break;
+    }
+    case "settings": {
+      if (!r || r.host !== ws.data.id || r.state !== "lobby") return;
+      const s = m.settings || {};
+      if (BOSSES[s.boss]) r.settings.boss = s.boss;
+      if (ARENAS.includes(s.arena)) r.settings.arena = s.arena;
+      if (DIFFS.includes(s.diff)) r.settings.diff = s.diff;
+      pushLobby(r);
+      break;
+    }
+    case "start": {
+      if (!r || r.host !== ws.data.id || r.state !== "lobby") return;
+      const notReady = [...r.players.values()].some((p) => p.id !== r.host && !p.ready);
+      if (notReady) return send(ws, { t: "error", msg: "All players must be ready before starting." });
+      r.state = "playing";
+      pushLobby(r);
+      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls })) });
+      break;
+    }
+    case "toLobby": {
+      if (!r || r.host !== ws.data.id) return;
+      r.state = "lobby";
+      for (const p of r.players.values()) p.ready = false;
+      pushLobby(r);
+      break;
+    }
+    case "g": {
+      if (!r || r.state !== "playing") return;
+      const out = JSON.stringify({ t: "g", from: ws.data.id, d: m.d });
+      if (m.host) { const h = r.players.get(r.host); if (h && h.id !== ws.data.id) { try { h.ws.send(out); } catch {} } return; }
+      for (const p of r.players.values()) if (p.id !== ws.data.id) { try { p.ws.send(out); } catch {} }
+      break;
+    }
+  }
+}
+
+let nextId = 1;
+const server = Bun.serve({
+  port: Number(Bun.env.PORT || 3000),
+  fetch(req, srv) {
+    const url = new URL(req.url);
+    if (url.pathname === "/ws") {
+      const id = (nextId++).toString(36) + Math.random().toString(36).slice(2, 7);
+      if (srv.upgrade(req, { data: { id, room: null } })) return;
+      return new Response("WebSocket upgrade failed", { status: 400 });
+    }
+    if (url.pathname === "/health") return new Response("ok");
+    return new Response(HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
+  },
+  websocket: {
+    idleTimeout: 120,
+    maxPayloadLength: 64 * 1024,
+    open(ws: any) { send(ws, { t: "welcome", id: ws.data.id }); },
+    message(ws: any, raw: any) {
+      let m: any;
+      try { m = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw)); } catch { return; }
+      if (m && typeof m.t === "string") handle(ws, m);
+    },
+    close(ws: any) { leave(ws); },
+  },
+});
+console.log("Hollow Crown server listening on", server.port);
