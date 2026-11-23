@@ -1474,7 +1474,7 @@ function updatePlayer(dt){
       if(k>=1&&Math.random()<.5)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
       if(!held('heavy')){
-        const full=k>=1,dmg=full?80:Math.round(24+36*k);shoot(full?'arrowC':'arrow',dmg,full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
+        const full=k>=1,dmg=full?75:Math.round(24+33*k);shoot(full?'arrowC':'arrow',dmg,full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
         P.cd.charged=.55;startCast({dur:.22,at:0,pose:'bow',move:.7,fired:true,fn:()=>{}});P.cast.fired=true;
       }
       break;}
