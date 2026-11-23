@@ -1399,7 +1399,7 @@ $('soloBack').onclick=toMenu;
 $('soloStart').onclick=()=>startGame({mode:'solo',boss:$('soloBoss').value,arena:$('soloArena').value,diff:$('soloDiff').value});
 $('mpBtn').onclick=async()=>{initAudio();$('menuStatus').textContent='Connecting to the server...';
   try{await netConnect();state='mp';setScreen('mp');$('mpStatus').textContent='';nsend({t:'list'});}
-  catch(e){$('menuStatus').textContent='Multiplayer is only available on the hosted version of the game. Solo play is available here.';}};
+  catch(e){$('menuStatus').innerHTML='Multiplayer is only available on the hosted version: <a href="https://game-production-0587ac3d.up.railway.app" target="_blank" style="color:#f2c75a">game-production-0587ac3d.up.railway.app</a>';}};
 $('mpBack').onclick=toMenu;
 $('refreshBtn').onclick=()=>nsend({t:'list'});
 $('createBtn').onclick=()=>nsend({t:'create',name:myName(),cls:myClass,public:$('pubChk').checked});
