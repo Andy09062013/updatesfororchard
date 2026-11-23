@@ -7,7 +7,7 @@ type Room = {
   host: string;
   public: boolean;
   state: "lobby" | "playing";
-  settings: { boss: string; arena: string; diff: string };
+  settings: { gm: string; boss: string; arena: string; diff: string };
   players: Map<string, Player>;
 };
 
@@ -75,12 +75,12 @@ function handle(ws: any, m: any) {
       const list = [...rooms.values()]
         .filter((x) => x.public && x.state === "lobby" && x.players.size < MAX)
         .slice(0, 30)
-        .map((x) => ({ code: x.code, hostName: x.players.get(x.host)?.name ?? "Unknown", count: x.players.size, boss: x.settings.boss, diff: x.settings.diff }));
+        .map((x) => ({ code: x.code, hostName: x.players.get(x.host)?.name ?? "Unknown", count: x.players.size, boss: x.settings.boss, diff: x.settings.diff, gm: x.settings.gm }));
       send(ws, { t: "lobbies", list });
       break;
     }
     case "create": {
-      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, state: "lobby", settings: { boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
+      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, state: "lobby", settings: { gm: "boss", boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
       rooms.set(room.code, room);
       join(ws, room, m.name, m.cls);
       break;
@@ -109,6 +109,7 @@ function handle(ws: any, m: any) {
       if (BOSSES[s.boss]) r.settings.boss = s.boss;
       if (ARENAS.includes(s.arena)) r.settings.arena = s.arena;
       if (DIFFS.includes(s.diff)) r.settings.diff = s.diff;
+      if (s.gm === "boss" || s.gm === "campaign") r.settings.gm = s.gm;
       pushLobby(r);
       break;
     }
