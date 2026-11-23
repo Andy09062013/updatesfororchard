@@ -238,6 +238,7 @@ const rand=(a,b)=>a+Math.random()*(b-a);
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let ARENA=24;
+const CHARGE=.7;
 
 // ==== DATA ====
 const CLASSES={
@@ -247,9 +248,9 @@ const CLASSES={
   mage:{name:'Mage',hp:80,speed:6.4,mana:100,desc:'A support caster. Heals and shields allies, and hurls fire. Spells consume mana.',
     skills:[{id:'fireball',k:'LMB',n:'Fireball',cost:10,cd:.55},{id:'inferno',k:'RMB',n:'Inferno Orb',cost:30,cd:6},{id:'sanct',k:'Q',n:'Sanctuary',cost:35,cd:14},{id:'burst',k:'E',n:'Healing Burst',cost:30,cd:9},{id:'ward',k:'F',n:'Arcane Ward',cost:30,cd:18}],
     ctrl:[['light','Fireball (10 mana)'],['heavy','Inferno Orb, large explosion (30 mana)'],['q','Sanctuary, healing circle for allies (35 mana)'],['e','Healing Burst, instant heal nearby (30 mana)'],['f','Arcane Ward, allies take reduced damage (30 mana)']]},
-  archer:{name:'Archer',hp:85,speed:7.2,desc:'A ranged hunter with unlimited arrows. Powerful volleys require long preparation.',
-    skills:[{id:'shot',k:'LMB',n:'Shot',cd:.8},{id:'charged',k:'RMB',n:'Charged Shot',cd:1.2},{id:'triple',k:'Q',n:'Triple Shot',cd:7},{id:'rain',k:'E',n:'Arrow Rain',cd:16}],
-    ctrl:[['light','Shoot arrow'],['heavy','Hold to charge a powerful shot, release to fire'],['q','Triple Shot (long draw)'],['e','Arrow Rain on the target area (long channel)']]},
+  archer:{name:'Archer',hp:85,speed:7.2,desc:'A ranged hunter with unlimited arrows. Rapid shots, heavy charged arrows and devastating volleys.',
+    skills:[{id:'shot',k:'LMB',n:'Shot',cd:.55},{id:'charged',k:'RMB',n:'Charged Shot',cd:.8},{id:'triple',k:'Q',n:'Triple Shot',cd:5},{id:'rain',k:'E',n:'Arrow Rain',cd:14}],
+    ctrl:[['light','Shoot arrow'],['heavy','Hold to charge (0.7s), full charge deals massive damage'],['q','Triple Shot, three heavy arrows at once'],['e','Arrow Rain on the target area']]},
   rogue:{name:'Rogue',hp:75,speed:7.6,desc:'A swift assassin with twin daggers. Strikes from the shadows and deals triple damage from behind.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'backstab',k:'RMB',n:'Backstab',cd:3},{id:'step',k:'Q',n:'Shadow Step',cd:8},{id:'poison',k:'E',n:'Envenom',cd:16},{id:'smoke',k:'F',n:'Smoke Bomb',cd:20}],
     ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Backstab lunge, triple damage and a guaranteed stun from behind'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
@@ -464,7 +465,7 @@ function makePlayer(cls){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
-  let glow=null;
+  let glow=null,bowRig=null;
   if(cls==='sword'){
     const steel=std(0x9aa2b0,{metalness:.75,roughness:.32}),dark=std(0x2a2c33,{metalness:.6,roughness:.5}),cloth=std(0x2f4f86,{roughness:.85}),leather=std(0x4a3324),gold=std(0xc9a04a,{metalness:.8,roughness:.3});
     const blade=std(0xdfe6ee,{metalness:.9,roughness:.15,emissive:0x223344,emissiveIntensity:.3});
@@ -513,13 +514,17 @@ function makePlayer(cls){
     const head=new THREE.Mesh(new THREE.SphereGeometry(.24,14,12),skin);head.position.y=1.18;head.castShadow=true;upper.add(head);
     const hood=new THREE.Mesh(new THREE.SphereGeometry(.29,12,10,0,TAU,0,1.9),tunic);hood.position.set(0,1.22,-.03);hood.castShadow=true;upper.add(hood);
     box(.2,.68,.2,tunic,0,-.34,0,armR);box(.2,.68,.2,tunic,0,-.34,0,armL);
-    const bow=grp(0,-.72,0,armL);
-    const arc=new THREE.Mesh(new THREE.TorusGeometry(.75,.035,6,24,Math.PI*.9),wood);arc.rotation.set(0,Math.PI/2,Math.PI/2+Math.PI*.05);arc.position.set(0,-.05,.0);bow.add(arc);
-    const bstr=new THREE.Mesh(new THREE.BoxGeometry(.01,1.45,.01),str);bstr.position.set(0,-.05,-.1);bow.add(bstr);
+    const bow=grp(0,-.74,0,armL);
+    box(.07,.07,.26,leather,0,0,0,bow);
+    const lu=box(.05,.06,.78,wood,0,.04,.45,bow);lu.rotation.x=-.32;const ll=box(.05,.06,.78,wood,0,.04,-.45,bow);ll.rotation.x=.32;
+    const s1=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,1),str),s2=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,1),str);bow.add(s1,s2);
+    const nock=grp(0,0,0,bow);const ns=new THREE.Mesh(new THREE.BoxGeometry(.035,1,.035),pMat(0x8a6a3a));ns.position.y=-.48;nock.add(ns);
+    const nh=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),pMat(0xcfd6e0));nh.rotation.x=Math.PI;nh.position.y=-1.02;nock.add(nh);
+    bowRig={s1,s2,nock,tipU:[.16,.82],tipL:[.16,-.82]};
   }
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   scene.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,glow,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,glow,bow:bowRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 function disposeModel(m){if(!m)return;scene.remove(m.root);m.root.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
 
@@ -898,7 +903,7 @@ function updateZones(dt){
       for(let n=0;n<3;n++){const a=Math.random()*TAU,r=Math.sqrt(Math.random())*z.r,ax=z.x+Math.sin(a)*r,az=z.z+Math.cos(a)*r;
         const ar=projMesh('arrow');ar.rotation.x=Math.PI/2;ar.position.set(ax,14,az);scene.add(ar);
         addFx({dur:.35,update(d,kk){ar.position.y=14-kk*14;},dispose(){scene.remove(ar);if(Math.random()<.3)burst(ax,.1,az,2,0x8a7a6a,2,.08,.3);}});}
-      if(z.own){z.tick-=dt;if(z.tick<=0){z.tick=.25;if(!B.dead&&Math.hypot(B.x-z.x,B.z-z.z)<z.r+B.r)hitBoss(9,2,false,B.x,BM.root.position.y+3,B.z,true);}}
+      if(z.own){z.tick-=dt;if(z.tick<=0){z.tick=.25;if(!B.dead&&Math.hypot(B.x-z.x,B.z-z.z)<z.r+B.r)hitBoss(12,3,false,B.x,BM.root.position.y+3,B.z,true);}}
     }
     if(z.t>=z.dur){scene.remove(z.m);scene.remove(z.ring);z.m.geometry.dispose();z.ring.geometry.dispose();z.mat.dispose();z.ringMat.dispose();zones.splice(i,1);}
   }
@@ -1015,12 +1020,12 @@ function tryActions(mx,mz,ml){
     if(gameTime-buf.f<.32&&ready('smoke')){buf.f=-9;useSkill('smoke');P.smoke=3.5;emit('smoke',{x:P.x,z:P.z});return true;}
     buf.heavy=buf.q=buf.e=buf.f=-9;
   }else{
-    if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.5,at:.28,pose:'bow',move:.55,fn:()=>{shoot('arrow',13,3,50);SFX.bow();}});return true;}
+    if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.42,at:.22,pose:'bow',move:.65,fn:()=>{shoot('arrow',18,4,58);SFX.bow();}});return true;}
     if(held('heavy')&&P.cd.charged<=0){buf.heavy=-9;P.state='draw';P.t=0;P.charge=0;return true;}
-    if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:1.45,at:1.25,pose:'bowC',move:.25,charge:true,fn:()=>{for(const o of[-.17,0,.17])shoot('arrowC',20,6,52,o);SFX.bow();}});return true;}
+    if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:.6,at:.4,pose:'bowC',move:.45,charge:true,fn:()=>{for(const o of[-.06,0,.06])shoot('arrowC',34,10,66,o);SFX.bow();shake(.12);}});return true;}
     if(gameTime-buf.e<.32&&ready('rain')){buf.e=-9;useSkill('rain');const tg=rainTarget();
-      const preview=addDanger({type:'circle',x:tg[0],z:tg[1],r:5.5},{color:0xe8d8a0,delay:1.8,dmg:0,owner:'local'});
-      startCast({dur:2,at:1.8,pose:'sky',move:.15,face:false,charge:true,fn:()=>{emit('zone',{z:{kind:'rain',x:tg[0],z:tg[1],r:5.5,dur:3,owner:NET.id||'me'}});SFX.bow();},preview});return true;}
+      const preview=addDanger({type:'circle',x:tg[0],z:tg[1],r:5.5},{color:0xe8d8a0,delay:.85,dmg:0,owner:'local'});
+      startCast({dur:1.05,at:.85,pose:'sky',move:.3,face:false,charge:true,fn:()=>{emit('zone',{z:{kind:'rain',x:tg[0],z:tg[1],r:5.5,dur:3,owner:NET.id||'me'}});SFX.bow();},preview});return true;}
     buf.light=buf.q=buf.e=-9;
   }
   return false;
@@ -1052,7 +1057,7 @@ function updatePlayer(dt){
   const blockHeld=P.cls==='sword'&&held('block');
   const bA=bossAngle(),SPD=CLASSES[P.cls].speed;
   let vx=0,vz=0;const pose=PM.pose;
-  pose.spin=0;pose.lean=0;pose.armRz=0;pose.armLz=0;
+  pose.spin=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;
   const restR={sword:-.55,mage:-.35,archer:-.25,rogue:-.45}[P.cls],restL={sword:-.35,mage:-.25,archer:-.45,rogue:-.45}[P.cls];
   switch(P.state){
     case 'idle':{
@@ -1132,9 +1137,9 @@ function updatePlayer(dt){
         case 'forward2':pose.armR=t<c.at?lerp(-.4,-2.6,ease(k)):-1.5;pose.armL=t<c.at?-2.2:-1.2;pose.lean=t<c.at?-.15:.2;break;
         case 'raise':pose.armR=lerp(-.4,-2.9,ease(k));pose.armL=lerp(-.3,-2.9,ease(k));pose.armRz=.3;pose.armLz=-.3;pose.lean=-.1;break;
         case 'both':pose.armR=-1.6;pose.armL=-1.6;pose.armRz=-.6*ease(k);pose.armLz=.6*ease(k);break;
-        case 'bow':pose.armL=-1.55;pose.armR=-1.55;pose.armRz=t<c.at?-.5*ease(k):0;pose.upperY=.15;break;
-        case 'bowC':pose.armL=-1.55;pose.armR=-1.55;pose.armRz=-.7*ease(k);pose.upperY=.2;pose.lean=-.05;break;
-        case 'sky':pose.armL=-2.6;pose.armR=-2.5;pose.armRz=-.5*ease(k);pose.lean=-.35;break;
+        case 'bow':{const dr=c.fired?0:ease(k);pose.armL=-1.57;pose.armR=-1.5+.15*dr;pose.armRz=-1.0*dr;pose.upperY=.35;pose.draw=dr;if(c.fired&&t-c.at<.12){pose.armRz=.25;pose.armR=-1.2;}break;}
+        case 'bowC':{const dr=c.fired?0:ease(k);pose.armL=-1.57;pose.armR=-1.45+.1*dr;pose.armRz=-1.1*dr;pose.upperY=.4;pose.lean=-.05;pose.draw=dr;if(c.fired){pose.armRz=.3;pose.armR=-1.15;}break;}
+        case 'sky':{const dr=c.fired?0:ease(k);pose.armL=-2.55;pose.armR=-2.45;pose.armRz=-.9*dr;pose.upperY=.3;pose.lean=-.35;pose.draw=dr;break;}
       }
       if(c.healFx&&Math.random()<.6)burst(P.x+rand(-.6,.6),.3,P.z+rand(-.6,.6),1,0xf2d870,1,.1,.8,-3);
       if(c.charge&&!c.fired&&Math.random()<.4)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
@@ -1143,15 +1148,15 @@ function updatePlayer(dt){
       if(t>=c.dur)P.state='idle';
       break;}
     case 'draw':{
-      P.charge=Math.min(1.6,P.charge+dt);const k=P.charge/1.6;
-      vx=mx*SPD*.45;vz=mz*SPD*.45;turnTo(aimAngle(),12,dt);
+      P.charge=Math.min(CHARGE,P.charge+dt);const k=P.charge/CHARGE;
+      vx=mx*SPD*.6;vz=mz*SPD*.6;turnTo(aimAngle(),14,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.35;pose.legR=-pose.legL;
-      pose.armL=-1.55;pose.armR=-1.55;pose.armRz=-.85*ease(k);pose.upperY=.2;
+      pose.armL=-1.57;pose.armR=-1.45+.1*ease(k);pose.armRz=-1.1*ease(k);pose.upperY=.4;pose.draw=.15+.85*ease(k);
       if(k>=1&&Math.random()<.5)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
       if(!held('heavy')){
-        const dmg=P.charge<.3?13:Math.round(13+45*k);shoot(k>=1?'arrowC':'arrow',dmg,Math.round(3+20*k),50+20*k);SFX.bow();
-        P.cd.charged=1.2;startCast({dur:.25,at:0,pose:'bow',move:.6,fired:true,fn:()=>{}});P.cast.fired=true;
+        const full=k>=1,dmg=full?72:Math.round(18+38*k);shoot(full?'arrowC':'arrow',dmg,full?28:Math.round(4+14*k),60+25*k);SFX.bow();if(full)shake(.15);
+        P.cd.charged=.8;startCast({dur:.22,at:0,pose:'bow',move:.7,fired:true,fn:()=>{}});P.cast.fired=true;
       }
       break;}
     case 'roll':{
@@ -1378,7 +1383,14 @@ function applyBossPose(dt){
   if(B.phase===2&&!B.dead&&Math.random()<.25)burst(B.x+rand(-B.r,B.r),B.y+rand(2.5,c.height),B.z+rand(-B.r,B.r),1,c.shockCol,1,.1,.9,-2);
 }
 function setOpacity(model,o){if(model._op===o)return;model._op=o;model.root.traverse(m=>{if(m.isMesh){m.material.transparent=o<1;m.material.opacity=o;m.material.needsUpdate=true;}});}
+function updateBow(model,draw,dt){
+  const b=model.bow;if(!b)return;model.draw=lerp(model.draw,draw,1-Math.exp(-25*dt));const d=model.draw,ny=.16+d*.5;
+  const seg=(m,t)=>{const dy=t[0]-ny,dz=t[1],L=Math.hypot(dy,dz);m.position.set(0,(ny+t[0])/2,dz/2);m.scale.z=L;m.rotation.x=Math.atan2(-dy,dz);};
+  seg(b.s1,b.tipU);seg(b.s2,b.tipL);
+  b.nock.visible=d>.04;b.nock.position.y=ny;
+}
 function applyPose(model,p,st,dt,px,pz,f,spinY){
+  updateBow(model,p.draw||0,dt);
   const s=1-Math.exp(-22*dt);
   model.root.position.set(px,0,pz);model.root.rotation.y=f;
   model.armR.rotation.x=lerp(model.armR.rotation.x,p.armR,s);model.armR.rotation.z=lerp(model.armR.rotation.z,p.armRz,s);
@@ -1439,7 +1451,7 @@ function updateHUD(spec){
   const sp=$('specTag');
   if(P.dead&&G.mode==='mp'){sp.classList.remove('hidden');sp.innerHTML=spec?`Spectating ${esc(spec.name)}<small>Left click to switch ally</small>`:'All allies have fallen';}else sp.classList.add('hidden');
   const cw=$('chargeWrap');let ch=-1;
-  if(P.state==='draw')ch=P.charge/1.6;else if(P.state==='cast'&&P.cast.charge&&!P.cast.fired)ch=P.t/P.cast.at;
+  if(P.state==='draw')ch=P.charge/CHARGE;else if(P.state==='cast'&&P.cast.charge&&!P.cast.fired)ch=P.t/P.cast.at;
   if(ch>=0){cw.classList.remove('hidden');$('chargeFill').style.width=(clamp(ch,0,1)*100)+'%';}else cw.classList.add('hidden');
   // name tags
   remotes.forEach(r=>{const p=project(r.x,2.6,r.z);if(!p||r.dead&&false){r.tag.style.display='none';return;}r.tag.style.display='block';
@@ -1455,7 +1467,7 @@ function addRemote(p){
 function updateRemotes(dt){
   const s=1-Math.exp(-15*dt);
   remotes.forEach(r=>{if(r.first)return;r.x=lerp(r.x,r.nx,s);r.z=lerp(r.z,r.nz,s);r.f+=wrap(r.nf-r.f)*s;
-    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8]};
+    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0};
     applyPose(r.model,p,r.st,dt,r.x,r.z,r.f);setOpacity(r.model,r.inv?.25:1);});
 }
 let sendT=0;
@@ -1463,7 +1475,7 @@ function netTick(dt){
   if(G.mode!=='mp')return;sendT-=dt;if(sendT>0)return;sendT=1/15;
   const p=PM.pose,r2=v=>Math.round(v*100)/100;
   nsend({t:'g',d:{k:'p',x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,inv:P.smoke>0?1:0,
-    p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin].map(r2)}});
+    p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0].map(r2)}});
   if(NET.isHost){const q=B.pose;
     nsend({t:'g',d:{k:'b',x:r2(B.x),z:r2(B.z),y:r2(B.y),f:r2(B.facing),hp:Math.round(B.hp),mhp:B.maxHp,ph:B.phase===2?2:1,fl:r2(B.flash),air:B.air?1:0,dash:B.dashId||0,fa:r2(B.fade===undefined?1:B.fade),
       p:[q.armR,q.armL,q.upperY,q.lean,q.crouch,q.legL,q.legR].map(r2)}});
