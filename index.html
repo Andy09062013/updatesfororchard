@@ -241,7 +241,7 @@ const CLASSES={
     ctrl:[['Left Click','Shoot arrow'],['Right Click (hold)','Charge a powerful shot, release to fire'],['Q','Triple Shot (long draw)'],['E','Arrow Rain on the target area (long channel)']]},
   rogue:{name:'Rogue',hp:75,speed:7.6,desc:'A swift assassin with twin daggers. Strikes from the shadows and deals triple damage from behind.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'backstab',k:'RMB',n:'Backstab',cd:3},{id:'step',k:'Q',n:'Shadow Step',cd:8},{id:'poison',k:'E',n:'Envenom',cd:16},{id:'smoke',k:'F',n:'Smoke Bomb',cd:20}],
-    ctrl:[['Left Click','Dagger flurry (rapid chained stabs)'],['Right Click','Backstab lunge, triple damage from behind the boss'],['Q','Shadow Step, teleport behind the boss'],['E','Envenom, attacks apply poison for 6 seconds'],['F','Smoke Bomb, the boss loses track of you for a few seconds']]}
+    ctrl:[['Left Click','Dagger flurry (rapid chained stabs)'],['Right Click','Backstab lunge, triple damage and a guaranteed stun from behind'],['Q','Shadow Step, teleport behind the boss'],['E','Envenom, attacks apply poison for 6 seconds'],['F','Smoke Bomb, the boss loses track of you for a few seconds']]}
 };
 const DIFFS={
   easy:{n:'Easy',hp:.7,dmg:.6,spd:.9,flasks:5,d:'Reduced boss health and damage. Five flasks.'},
@@ -702,7 +702,7 @@ function handleEv(e,d,from,local){
     case 'zone':addZone(d.z);break;
     case 'healburst':healBurst(d.x,d.z,d.r,d.amt,from);break;
     case 'ward':wardBurst(d.x,d.z,d.r,d.dur);break;
-    case 'hit':if(NET.isHost)damageBoss(d.dmg,d.poise,d.heavy,from);break;
+    case 'hit':if(NET.isHost)damageBoss(d.dmg,d.poise,d.heavy,from,d.stun);break;
     case 'parry':if(NET.isHost&&B.action&&!B.air&&!B.dead)staggerBoss(2.0);break;
     case 'bossDead':if(!B.dead||local)bossDeathFx();break;
     case 'wipe':if(state==='play')endTimer=Math.min(endTimer>0?endTimer:9,1.5),G.wiped=true;break;
@@ -890,21 +890,22 @@ function hurtPlayer(dmg,src){
 }
 function killPlayer(){P.hp=0;P.dead=true;P.state='dead';P.t=0;SFX.hurt();shake(.6);
   if(G.mode==='solo')endTimer=2.4;else{emit('fallen',{});showMsg('YOU HAVE FALLEN','Death is permanent. You will now spectate your allies.',3.5);}}
-function hitBoss(dmg,poise,heavy,hx,hy,hz,quiet){
+function hitBoss(dmg,poise,heavy,hx,hy,hz,quiet,stun){
   if(B.dead)return;
   stats.dealt+=dmg;
   if(!quiet){burst(hx,hy,hz,heavy?20:10,0xffd27a,heavy?9:6,.12,.45,10);SFX.hit();hitstop=Math.max(hitstop,heavy?.09:.04);shake(heavy?.3:.15);}
   floatText(Math.round(dmg*(B.action&&B.action.name==='stagger'?1.5:1)),B.x,BM.root.position.y+G.boss.height,B.z,heavy?'big':'');
   B.flash=1;
-  toHost('hit',{dmg,poise,heavy:!!heavy});
+  toHost('hit',{dmg,poise,heavy:!!heavy,stun:!!stun});
 }
-function damageBoss(dmg,poise,heavy){
+function damageBoss(dmg,poise,heavy,from,stun){
   if(B.dead)return;
   const staggered=B.action&&B.action.name==='stagger';
   if(staggered)dmg*=1.5;
   B.hp-=dmg;B.chipT=.8;B.flash=1;
   if(B.hp<=0){B.hp=0;killBoss();return;}
   if(B.phase===1&&B.hp<=B.maxHp*.5){B.phase=1.5;cancelDangers('melee');emit('cancel',{owner:'melee'});B.queue=[];startAction('roar');return;}
+  if(stun&&!(B.action&&(B.action.name==='roar'||B.action.name==='stagger'))){floatText('STUNNED',B.x,G.boss.height+2,B.z,'label');staggerBoss(1.5);return;}
   const busy=B.action&&(B.action.name==='roar'||B.action.name==='leap'||B.action.name==='blink'||staggered);
   B.poise-=poise;B.poiseT=2.5;
   if(B.poise<=0&&!busy){B.poise=B.maxPoise;floatText('STAGGERED',B.x,G.boss.height+1,B.z,'label');staggerBoss(1.7);}
@@ -977,11 +978,11 @@ function shadowStep(){
   [x,z]=clampArena(x,z,.8);P.x=x;P.z=z;P.facing=bossAngle();P.iframe=.45;P.vx=P.vz=0;P.kx=P.kz=0;P.state='idle';
   emit('pstep',{x,z,ox,oz});
 }
-function checkPlayerHit(range,dmg,poise,heavy){
+function checkPlayerHit(range,dmg,poise,heavy,stun){
   if(P.hitDone||B.dead||B.air)return;
   if(P.cls==='rogue'&&P.poisonT>0){dmg+=4;P.dotT=4;}
   const dx=B.x-P.x,dz=B.z-P.z,d=Math.hypot(dx,dz);
-  if(d-B.r<=range&&Math.abs(wrap(Math.atan2(dx,dz)-P.facing))<1.15){P.hitDone=true;hitBoss(dmg,poise,heavy,lerp(P.x,B.x,.55),2.2,lerp(P.z,B.z,.55));}
+  if(d-B.r<=range&&Math.abs(wrap(Math.atan2(dx,dz)-P.facing))<1.15){P.hitDone=true;hitBoss(dmg,poise,heavy,lerp(P.x,B.x,.55),2.2,lerp(P.z,B.z,.55),false,stun);}
 }
 function updatePlayer(dt){
   P.iframe=Math.max(0,P.iframe-dt);P.hurtInv=Math.max(0,P.hurtInv-dt);P.t+=dt;P.ward=Math.max(0,P.ward-dt);P.rollCd-=dt;
@@ -1052,7 +1053,7 @@ function updatePlayer(dt){
       if(t<h0)turnTo(lockOn&&!B.dead?bA:P.facing,8,dt);
       if(t>.15&&t<h1){vx=Math.sin(P.facing)*10;vz=Math.cos(P.facing)*10;}
       if(t>=h0&&t<=h1&&!P.hitDone&&!B.dead){const behind=Math.abs(wrap(Math.atan2(P.x-B.x,P.z-B.z)-B.facing))>2.0;
-        checkPlayerHit(2.6,behind?90:32,behind?35:15,true);if(P.hitDone&&behind){floatText('BACKSTAB',B.x,G.boss.height+1.2,B.z,'label');shake(.4);}}
+        checkPlayerHit(2.6,behind?90:32,behind?35:15,true,behind);if(P.hitDone&&behind){floatText('BACKSTAB',B.x,G.boss.height+1.2,B.z,'label');shake(.4);}}
       pose.lean=t<h0?.35:.55;pose.armR=t<h0?-.4:-1.75;pose.armL=t<h0?-.4:-1.75;pose.armRz=t<h0?.4:0;pose.armLz=t<h0?-.4:0;pose.legL=.6;pose.legR=-.4;
       if(t>=.75)P.state='idle';
       break;}
