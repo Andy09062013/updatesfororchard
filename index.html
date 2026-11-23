@@ -10,7 +10,7 @@
 html,body{width:100%;height:100%;overflow:hidden;background:#050407;font-family:Inter,system-ui,sans-serif;color:#e8e2d6;user-select:none}
 canvas{display:block}
 .hidden{display:none!important}
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:20;background:radial-gradient(ellipse at center,rgba(40,18,14,.86),rgba(5,4,7,.97) 70%);overflow-y:auto;padding:24px 0}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:18px;z-index:20;background:radial-gradient(ellipse at center,rgba(40,18,14,.86),rgba(5,4,7,.97) 70%);overflow-y:auto;padding:24px 0}
 h1{font-family:Cinzel,serif;font-weight:900;font-size:clamp(40px,7vw,84px);letter-spacing:.12em;color:#d9c39a;text-shadow:0 0 30px rgba(255,90,40,.35),0 4px 0 #000}
 h2{font-family:Cinzel,serif;font-weight:700;font-size:clamp(28px,4vw,44px);letter-spacing:.12em;color:#d9c39a;text-shadow:0 3px 0 #000}
 .sub{font-family:Cinzel,serif;letter-spacing:.3em;text-transform:uppercase;color:#a8977a;font-size:14px}
@@ -123,6 +123,9 @@ button.sm:hover{filter:brightness(1.3)}
 .ctrlTable div:last-child{border-bottom:none}
 .ctrlTable b{font-family:Cinzel,serif;color:#e3cfa6;font-weight:700;letter-spacing:.05em}
 .ctrlTable span{color:#b5a991;text-align:right}
+.ctrlTable div{align-items:center}
+.bindBtn{min-width:130px;padding:6px 12px}
+.bindBtn.on{border-color:#d9a74a;background:#3c2b18;color:#f2c75a}
 #crosshair{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,230,190,.45);z-index:5;pointer-events:none}
 </style>
 </head>
@@ -133,7 +136,7 @@ button.sm:hover{filter:brightness(1.3)}
   <div class="sub">Select Your Class</div>
   <div class="cards" id="classCards"></div>
   <div class="classInfo" id="classInfo"></div>
-  <div class="row"><button class="big" id="soloBtn">Play Solo</button><button class="big alt" id="mpBtn">Multiplayer</button></div>
+  <div class="row"><button class="big" id="soloBtn">Play Solo</button><button class="big alt" id="mpBtn">Multiplayer</button><button class="big alt" id="menuBindsBtn">Keybinds</button></div>
   <div class="status" id="menuStatus"></div>
 </div>
 
@@ -205,7 +208,15 @@ button.sm:hover{filter:brightness(1.3)}
   <div class="sub" id="pauseNote"></div>
   <div class="ctrlTable" id="ctrlTable"></div>
   <button class="big" id="resumeBtn">Resume</button>
+  <button class="big alt" id="pauseBindsBtn">Keybinds</button>
   <button class="big alt" id="quitBtn">Leave Expedition</button>
+</div>
+
+<div id="binds" class="screen hidden">
+  <h2>Keybinds</h2>
+  <div class="ctrlTable" id="bindTable"></div>
+  <div class="sub" style="letter-spacing:.08em;font-size:12px;text-transform:none;font-family:Inter,sans-serif">Select an action, then press a key or mouse button. Press Escape to cancel. Bindings are saved in this browser.</div>
+  <div class="row"><button class="big alt" id="bindReset">Reset to Defaults</button><button class="big" id="bindBack">Done</button></div>
 </div>
 
 <div id="end" class="screen hidden">
@@ -232,16 +243,16 @@ let ARENA=24;
 const CLASSES={
   sword:{name:'Swordsman',hp:110,speed:6.8,desc:'A disciplined warrior with sword and shield. Blocks, parries and delivers crushing strikes.',
     skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
-    ctrl:[['Left Click','Light attack (3-hit combo)'],['Right Click','Heavy attack'],['Shift (hold)','Block, press just before impact to parry']]},
+    ctrl:[['light','Light attack (3-hit combo)'],['heavy','Heavy attack'],['block','Block (hold), press just before impact to parry']]},
   mage:{name:'Mage',hp:80,speed:6.4,mana:100,desc:'A support caster. Heals and shields allies, and hurls fire. Spells consume mana.',
     skills:[{id:'fireball',k:'LMB',n:'Fireball',cost:10,cd:.55},{id:'inferno',k:'RMB',n:'Inferno Orb',cost:30,cd:6},{id:'sanct',k:'Q',n:'Sanctuary',cost:35,cd:14},{id:'burst',k:'E',n:'Healing Burst',cost:30,cd:9},{id:'ward',k:'F',n:'Arcane Ward',cost:30,cd:18}],
-    ctrl:[['Left Click','Fireball (10 mana)'],['Right Click','Inferno Orb, large explosion (30 mana)'],['Q','Sanctuary, healing circle for allies (35 mana)'],['E','Healing Burst, instant heal nearby (30 mana)'],['F','Arcane Ward, allies take reduced damage (30 mana)']]},
+    ctrl:[['light','Fireball (10 mana)'],['heavy','Inferno Orb, large explosion (30 mana)'],['q','Sanctuary, healing circle for allies (35 mana)'],['e','Healing Burst, instant heal nearby (30 mana)'],['f','Arcane Ward, allies take reduced damage (30 mana)']]},
   archer:{name:'Archer',hp:85,speed:7.2,desc:'A ranged hunter with unlimited arrows. Powerful volleys require long preparation.',
     skills:[{id:'shot',k:'LMB',n:'Shot',cd:.8},{id:'charged',k:'RMB',n:'Charged Shot',cd:1.2},{id:'triple',k:'Q',n:'Triple Shot',cd:7},{id:'rain',k:'E',n:'Arrow Rain',cd:16}],
-    ctrl:[['Left Click','Shoot arrow'],['Right Click (hold)','Charge a powerful shot, release to fire'],['Q','Triple Shot (long draw)'],['E','Arrow Rain on the target area (long channel)']]},
+    ctrl:[['light','Shoot arrow'],['heavy','Hold to charge a powerful shot, release to fire'],['q','Triple Shot (long draw)'],['e','Arrow Rain on the target area (long channel)']]},
   rogue:{name:'Rogue',hp:75,speed:7.6,desc:'A swift assassin with twin daggers. Strikes from the shadows and deals triple damage from behind.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'backstab',k:'RMB',n:'Backstab',cd:3},{id:'step',k:'Q',n:'Shadow Step',cd:8},{id:'poison',k:'E',n:'Envenom',cd:16},{id:'smoke',k:'F',n:'Smoke Bomb',cd:20}],
-    ctrl:[['Left Click','Dagger flurry (rapid chained stabs)'],['Right Click','Backstab lunge, triple damage and a guaranteed stun from behind'],['Q','Shadow Step, teleport behind the boss'],['E','Envenom, attacks apply poison for 6 seconds'],['F','Smoke Bomb, the boss loses track of you for a few seconds']]}
+    ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Backstab lunge, triple damage and a guaranteed stun from behind'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
 };
 const DIFFS={
   easy:{n:'Easy',hp:.7,dmg:.6,spd:.9,flasks:5,d:'Reduced boss health and damage. Five flasks.'},
@@ -598,30 +609,56 @@ const D=d=>Math.round(d*G.diff.dmg);
 // ==== INPUT ====
 const keys={},mouse={},buf={light:-9,heavy:-9,roll:-9,heal:-9,q:-9,e:-9,f:-9};
 const consume=n=>{if(gameTime-buf[n]<.32){buf[n]=-9;return true;}return false;};
+const ACTIONS=[['up','Move Forward','KeyW'],['down','Move Backward','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
+  ['light','Primary Attack','Mouse0'],['heavy','Secondary Attack','Mouse2'],['roll','Roll','Space'],['block','Block / Parry (Swordsman)','ShiftLeft'],
+  ['q','Ability 1','KeyQ'],['e','Ability 2','KeyE'],['f','Ability 3','KeyF'],['heal','Drink Flask','KeyR'],['lock','Toggle Lock-On','Tab']];
+let BINDS={};
+function defaultBinds(){BINDS={};ACTIONS.forEach(a=>BINDS[a[0]]=a[2]);}
+defaultBinds();
+try{const sv=JSON.parse(localStorage.getItem('hc_binds')||'null');if(sv)for(const k in sv)if(k in BINDS&&typeof sv[k]==='string')BINDS[k]=sv[k];}catch(e){}
+function saveBinds(){try{localStorage.setItem('hc_binds',JSON.stringify(BINDS));}catch(e){}}
+function keyName(c,short){
+  if(!c)return 'Unbound';
+  const M={Mouse0:['Left Click','LMB'],Mouse1:['Middle Click','MMB'],Mouse2:['Right Click','RMB'],Mouse3:['Mouse 4','M4'],Mouse4:['Mouse 5','M5'],
+    ShiftLeft:['Left Shift','LShift'],ShiftRight:['Right Shift','RShift'],ControlLeft:['Left Ctrl','LCtrl'],ControlRight:['Right Ctrl','RCtrl'],AltLeft:['Left Alt','LAlt'],AltRight:['Right Alt','RAlt'],
+    Space:['Space','Space'],Tab:['Tab','Tab'],CapsLock:['Caps Lock','Caps'],Enter:['Enter','Enter'],Backspace:['Backspace','Bksp'],Backquote:['`','`'],Minus:['-','-'],Equal:['=','='],
+    BracketLeft:['[','['],BracketRight:[']',']'],Semicolon:[';',';'],Quote:["'","'"],Comma:[',',','],Period:['.','.'],Slash:['/','/'],Backslash:['\\','\\'],
+    ArrowUp:['Up Arrow','Up'],ArrowDown:['Down Arrow','Down'],ArrowLeft:['Left Arrow','Left'],ArrowRight:['Right Arrow','Right']};
+  if(M[c])return M[c][short?1:0];
+  if(/^Key[A-Z]$/.test(c))return c.slice(3);
+  if(/^Digit\d$/.test(c))return c.slice(5);
+  if(/^Numpad/.test(c))return 'Num '+c.slice(6);
+  return c;
+}
+function held(a){const b=BINDS[a];if(!b)return false;return b.startsWith('Mouse')?!!mouse[+b.slice(5)]:!!keys[b];}
+function press(code){
+  for(const a in BINDS)if(BINDS[a]===code){
+    if(a==='lock')lockOn=!lockOn;
+    else if(a in buf)buf[a]=gameTime;
+  }
+}
+let rebinding=null,rebindT=0;
 addEventListener('keydown',e=>{
+  if(rebinding){e.preventDefault();finishRebind(e.code==='Escape'?null:e.code);return;}
   if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
-  if(e.code==='Tab'){e.preventDefault();if(!e.repeat&&state==='play')lockOn=!lockOn;return;}
-  if(e.code==='Space')e.preventDefault();
+  const bound=Object.values(BINDS).includes(e.code);
+  if(state==='play'&&(bound||e.code==='Space'||e.code==='Tab'))e.preventDefault();
   keys[e.code]=true;if(e.repeat)return;
-  if(e.code==='Space')buf.roll=gameTime;
-  if(e.code==='KeyR')buf.heal=gameTime;
-  if(e.code==='KeyQ')buf.q=gameTime;
-  if(e.code==='KeyE')buf.e=gameTime;
-  if(e.code==='KeyF')buf.f=gameTime;
+  if(state==='play'&&!paused&&!(P&&P.dead))press(e.code);
   if(e.code==='Escape'&&state==='play'&&!paused&&!document.pointerLockElement)openPause();
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;for(const k in mouse)mouse[k]=false;});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('contextmenu',e=>{if(rebinding||performance.now()-rebindT<400)e.preventDefault();});
+document.addEventListener('mousedown',e=>{if(rebinding){e.preventDefault();e.stopPropagation();finishRebind('Mouse'+e.button);}},true);
 canvas.addEventListener('mousedown',e=>{
   if(state!=='play')return;initAudio();
   if(paused)return;
   if(!document.pointerLockElement){try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(err){}}
-  mouse[e.button]=true;
+  mouse[e.button]=true;if(e.button===1)e.preventDefault();
   if(P&&P.dead){if(e.button===0)specIdx++;return;}
-  if(e.button===0)buf.light=gameTime;
-  if(e.button===2)buf.heavy=gameTime;
-  if(e.button===1){e.preventDefault();lockOn=!lockOn;}
+  press('Mouse'+e.button);
 });
 addEventListener('mouseup',e=>{mouse[e.button]=false;});
 addEventListener('mousemove',e=>{
@@ -634,13 +671,30 @@ document.addEventListener('pointerlockchange',()=>{
   if(document.pointerLockElement===canvas)hadLock=true;
   else if(hadLock&&state==='play'&&!paused)openPause();
 });
+function ctrlRows(){return CLASSES[myClass].ctrl.map(r=>[keyName(BINDS[r[0]]),r[1]]);}
 function openPause(){paused=true;$('pause').classList.remove('hidden');
   $('pauseNote').textContent=G&&G.mode==='mp'?'The expedition continues while this menu is open':'';
-  const c=CLASSES[myClass].ctrl;
-  const rows=[['W A S D','Move (keep moving to sprint)'],['Mouse / Arrow Keys','Rotate camera'],...c,['Space','Roll (invulnerable while rolling)'],['R','Drink flask (restores 45 health)'],['Tab / Middle Mouse','Toggle lock-on'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
-  $('ctrlTable').innerHTML=rows.map(r=>`<div><b>${r[0]}</b><span>${r[1]}</span></div>`).join('');}
+  const mv=['up','left','down','right'].map(a=>keyName(BINDS[a],true)).join(' ');
+  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Arrow Keys','Rotate camera'],...ctrlRows(),[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)'],[keyName(BINDS.lock),'Toggle lock-on'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
+  $('ctrlTable').innerHTML=rows.map(r=>`<div><b>${esc(r[0])}</b><span>${r[1]}</span></div>`).join('');}
+let bindsFrom='menu';
+function openBinds(from){bindsFrom=from;rebinding=null;renderBinds();
+  if(from==='pause'){$('pause').classList.add('hidden');$('binds').classList.remove('hidden');}else setScreen('binds');}
+function renderBinds(){
+  $('bindTable').innerHTML=ACTIONS.map(a=>`<div><b>${a[1]}</b><button class="sm bindBtn ${rebinding===a[0]?'on':''}" data-a="${a[0]}">${rebinding===a[0]?'Press a key...':esc(keyName(BINDS[a[0]]))}</button></div>`).join('');
+  $('bindTable').querySelectorAll('.bindBtn').forEach(b=>b.onclick=ev=>{ev.stopPropagation();rebinding=b.dataset.a;renderBinds();});
+}
+function finishRebind(code){
+  const a=rebinding;rebinding=null;rebindT=performance.now();
+  if(a&&code){const other=Object.keys(BINDS).find(k=>k!==a&&BINDS[k]===code);if(other)BINDS[other]=BINDS[a];BINDS[a]=code;saveBinds();if(state==='play')buildSkillBar();renderClassCards();}
+  renderBinds();
+}
 function resume(){paused=false;$('pause').classList.add('hidden');try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(err){}}
 $('resumeBtn').onclick=resume;
+$('pauseBindsBtn').onclick=()=>openBinds('pause');
+$('menuBindsBtn').onclick=()=>openBinds('menu');
+$('bindReset').onclick=()=>{defaultBinds();saveBinds();rebinding=null;renderBinds();if(state==='play')buildSkillBar();renderClassCards();};
+$('bindBack').onclick=()=>{rebinding=null;if(bindsFrom==='pause'){$('binds').classList.add('hidden');openPause();}else{setScreen('menu');renderClassCards();}};
 $('quitBtn').onclick=()=>{paused=false;$('pause').classList.add('hidden');leaveGame();};
 
 // ==== NETWORK ====
@@ -962,7 +1016,7 @@ function tryActions(mx,mz,ml){
     buf.heavy=buf.q=buf.e=buf.f=-9;
   }else{
     if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.5,at:.28,pose:'bow',move:.55,fn:()=>{shoot('arrow',13,3,50);SFX.bow();}});return true;}
-    if(mouse[2]&&P.cd.charged<=0){buf.heavy=-9;P.state='draw';P.t=0;P.charge=0;return true;}
+    if(held('heavy')&&P.cd.charged<=0){buf.heavy=-9;P.state='draw';P.t=0;P.charge=0;return true;}
     if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:1.45,at:1.25,pose:'bowC',move:.25,charge:true,fn:()=>{for(const o of[-.17,0,.17])shoot('arrowC',20,6,52,o);SFX.bow();}});return true;}
     if(gameTime-buf.e<.32&&ready('rain')){buf.e=-9;useSkill('rain');const tg=rainTarget();
       const preview=addDanger({type:'circle',x:tg[0],z:tg[1],r:5.5},{color:0xe8d8a0,delay:1.8,dmg:0,owner:'local'});
@@ -992,10 +1046,10 @@ function updatePlayer(dt){
   if(P.dotT>0){P.dotT-=dt;P.dotTick=(P.dotTick||0)-dt;if(P.dotTick<=0){P.dotTick=.5;if(!B.dead){hitBoss(4,0,false,B.x,BM.root.position.y+3,B.z,true);burst(B.x+rand(-1,1),BM.root.position.y+rand(1,4),B.z+rand(-1,1),2,0x6adf4a,1.5,.12,.6,-1);}}}
   P.regen=!P.dead&&gameTime-P.lastHit>5&&P.hp<P.maxHp;
   if(P.regen)P.hp=Math.min(P.maxHp,P.hp+P.maxHp*.018*dt);
-  const ix=(keys.KeyD?1:0)-(keys.KeyA?1:0),iz=(keys.KeyW?1:0)-(keys.KeyS?1:0);
+  const ix=(held('right')?1:0)-(held('left')?1:0),iz=(held('up')?1:0)-(held('down')?1:0);
   const sy=Math.sin(cam.yaw),cy=Math.cos(cam.yaw);
   let mx=ix*cy-iz*sy,mz=-ix*sy-iz*cy;const ml=Math.hypot(mx,mz);if(ml>0){mx/=ml;mz/=ml;}
-  const blockHeld=P.cls==='sword'&&(keys.ShiftLeft||keys.ShiftRight);
+  const blockHeld=P.cls==='sword'&&held('block');
   const bA=bossAngle(),SPD=CLASSES[P.cls].speed;
   let vx=0,vz=0;const pose=PM.pose;
   pose.spin=0;pose.lean=0;pose.armRz=0;pose.armLz=0;
@@ -1095,7 +1149,7 @@ function updatePlayer(dt){
       pose.armL=-1.55;pose.armR=-1.55;pose.armRz=-.85*ease(k);pose.upperY=.2;
       if(k>=1&&Math.random()<.5)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
-      if(!mouse[2]){
+      if(!held('heavy')){
         const dmg=P.charge<.3?13:Math.round(13+45*k);shoot(k>=1?'arrowC':'arrow',dmg,Math.round(3+20*k),50+20*k);SFX.bow();
         P.cd.charged=1.2;startCast({dur:.25,at:0,pose:'bow',move:.6,fired:true,fn:()=>{}});P.cast.fired=true;
       }
@@ -1363,7 +1417,8 @@ function updateCamera(dt){
 // ==== HUD ====
 function buildSkillBar(){
   const sk=CLASSES[myClass].skills;
-  $('skills').innerHTML=sk.map((s,i)=>`<div class="sk" id="sk${i}"><span class="key">${s.k}</span><span class="nm">${s.n}</span>${s.cost?`<span class="cost">${s.cost}</span>`:''}<div class="cdv"></div><div class="cdt"></div></div>`).join('');
+  const KM={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e',F:'f'};
+  $('skills').innerHTML=sk.map((s,i)=>`<div class="sk" id="sk${i}"><span class="key">${esc(keyName(BINDS[KM[s.k]],true))}</span><span class="nm">${s.n}</span>${s.cost?`<span class="cost">${s.cost}</span>`:''}<div class="cdv"></div><div class="cdt"></div></div>`).join('');
 }
 function updateHUD(spec){
   $('hpFill').style.width=(Math.max(0,P.hp)/P.maxHp*100)+'%';$('hpChip').style.width=(P.chip/P.maxHp*100)+'%';$('hpTxt').textContent=Math.ceil(Math.max(0,P.hp))+' / '+P.maxHp;
@@ -1418,7 +1473,7 @@ function netTick(dt){
 }
 
 // ==== GAME FLOW ====
-function setScreen(id){['menu','solo','mp','lobby','end','pause'].forEach(s=>$(s).classList.toggle('hidden',s!==id));}
+function setScreen(id){['menu','solo','mp','lobby','end','pause','binds'].forEach(s=>$(s).classList.toggle('hidden',s!==id));}
 function startGame(cfg){
   initAudio();
   G={mode:cfg.mode,boss:BOSSES[cfg.boss],bossId:cfg.boss,arena:cfg.arena,diff:DIFFS[cfg.diff],diffId:cfg.diff,cfg,wiped:false};
@@ -1489,7 +1544,7 @@ const ICONS={
 function renderClassCards(){
   $('classCards').innerHTML=Object.entries(CLASSES).map(([id,c])=>`<div class="card ${id===myClass?'sel':''}" data-c="${id}">${ICONS[id]}<h3>${c.name}</h3><p>${c.desc}</p><span class="tag">${c.hp} Health${c.mana?' · '+c.mana+' Mana':''}</span></div>`).join('');
   $('classCards').querySelectorAll('.card').forEach(el=>el.onclick=()=>{myClass=el.dataset.c;try{localStorage.setItem('hc_class',myClass);}catch(e){}renderClassCards();});
-  $('classInfo').innerHTML=CLASSES[myClass].ctrl.map(r=>`<b>${r[0]}</b> ${r[1]}`).join(' &nbsp;·&nbsp; ')+' &nbsp;·&nbsp; <b>Space</b> Roll &nbsp;·&nbsp; <b>R</b> Flask';
+  $('classInfo').innerHTML=ctrlRows().map(r=>`<b>${esc(r[0])}</b> ${r[1]}`).join(' &nbsp;·&nbsp; ')+` &nbsp;·&nbsp; <b>${esc(keyName(BINDS.roll))}</b> Roll &nbsp;·&nbsp; <b>${esc(keyName(BINDS.heal))}</b> Flask`;
 }
 function fillSelects(b,a,d){
   b.innerHTML=Object.entries(BOSSES).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
