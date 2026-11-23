@@ -260,7 +260,7 @@ const CLASSES={
     skills:[{id:'shot',k:'LMB',n:'Shot',cd:.5},{id:'charged',k:'RMB',n:'Charged Shot',cd:.55},{id:'triple',k:'Q',n:'Triple Shot',cd:4.5},{id:'rain',k:'E',n:'Arrow Rain',cd:12},{id:'vault',k:'F',n:'Vault Shot',cd:7}],
     ctrl:[['light','Shoot arrow'],['heavy','Hold to charge (0.7s), full charge deals massive damage'],['q','Triple Shot, three heavy arrows at once'],['e','Arrow Rain on the target area'],['f','Vault Shot, backflip away and fire a heavy arrow (invulnerable)']]},
   warlock:{name:'Warlock',hp:85,speed:6.7,ult:'Doom',desc:'A dark caster who withers foes with curses, rifts and life-draining magic.',
-    skills:[{id:'bolt',k:'LMB',n:'Shadow Bolt',cd:.45},{id:'curse',k:'RMB',n:'Curse of Agony',cd:6},{id:'rift',k:'Q',n:'Void Rift',cd:10},{id:'siphon',k:'E',n:'Siphon Life',cd:12},{id:'blink',k:'F',n:'Shadow Blink',cd:6}],
+    skills:[{id:'bolt',k:'LMB',n:'Shadow Bolt',cd:.45},{id:'curse',k:'RMB',n:'Curse of Agony',cd:6},{id:'rift',k:'Q',n:'Void Rift',cd:10},{id:'siphon',k:'E',n:'Siphon Life',cd:15},{id:'blink',k:'F',n:'Shadow Blink',cd:6}],
     ctrl:[['light','Shadow Bolt'],['heavy','Curse of Agony, damage over time on the target'],['q','Void Rift, a damaging rift at the target'],['e','Siphon Life, drain the target and heal yourself'],['f','Shadow Blink, teleport a short distance']]},
   berserker:{name:'Berserker',hp:135,speed:6.4,ult:'Earthshatter',desc:'A towering brute with a greataxe. Slow but durable, with crushing blows fuelled by bloodlust.',
     skills:[{k:'LMB',n:'Cleave'},{k:'RMB',n:'Crushing Blow'},{id:'whirl',k:'Q',n:'Whirlwind',cd:10},{id:'rage',k:'E',n:'Blood Rage',cd:22},{id:'leap',k:'F',n:'Leap Slam',cd:12}],
@@ -307,7 +307,7 @@ const BOSSES={
     moves:{near:[['reap',3],['cross',2.5],['dashes',1]],mid:[['dashes',3],['cage',2]],far:[['dashes',2.5],['cage',1.5],['rain',1]]},
     p2:{near:[['comboD',3],['cage',1.5]],mid:[['comboE',2],['cage',2],['rain',1.5]],far:[['rain',2],['cage',2],['dashes',2]]},
     combos:{comboD:['reap','cross'],comboE:['dashes','reap']}},
-  thoruun:{n:'Thoruun, the Storm Tyrant',arena:'storm',hp:3200,r:1.9,speed:3.8,height:6,reach:4.2,slamR:3.2,sweepR:7,novaR:5.5,dmg:1,model:'storm',
+  thoruun:{n:'Thoruun, the Storm Tyrant',arena:'storm',hp:3900,r:1.9,speed:4.4,height:6,reach:4.2,slamR:3.2,sweepR:7,novaR:6.5,dmg:1.15,model:'storm',coolMul:.8,
     col:0x6ad0ff,dust:0x4a5060,fireCol:0x8ad8ff,pillar:0xbfe8ff,spikeCol:0x6ad0ff,shockCol:0x8ad8ff,rainFx:'ice',p2emis:0x0a2a4a,
     enrage:['THE TYRANT SUMMONS THE TEMPEST','Lightning strikes without warning'],d:'A giant who wields the storm itself. Calls lightning onto every foe and hurls his hammer.',
     moves:{near:[['clap',3],['hurl',1.5],['chain',1]],mid:[['hurl',3],['chain',2.5],['bolts',2]],far:[['bolts',3],['chain',2.5]]},
@@ -1154,7 +1154,7 @@ function tryActions(mx,mz,ml){
     if(gameTime-buf.heavy<.32&&ready('curse')){buf.heavy=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>32){toast('No target in range');return false;}useSkill('curse');P.facing=bossAngle();
       startCast({dur:.4,at:.2,pose:'both',move:.5,fn:()=>{P.curse={t:6,tick:.5,boss:LT.boss,mid:LT.boss?null:nearestMinionId()};emit('cursefx',{x:LT.x,z:LT.z});}});return true;}
     if(gameTime-buf.q<.32&&ready('rift')){buf.q=-9;useSkill('rift');const tg=rainTarget();startCast({dur:.55,at:.35,pose:'raise',move:.4,face:false,fn:()=>{emit('zone',{z:{kind:'rift',x:tg[0],z:tg[1],r:4.5,dur:4,dmg:14,owner:NET.id||'me'}});}});return true;}
-    if(gameTime-buf.e<.32&&ready('siphon')){buf.e=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>20){toast('No target in range');return false;}useSkill('siphon');P.state='siphon';P.t=0;P.tick=0;return true;}
+    if(gameTime-buf.e<.32&&ready('siphon')){buf.e=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>16){toast('No target in range');return false;}useSkill('siphon');P.state='siphon';P.t=0;P.tick=0;return true;}
     if(gameTime-buf.f<.32&&ready('blink')){buf.f=-9;useSkill('blink');const a=ml>0?Math.atan2(mx,mz):aimAngle();const ox=P.x,oz=P.z;let [x,z]=clampArena(P.x+Math.sin(a)*9,P.z+Math.cos(a)*9,.8);
       P.x=x;P.z=z;P.iframe=.3;P.vx=P.vz=0;emit('pstep',{x,z,ox,oz});return true;}
     buf.light=buf.heavy=buf.q=buf.e=buf.f=-9;
@@ -1500,11 +1500,11 @@ function updatePlayer(dt){
     case 'siphon':{
       const t=P.t;vx=mx*SPD*.35;vz=mz*SPD*.35;if(LT.alive)turnTo(bossAngle(),10,dt);
       pose.armL=-1.6;pose.armR=-1.6;pose.armLz=.3;pose.armRz=-.3;pose.lean=-.05;
-      P.tick-=dt;if(P.tick<=0&&LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<22){P.tick=.2;healBeam(LT.x,LT.z,P.x,P.z,0xb06aff);
-        if(LT.boss)hitBoss(10,2,false,LT.x,2.5,LT.z,true);else{const id=nearestMinionId(),m=mins.get(id);if(m)hitMinion(m,10,false,true);}
-        P.hp=Math.min(P.maxHp,P.hp+5);}
+      P.tick-=dt;if(P.tick<=0&&LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<16){P.tick=.3;healBeam(LT.x,LT.z,P.x,P.z,0xb06aff);
+        if(LT.boss)hitBoss(7,1,false,LT.x,2.5,LT.z,true);else{const id=nearestMinionId(),m=mins.get(id);if(m)hitMinion(m,7,false,true);}
+        P.hp=Math.min(P.maxHp,P.hp+3);}
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
-      if(t>=1.8||!LT.alive)P.state='idle';break;}
+      if(t>=1.6||!LT.alive)P.state='idle';break;}
     case 'ult':{updateUlt(dt,pose,mx,mz);vx=P.uvx||0;vz=P.uvz||0;break;}
     case 'hurt':{pose.lean=-.35;pose.armR=-.3;pose.armL=-.2;if(P.t>=.42)P.state='idle';break;}
     case 'dead':{pose.lean=-1.5*ease(P.t/.8);pose.armR=.2;pose.armL=.2;break;}
@@ -1696,21 +1696,21 @@ const ATK={
     if(a.t<L)trackTurn(dt,3);
     if(a.t>=L&&!a.tele){a.tele=true;const len=Math.min(24,ARENA*1.3);
       hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.8},{color:c.col,delay:(W-L)/B.speedMul,dmg:D(32*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'bolt'});
-      hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.8},{color:c.col,delay:(W-L)/B.speedMul+.85,dmg:D(26*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'whoosh'});}
+      hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.8},{color:c.col,delay:(W-L)/B.speedMul+.65,dmg:D(30*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'whoosh'});}
     p.armR=a.t<W?lerp(-.3,-3,ease(a.t/W)):-1.4;p.lean=a.t<W?-.25:.3;p.upperY=a.t<W?.5:-.4;
     return a.t>=W+1.4;},
   chain(dt,a){a.t+=dt;const c=G.boss,W=.6,p=B.pose;
     if(!a.tele&&a.t>=.15){a.tele=true;alivePlayers().forEach(pl=>{const ang=Math.atan2(pl.x-B.x,pl.z-B.z),len=Math.hypot(pl.x-B.x,pl.z-B.z)+4;
-      hostDanger({type:'rect',x:B.x,z:B.z,a:ang,len,w:2},{color:c.col,delay:(W-.15)/B.speedMul+.15,dmg:D(28*c.dmg),srcX:B.x,srcZ:B.z,blockable:false,owner:'melee',fx:'bolt'});});}
+      for(let k=0;k<(B.phase===2?2:1);k++)hostDanger({type:'rect',x:B.x,z:B.z,a:ang+k*.35*(Math.random()<.5?1:-1),len,w:2.2},{color:c.col,delay:(W-.15)/B.speedMul+.15+k*.55,dmg:D(28*c.dmg),srcX:B.x,srcZ:B.z,blockable:false,owner:'melee',fx:'bolt'});});}
     p.armL=-1.7;p.armR=-.5;p.lean=-.1;return a.t>=W+1;},
   bolts(dt,a){a.t+=dt;const c=G.boss,W=.6,p=B.pose;
     if(a.t<W){const k=ease(a.t/W);p.armL=lerp(-.3,-3,k);p.armR=lerp(-.3,-3,k);return false;}
-    if(!a.go){a.go=true;SFX.roar();alivePlayers().forEach(pl=>{for(let i=0;i<3;i++){const [x,z]=clampArena(pl.x+pl.vx*(.45+i*.4),pl.z+pl.vz*(.45+i*.4),1);
-      hostDanger({type:'circle',x,z,r:2.3},{color:c.col,delay:.7+i*.42,dmg:D(26*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}});}
+    if(!a.go){a.go=true;SFX.roar();alivePlayers().forEach(pl=>{const n=B.phase===2?5:4;for(let i=0;i<n;i++){const [x,z]=clampArena(pl.x+pl.vx*(.4+i*.35),pl.z+pl.vz*(.4+i*.35),1);
+      hostDanger({type:'circle',x,z,r:2.5},{color:c.col,delay:.6+i*.35,dmg:D(26*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}});}
     p.armL=-3;p.armR=-3;return a.t>=W+1.8;},
   tempest(dt,a){a.t+=dt;const c=G.boss,W=.8,p=B.pose;
     if(a.t<W){const k=ease(a.t/W);p.armL=lerp(-.3,-3,k);p.armR=lerp(-.3,-3,k);p.lean=-.3*k;return false;}
-    if(!a.go){a.go=true;SFX.roar();shake(.4);for(let i=0;i<12;i++){const an=Math.random()*TAU,r=rand(3,ARENA-2),x=Math.sin(an)*r,z=Math.cos(an)*r;
+    if(!a.go){a.go=true;SFX.roar();shake(.4);const nT=16+alivePlayers().length*2;for(let i=0;i<nT;i++){const an=Math.random()*TAU,r=rand(3,ARENA-2),x=Math.sin(an)*r,z=Math.cos(an)*r;
       hostDanger({type:'circle',x,z,r:3.6},{color:c.col,delay:.9+i*.13,dmg:D(30*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}}
     p.armL=-3;p.armR=-3;return a.t>=W+2.2;},
   ring(dt,a){a.t+=dt;const c=G.boss,W=.5,p=B.pose;
