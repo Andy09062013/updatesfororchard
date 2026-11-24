@@ -220,6 +220,7 @@ body.touchmode .tb span{padding:0 7px}
 #hubSettings,#hubEnter,#hubStick{pointer-events:auto;touch-action:none}
 #hubStatus{position:absolute;bottom:65px;left:50%;transform:translateX(-50%);color:#ffcda1;width:min(450px,82vw)}
 #hubStatus:empty{display:none}
+#hubConnection{display:block;margin-top:4px;color:#d6e7e6}
 #hubReticle{position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:#fff3d1;box-shadow:0 0 0 1px #402c24;transform:translate(-50%,-50%)}
 #hubEnter{position:absolute;left:50%;top:58%;transform:translateX(-50%);padding:9px 15px;white-space:nowrap;background:#1c2731ee;color:#ffefc6;border:1px solid #caab73;border-radius:4px;cursor:pointer;font-size:14px}
 #hubStick{position:absolute;left:18px;bottom:60px;width:96px;height:96px;border-radius:50%;border:2px solid #ffe2b078;background:#22334260;color:#ffedca;display:none;place-content:center}
@@ -248,7 +249,7 @@ body.village-active>canvas:active{cursor:grabbing}
   <div id="hubReticle" aria-hidden="true"></div>
   <button id="hubEnter" type="button" class="hidden"></button>
   <div id="hubStick" aria-label="Drag to move"></div>
-  <footer class="hub-footer"><span id="hubCharacter"></span><span id="hubHelp" class="hub-help"></span></footer>
+  <footer class="hub-footer"><span><span id="hubCharacter"></span><small id="hubConnection"></small></span><span id="hubHelp" class="hub-help"></span></footer>
   <div class="status" id="hubStatus" role="status"></div>
 </section>
 <section id="skins" class="screen hidden">
@@ -348,7 +349,7 @@ body.village-active>canvas:active{cursor:grabbing}
 <div id="touch" class="hidden"><div id="joyBase"><div id="joyKnob"></div></div><div id="tBtns"></div><button id="tPause" class="tsys">II</button><button id="tChat" class="tsys">Chat</button></div>
 <div id="tEdit" class="hidden"><b style="font-family:Cinzel,serif;letter-spacing:.08em">Touch Layout</b><span>Drag any button to move it</span>
   <label>Size <input type="range" id="tSize" min="60" max="160"></label><label>Opacity <input type="range" id="tOpac" min="25" max="100"></label>
-  <label>Show <select id="tMode"><option value="auto">Automatic</option><option value="on">Always</option><option value="off">Never</option></select></label>
+  <label>Show <select id="tMode"><option value="auto">After touching the screen</option><option value="off">Never</option></select></label>
   <button class="sm" id="tReset">Reset Layout</button><button class="sm" id="tDone" style="border-color:#d9a74a;color:#f2c75a">Done</button></div>
 <div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="140" placeholder="Type a message and press Enter (Esc to cancel)" autocomplete="off" class="hidden"></div>
 
@@ -404,7 +405,7 @@ const CHARGE=.7;
 const CLASSES={
   sword:{ult:'Judgement',name:'Swordsman',hp:110,speed:6.8,desc:'A disciplined warrior with sword and shield. Blocks, parries and delivers crushing strikes.',
     skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
-    ctrl:[['light','Light attack (3-hit combo)'],['heavy','Heavy attack'],['block','Block (hold), press just before impact to parry']]},
+    ctrl:[['light','Light attack (3-hit combo)'],['heavy','Heavy attack'],['block','Hold shield to halve frontal blockable damage. Tap just before impact to parry.']]},
   mage:{name:'Mage',hp:85,speed:6.6,mana:120,ult:'Divine Ascension',desc:'A healer who shields the party and can raise fallen allies once per expedition as 10-HP skeletons.',
     skills:[{id:'mend',k:'LMB',n:'Mending Ray',cost:12,cd:.6},{id:'fireball',k:'RMB',n:'Fireball',cost:30,cd:.8},{id:'sanct',k:'Q',n:'Sanctuary',cost:35,cd:12},{id:'burst',k:'E',n:'Healing Burst',cost:30,cd:8},{id:'ward',k:'F',n:'Arcane Ward',cost:30,cd:16}],
     ctrl:[['light','Mending Ray, small heal on the targeted ally (12 mana)'],['heavy','Fireball (30 mana)'],['q','Sanctuary, healing circle placed at the targeted ally (35 mana)'],['e','Healing Burst, large instant heal around you (30 mana)'],['f','Arcane Ward, allies take reduced damage; nearby enemies are damaged and stunned (30 mana)']]},
@@ -419,10 +420,10 @@ const CLASSES={
     ctrl:[['light','Cleave (wide alternating swings)'],['heavy','Crushing Blow, slow overhead strike'],['q','Whirlwind, become a tornado for 3 seconds (reduced damage taken)'],['e','Blood Rage, more damage, lifesteal, speed and damage reduction for 8 seconds'],['f','Leap Slam onto the boss (invulnerable in the air)']]},
   paladin:{name:'Paladin',hp:145,speed:6.15,ult:'Heavenfall',desc:'A shield-bearing tank who protects allies, taunts bosses and crashes down from above.',
     skills:[{k:'LMB',n:'Mace Tap'},{k:'Shift',n:'Raise Shield'},{id:'aura',k:'Q',n:'Guardian Aura',cd:13},{id:'taunt',k:'E',n:'Challenge',cd:14}],
-    ctrl:[['light','Mace tap deals 8 damage'],['block','Hold shield to take 40% less damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack']]},
+    ctrl:[['light','Mace tap deals 8 damage'],['block','Hold shield to take 90% less damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack']]},
   sentinel:{name:'Sentinel',hp:120,speed:6.6,ult:'Beaconfall',desc:'A spear-wielding guardian with a defensive barrier and pulses of radiant energy.',
-    skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7}],
-    ctrl:[['light','Throw a lance of light'],['heavy','Aegis reduces incoming damage for 3.5s'],['q','Dawn Pulse strikes enemies around you']]},
+    skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10}],
+    ctrl:[['light','Throw a lance of light'],['heavy','Aegis reduces incoming damage for 3.5s'],['q','Dawn Pulse strikes enemies around you'],['e','Sunstrike deals 52 damage in a circle around your locked target or ahead of you']]},
   rogue:{ult:'Thousand Cuts',name:'Ninja',hp:70,speed:7.4,desc:'A swift dagger fighter with piercing shuriken and a 10% chance to dodge each incoming hit.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'shuriken',k:'RMB',n:'Piercing Shuriken',cd:.85},{id:'step',k:'Q',n:'Shadow Step',cd:12},{id:'poison',k:'E',n:'Envenom',cd:18},{id:'smoke',k:'F',n:'Smoke Bomb',cd:25}],
     ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Throw a shuriken that pierces enemies for 23 damage each'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
@@ -1153,7 +1154,7 @@ function pixelDeath(x,z,cls){
   playOof();
 }
 
-function makePlayer(cls,level=1,skin='classic'){
+function makePlayer(cls,level=1,skin='classic',world=scene){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
@@ -1387,10 +1388,16 @@ function makePlayer(cls,level=1,skin='classic'){
     }
   }
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
-  scene.add(root);
+  world.add(root);
   return {root,spin,upper,armR,armL,hipL,hipR,skin,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
-function disposeModel(m){if(!m)return;scene.remove(m.root);m.root.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
+function disposeModel(m,ownsMaterials=false){
+  if(!m)return;
+  m.root.parent?.remove(m.root);
+  const materials=ownsMaterials?new Set():null;
+  m.root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(materials&&o.material)materials.add(o.material);});
+  if(materials)for(const material of materials)material.dispose();
+}
 
 function hewnBlock(w,h,d,mat,x,y,z,parent){
   const b=Math.min(w,h,d)*.16,hw=w/2-b,hh=h/2-b;
@@ -1719,23 +1726,28 @@ $('cameraSettingsDone').onclick=()=>{if(settingsFrom==='pause')openPause();else 
 
 // ==== NETWORK ====
 function nsend(o){if(NET.ws&&NET.ws.readyState===1)NET.ws.send(JSON.stringify(o));}
+let netPending=null;
 function netConnect(){
-  return new Promise((res,rej)=>{
-    if(NET.ws&&NET.ws.readyState===1)return res();
+  if(NET.ws?.readyState===1)return Promise.resolve();
+  if(netPending)return netPending;
+  netPending=new Promise((res,rej)=>{
     if(!location.host||location.protocol==='file:')return rej(new Error('nohost'));
     let ws;try{ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');}catch(e){return rej(e);}
     const to=setTimeout(()=>{rej(new Error('timeout'));try{ws.close();}catch(e){}},6000);
     ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}
       if(m.t==='welcome'){NET.id=m.id;NET.ws=ws;clearTimeout(to);res();return;}onNet(m);};
     ws.onerror=()=>{clearTimeout(to);rej(new Error('fail'));};
-    ws.onclose=()=>{if(NET.ws===ws){NET.ws=null;NET.room=null;onDisconnect();}};
-  });
+    ws.onclose=()=>{clearTimeout(to);if(NET.ws===ws){NET.ws=null;NET.room=null;onDisconnect();}else rej(new Error('closed'));};
+  }).finally(()=>{netPending=null;});
+  return netPending;
 }
 function onDisconnect(){
+  hub.connected=false;clearVillagePeers();
   if(G&&G.mode==='mp'&&state==='play'){showMsg('CONNECTION LOST','Returned to the village',3);}
   if(state==='lobby'||state==='mp'||(['play','end'].includes(state)&&G?.mode==='mp')){toMenu();$('hubStatus').textContent='Disconnected from the server.';}
 }
 function onNet(m){
+  if(m.t==='village'){syncVillage(m.peers);return;}
   if(m.t==='error'){const el=state==='lobby'?$('lobbyStatus'):$('mpStatus');el.textContent=m.msg;return;}
   if(m.t==='lobbies'){renderLobbyList(m.list);return;}
   if(m.t==='lobby'){NET.room=m.room;NET.isHost=m.room.host===NET.id;
@@ -2097,7 +2109,7 @@ function hurtPlayer(dmg,src){
   if(activeEffect('fracture'))dmg*=1.15;
   if(P.ward>0)dmg*=.55;
   if(P.guard>0)dmg*=.7;
-  if(P.cls==='paladin'&&P.state==='block')dmg*=.6;
+  if(P.cls==='paladin'&&P.state==='block')dmg*=.1;
   if(P.state==='whirl')dmg*=.6;
   if(P.rageT>0)dmg*=.65;
   if(P.cls==='sword'&&P.state==='block'&&src.blockable){
@@ -2107,7 +2119,7 @@ function hurtPlayer(dmg,src){
         stats.parries++;SFX.parry();hitstop=.12;shake(.4);
         burst(P.x+Math.sin(P.facing)*.8,1.5,P.z+Math.cos(P.facing)*.8,22,0x9fd8ff,7,.12,.5,6);
         floatText('PARRIED',P.x,2.8,P.z,'label');toHost('parry',{});P.hurtInv=.4;return;}
-      dmg*=.2;SFX.block();burst(P.x+Math.sin(P.facing)*.7,1.3,P.z+Math.cos(P.facing)*.7,10,0xffd090,5,.1,.35);
+      dmg*=.5;SFX.block();burst(P.x+Math.sin(P.facing)*.7,1.3,P.z+Math.cos(P.facing)*.7,10,0xffd090,5,.1,.35);
       const ka=Math.atan2(P.x-src.x,P.z-src.z);P.kx=Math.sin(ka)*6;P.kz=Math.cos(ka)*6;P.hurtInv=.3;
       P.hp-=dmg;stats.taken+=dmg;if(P.hp<=0)killPlayer();return true;}
   }
@@ -2312,6 +2324,15 @@ function tryActions(mx,mz,ml){
         if(level===3)emit('healburst',{x:P.x,z:P.z,r:8,amt:15});
       }});return true;
     }
+    if(gameTime-buf.e<.32&&ready('sunstrike')){
+      buf.e=-9;useSkill('sunstrike');P.facing=aimAngle();
+      const dir=P.facing,r=4.8;
+      const [x,z]=clampArena(lockTarget&&lockTarget.kind!=='ally'?LT.x:P.x+Math.sin(dir)*12,
+        lockTarget&&lockTarget.kind!=='ally'?LT.z:P.z+Math.cos(dir)*12,1);
+      startCast({dur:.82,at:.48,pose:'raise',move:.4,face:false,fn:()=>{
+        emit('ultfx',{k:'sunstrike',x,z,r});aoeHit(x,z,r,52,19,true,false);
+      }});return true;
+    }
   }else if(P.cls==='archer'){
     if(gameTime-buf.f<.32&&ready('vault')){buf.f=-9;useSkill('vault');P.facing=aimAngle();P.state='vault';P.t=0;P.iframe=.5;P.fired=false;SFX.roll();return true;}
     if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.38,at:.2,pose:'bow',move:.7,fn:()=>{shoot(P.level===3?'crossbolt':'arrow',P.level===3?35:26,6,P.level===3?76:62);SFX.bow();}});return true;}
@@ -2471,6 +2492,11 @@ function ultFx(d){
   if(d.k==='voidBeam')renderVoidBeam(d);
   else if(d.k==='heavenfall'){ringFx(d.x,d.z,0xffd8a2,9,.62);burst(d.x,1,d.z,55,0xffc56f,11,.24,.7,9);SFX.slam();}
   else if(d.k==='siege'){ringFx(d.x,d.z,0xffc57d,4.2,.43);burst(d.x,1,d.z,24,0xffc57d,6,.17,.55,5);SFX.boom();}
+  else if(d.k==='sunstrike'){
+    ringFx(d.x,d.z,0xffd577,d.r,.46);
+    firePillar(d.x,d.z,.75,0xffe09a);
+    burst(d.x,.45,d.z,32,0xffdc8e,6,.18,.59,6);SFX.slam();
+  }
   else if(d.k==='beacon'){ringFx(d.x,d.z,0x9dffe0,7,.65);burst(d.x,1,d.z,45,0xa5f2cf,8,.24,.65,6);SFX.boom();}
   else if(d.k==='judge'){ringFx(d.x,d.z,0xffd27a,7,.5);burst(d.x,1,d.z,40,0xffd27a,9,.2,.7,4);SFX.slam();}
   else if(d.k==='quake'){ringFx(d.x,d.z,0xc01a10,8,.6);burst(d.x,.3,d.z,50,0x5a5048,12,.3,1,8);spikeLine(d.x,d.z,0,6,0xc01a10);spikeLine(d.x,d.z,Math.PI,6,0xc01a10);spikeLine(d.x,d.z,Math.PI/2,6,0xc01a10);spikeLine(d.x,d.z,-Math.PI/2,6,0xc01a10);}
@@ -3248,6 +3274,7 @@ function netTick(dt){
 
 // ==== GAME FLOW ====
 function setScreen(id){
+  if(id!=='hub'&&document.body.classList.contains('village-active'))leaveVillagePresence();
   ['hub','menu','skins','solo','mp','lobby','end','pause','binds','cameraSettings'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
   document.body.classList.toggle('village-active',id==='hub');
   if(id!==null&&id!=='hub'&&document.pointerLockElement===canvas)document.exitPointerLock();
@@ -3279,12 +3306,13 @@ function startGame(cfg){
   for(const k in buf)buf[k]=-9;
   NET.isHost=G.mode==='solo'||cfg.host===NET.id;
   setupRoom(def,true);
-  state='play';paused=false;setScreen(null);
+  const touchLaunch=usingTouch;
+  state='play';paused=false;usingTouch=false;setScreen(null);
   $('hud').classList.remove('hidden');$('crosshair').classList.remove('hidden');showTouch(touchOn());
   $('pName').textContent=(G.mode==='mp'?me.name+' · ':'')+C.name+' · Lv. '+level;
   $('runCoins').textContent=profile.coins+' coins · +0 this run';
   $('manaBar').classList.toggle('hidden',myClass!=='mage');$('ultBar').classList.remove('hidden');buildSkillBar();
-  requestShiftLock();
+  if(!touchLaunch)requestShiftLock();
 }
 let doorGroup=null,doorMat=null;
 function buildDoor(){
@@ -3496,13 +3524,26 @@ function toMenu(){showTouch(false);NET.room=null;try{document.exitPointerLock();
   $('hubStatus').textContent='';returnToHub();}
 
 // ==== TOUCH CONTROLS ====
-const TOUCH_DEV=(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||('ontouchstart' in window);
+let usingTouch=false;
 const TBTN=[{a:'light',d:[.84,.80],s:1.3},{a:'heavy',d:[.95,.66],s:1},{a:'roll',d:[.95,.88],s:.95},{a:'block',d:[.73,.90],s:.9},
   {a:'q',d:[.72,.72],s:.85},{a:'e',d:[.77,.58],s:.85},{a:'f',d:[.86,.52],s:.85},{a:'ult',d:[.95,.43],s:.95},{a:'heal',d:[.63,.90],s:.8},{a:'lock',d:[.95,.31],s:.75},{a:'prevTarget',d:[.79,.31],s:.53},{a:'nextTarget',d:[.87,.31],s:.53}];
 let TLAY={pos:{},size:100,opac:70,mode:'auto'};
 try{const sv=JSON.parse(localStorage.getItem('hc_touch')||'null');if(sv)TLAY=Object.assign(TLAY,sv);}catch(e){}
 function saveTouch(){try{localStorage.setItem('hc_touch',JSON.stringify(TLAY));}catch(e){}}
-const touchOn=()=>TLAY.mode==='on'||(TLAY.mode==='auto'&&TOUCH_DEV);
+if(TLAY.mode==='on')TLAY.mode='auto';
+const touchOn=()=>TLAY.mode!=='off'&&usingTouch;
+function useTouchInput(enabled){
+  if(usingTouch===enabled)return;
+  usingTouch=enabled;
+  if(!tEditing&&state==='play')showTouch(touchOn());
+  if(state==='hub'){if(!enabled)resetVillageInput();syncVillageInput();}
+}
+addEventListener('touchstart',()=>useTouchInput(true),{capture:true,passive:true});
+addEventListener('pointerdown',e=>{
+  if(e.pointerType==='touch')useTouchInput(true);
+  else if(e.pointerType==='mouse'&&!e.sourceCapabilities?.firesTouchEvents)useTouchInput(false);
+},true);
+addEventListener('keydown',e=>{if(!e.repeat)useTouchInput(false);},true);
 const TC={x:0,y:0,joyId:null,jx:0,jy:0,camId:null,cx:0,cy:0},vheld={};let tEditing=false,tEditFrom='menu',tDrag=null;
 function tLabel(a){
   const C=currentLoadout();
@@ -3539,7 +3580,16 @@ function tPress(a,down){
   if(P&&P.dead){if(a==='light')specIdx++;return;}
   if(a==='lock')toggleLock();else if(a==='prevTarget'||a==='nextTarget')cycleTarget(a==='nextTarget'?1:-1);else if(a in buf)buf[a]=gameTime;
 }
-function showTouch(v){$('touch').classList.toggle('hidden',!v);document.body.classList.toggle('touchmode',v&&!tEditing);document.body.classList.toggle('tediting',v&&tEditing);if(v){buildTouch();}}
+function showTouch(v){
+  $('touch').classList.toggle('hidden',!v);document.body.classList.toggle('touchmode',v&&!tEditing);
+  document.body.classList.toggle('tediting',v&&tEditing);
+  if(v)buildTouch();
+  else{
+    TC.x=TC.y=0;TC.joyId=TC.camId=null;
+    for(const a in vheld)vheld[a]=false;
+    $('joyBase').classList.remove('on');$('joyKnob').style.transform='';
+  }
+}
 (function(){
   const el=$('touch');
   el.addEventListener('touchstart',e=>{if(tEditing)return;e.preventDefault();
@@ -3867,7 +3917,89 @@ function buildVillage(){
 const HUB_KEY={KeyA:[-1,0],ArrowLeft:[-1,0],KeyD:[1,0],ArrowRight:[1,0],
   KeyW:[0,1],ArrowUp:[0,1],KeyS:[0,-1],ArrowDown:[0,-1]};
 const hub={x:0,z:8.8,yaw:0,pitch:-.045,pace:0,held:new Set(),opening:false,partyPoll:0,
-  near:null,from:null,look:null,stick:null,side:0,forward:0,touch:false};
+  near:null,from:null,look:null,stick:null,side:0,forward:0,touch:false,connected:false,reportAt:0,retryAt:0,moving:false,facing:Math.PI,model:null,style:null};
+const villagePeers=new Map();
+const VILLAGE_WALK_POSE={armR:-.4,armL:-.32,armRz:0,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0};
+function villageAvatar(cls,level,skin){
+  return makePlayer(cls,level,skin,villageScene);
+}
+function animateVillager(v,dt){
+  v.pace+=v.moving?dt*10:0;
+  const swing=v.moving?Math.sin(v.pace)*.62:0;
+  const pose={...VILLAGE_WALK_POSE,armR:-.4-swing*.49,armL:-.32+swing*.49,legL:swing,legR:-swing};
+  applyPose(v.model,pose,v.moving?'walk':'idle',dt,v.x,v.z,v.facing);
+}
+function removeVillager(peer){
+  disposeModel(peer.model,true);
+  villageScene.remove(peer.tag);peer.tag.material.map.dispose();peer.tag.material.dispose();
+}
+function clearVillagePeers(){
+  for(const peer of villagePeers.values())removeVillager(peer);
+  villagePeers.clear();
+}
+function villageName(name){
+  const map=canvasTex(256,64,(ctx,w,h)=>{
+    ctx.fillStyle='#172331e6';ctx.fillRect(0,5,w,h-10);
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff2d1';
+    ctx.font='bold 25px sans-serif';ctx.fillText(name,w/2,h/2,w-20);
+  },1,1);
+  const tag=new THREE.Sprite(new THREE.SpriteMaterial({map,depthWrite:false}));
+  tag.scale.set(2.4,.6,1);villageScene.add(tag);return tag;
+}
+function enterVillagePresence(){
+  hub.reportAt=0;hub.connected=false;hub.retryAt=0;
+  if(typeof location!=='undefined'&&location.host)
+    netConnect().catch(()=>{});
+}
+function leaveVillagePresence(){
+  nsend({t:'villageLeave'});
+  hub.connected=false;clearVillagePeers();
+}
+function syncVillage(peers){
+  if(state!=='hub'||!Array.isArray(peers))return;
+  hub.connected=true;
+  const seen=new Set();
+  for(const v of peers){
+    if(!v||typeof v.id!=='string'||v.id===NET.id||!Object.hasOwn(CLASSES,v.cls)||![v.x,v.z,v.facing].every(Number.isFinite))continue;
+    const level=safeLevel(v.level),skin=v.skin==='pixel'?'pixel':'classic';
+    const style=v.cls+':'+level+':'+skin;
+    const old=villagePeers.get(v.id);
+    if(!old||old.style!==style||old.name!==v.name){
+      if(old)removeVillager(old);
+      villagePeers.set(v.id,{style,name:v.name,x:v.x,z:v.z,facing:v.facing,pace:0,
+        model:villageAvatar(v.cls,level,skin),tag:villageName(v.name)});
+    }
+    const peer=villagePeers.get(v.id);
+    Object.assign(peer,{tx:v.x,tz:v.z,tf:v.facing,moving:!!v.moving});
+    if(Math.hypot(peer.x-v.x,peer.z-v.z)>8){peer.x=v.x;peer.z=v.z;peer.facing=v.facing;}
+    seen.add(v.id);
+  }
+  for(const [id,peer] of villagePeers)if(!seen.has(id)){removeVillager(peer);villagePeers.delete(id);}
+}
+function tickVillagePresence(dt,now){
+  const style=myClass+':'+charLevel(myClass)+':'+skinFor(myClass);
+  if(style!==hub.style){
+    disposeModel(hub.model,true);hub.model=villageAvatar(myClass,charLevel(myClass),skinFor(myClass));hub.style=style;
+  }
+  animateVillager(hub,dt);
+  hub.model.root.visible=villageCamera.position.distanceTo(hub.model.root.position)>1.05;
+  if(NET.ws?.readyState===1&&now>=hub.reportAt){
+    hub.reportAt=now+140;
+    nsend({t:'village',name:myName(),cls:myClass,skin:skinFor(myClass),level:charLevel(myClass),
+      x:hub.x,z:hub.z,facing:hub.facing,moving:hub.moving});
+  }else if(!NET.ws&&typeof location!=='undefined'&&location.host&&now>=hub.retryAt){
+    hub.retryAt=now+10000;netConnect().catch(()=>{});
+  }
+  const alpha=1-Math.exp(-12*dt);
+  for(const peer of villagePeers.values()){
+    peer.x=lerp(peer.x,peer.tx,alpha);peer.z=lerp(peer.z,peer.tz,alpha);
+    peer.facing+=wrap(peer.tf-peer.facing)*alpha;animateVillager(peer,dt);
+    peer.tag.position.set(peer.model.root.position.x,2.65,peer.model.root.position.z);
+  }
+  const badge=hub.connected?(villagePeers.size+1)+' in village':'Offline village';
+  if($('hubConnection').textContent!==badge)$('hubConnection').textContent=badge;
+}
+
 
 function villageEntrance(site,walking){
   return site.kind==='house'?(walking?1.83:3.6):
@@ -3897,12 +4029,13 @@ function walkVillage(dt){
   let side=hub.side,forward=hub.forward;
   for(const code of hub.held){side+=HUB_KEY[code][0];forward+=HUB_KEY[code][1];}
   const length=Math.hypot(side,forward),moving=length>.04;
+  hub.moving=moving;
   if(moving){
     const step=5.2*dt/Math.max(1,length),s=Math.sin(hub.yaw),c=Math.cos(hub.yaw);
     const dx=(side*c-forward*s)*step,dz=(-side*s-forward*c)*step;
+    hub.facing=Math.atan2(dx,dz);
     if(villageClear(hub.x+dx,hub.z))hub.x+=dx;
     if(villageClear(hub.x,hub.z+dz))hub.z+=dz;
-    hub.pace+=dt*10;
     const door=villageNearby(true);
     if(door){hubEnter(door);return;}
   }
@@ -3912,12 +4045,20 @@ function walkVillage(dt){
     $('hubEnter').classList.toggle('hidden',!near);
     if(near){const site=VILLAGE_PLACES[near];$('hubEnter').textContent=(hub.touch?'':'E · ')+site.title+(site.hint?' · '+site.hint:'');}
   }
-  villageCamera.position.set(hub.x,1.68+(moving?Math.sin(hub.pace)*.038:0),hub.z);
-  villageCamera.rotation.set(hub.pitch,hub.yaw,0,'YXZ');
+  const distance=5.4,s=Math.sin(hub.yaw),c=Math.cos(hub.yaw),tilt=Math.cos(hub.pitch);
+  let offset=distance;
+  for(let step=.32;step<=distance;step+=.22){
+    if(!villageClear(hub.x+s*step*tilt,hub.z+c*step*tilt)){offset=Math.max(.26,step-.32);break;}
+  }
+  villageCamera.position.set(hub.x+s*offset*tilt,Math.max(.62,1.48-Math.sin(hub.pitch)*offset),hub.z+c*offset*tilt);
+  villageCamera.lookAt(hub.x,1.48,hub.z);
+}
+function syncVillageInput(){
+  hub.touch=touchOn();
+  $('hub').classList.toggle('mobile-hub',hub.touch);
+  hub.near=null;$('hubEnter').classList.add('hidden');hubHint();
 }
 function initVillageControls(){
-  hub.touch=TOUCH_DEV;
-  $('hub').classList.toggle('mobile-hub',hub.touch);
   $('hubEnter').onclick=()=>{if(hub.near)hubEnter(hub.near);};
   addEventListener('keydown',event=>{
     if(state!=='hub'||event.target?.tagName==='INPUT')return;
@@ -3930,6 +4071,7 @@ function initVillageControls(){
   document.addEventListener('pointerlockchange',()=>{if(state==='hub')hubHint();});
   canvas.addEventListener('pointerdown',event=>{
     if(state!=='hub'||hub.look||event.button!==0)return;
+    if(event.pointerType==='touch')useTouchInput(true);
     hub.look={id:event.pointerId,x:event.clientX,y:event.clientY};
     canvas.setPointerCapture?.(event.pointerId);
     if(event.pointerType==='mouse'&&cameraPrefs.shiftLock&&!hub.touch)requestShiftLock();
@@ -3995,13 +4137,13 @@ function hubEnter(id){
 function returnToHub(){
   centerEl.style.opacity=0;$('toast').style.opacity=0;
   for(const f of floats)f.el.remove();floats.length=0;
-  state='hub';resetVillageInput();hub.near=null;$('hubEnter').classList.add('hidden');
+  state='hub';usingTouch=false;resetVillageInput();hub.near=null;$('hubEnter').classList.add('hidden');
   if(hub.from){
     const site=VILLAGE_PLACES[hub.from],distance=villageEntrance(site,false)+.8;
     hub.x=site.x+Math.sin(site.yaw)*distance;hub.z=site.z+Math.cos(site.yaw)*distance;
     hub.yaw=wrap(site.yaw+Math.PI);hub.pitch=-.045;hub.from=null;
   }
-  setScreen('hub');updateHubLabel();hubHint();walkVillage(0);
+  setScreen('hub');updateHubLabel();syncVillageInput();walkVillage(0);enterVillagePresence();
 }
 function initHub(){
   $('skinClass').innerHTML=Object.entries(CLASSES).map(([id,c])=>`<option value="${id}">${c.name}</option>`).join('');
@@ -4027,7 +4169,11 @@ let last=performance.now();
 function loop(now){
   requestAnimationFrame(loop);
   let dt=Math.min(.05,(now-last)/1000);last=now;const real=dt;
-  if(state==='hub'){walkVillage(real);renderer.render(villageScene,villageCamera);return;}
+  if(state==='hub'){
+    walkVillage(real);
+    if(state==='hub')tickVillagePresence(real,now);
+    renderer.render(villageScene,villageCamera);return;
+  }
   if(state==='mp'&&now>=hub.partyPoll&&NET.ws?.readyState===1){hub.partyPoll=now+4500;nsend({t:'list'});}
   updateArena(real,now);
   if(state==='play'&&G){
