@@ -11,12 +11,12 @@ type Room = {
   players: Map<string, Player>;
 };
 
-const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel"];
+const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin"];
 const BOSSES: Record<string, string> = { varkhul: "keep", sylvara: "frost", ignar: "forge", morvane: "void", thoruun: "storm", vaelis: "void" };
 const ARENAS = ["keep", "frost", "forge", "void", "storm"];
 const DIFFS = ["easy", "normal", "hard", "nightmare"];
 const MAX = 5;
-const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "wipe"]);
+const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe"]);
 const rooms = new Map<string, Room>();
 
 function makeCode(): string {
