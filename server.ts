@@ -23,6 +23,23 @@ function roomCapacity(value: unknown, fallback: number): number {
 }
 const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe"]);
 const rooms = new Map<string, Room>();
+type Presence = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel";
+  x: number; z: number; facing: number; moving: boolean; seen: number };
+const village = new Map<string, Presence>();
+const VILLAGE_LIMIT = 32;
+function villageUpdate(ws: any, m: any) {
+  const id = ws.data.id, now = Date.now();
+  if (ws.data.room || now - (ws.data.lastVillage ?? 0) < 95) return;
+  if (![m.x, m.z, m.facing].every(Number.isFinite) || Math.abs(m.x) > 24 || m.z < -22 || m.z > 20) return;
+  ws.data.lastVillage = now;
+  for (const [key, p] of village) if (now - p.seen > 6500) village.delete(key);
+  if (village.has(id) || village.size < VILLAGE_LIMIT) {
+    village.set(id, { id, name: clean(m.name), cls: cls(m.cls), level: charLevel(m.level),
+      skin: skinType(m.skin), x: m.x, z: m.z, facing: m.facing % (Math.PI * 2), moving: m.moving === true, seen: now });
+  }
+  const peers = [...village.values()].filter(p => p.id !== id).map(({ seen, ...p }) => p);
+  send(ws, { t: "village", peers });
+}
 
 function makeCode(): string {
   const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -69,6 +86,7 @@ function leave(ws: any) {
 
 function join(ws: any, r: Room, name: string, c: string, level: unknown, skin: unknown) {
   if (ws.data.room) leave(ws);
+  village.delete(ws.data.id);
   const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), level: charLevel(level), skin: skinType(skin), ready: false, ws };
   r.players.set(p.id, p);
   ws.data.room = r.code;
@@ -78,6 +96,8 @@ function join(ws: any, r: Room, name: string, c: string, level: unknown, skin: u
 function handle(ws: any, m: any) {
   const r = ws.data.room ? rooms.get(ws.data.room) : undefined;
   switch (m.t) {
+    case "village": villageUpdate(ws, m); break;
+    case "villageLeave": village.delete(ws.data.id); break;
     case "list": {
       const list = [...rooms.values()]
         .filter((x) => x.public && x.state === "lobby" && x.players.size < x.capacity)
@@ -190,7 +210,7 @@ const server = Bun.serve({
       try { m = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw)); } catch { return; }
       if (m && typeof m.t === "string") handle(ws, m);
     },
-    close(ws: any) { leave(ws); },
+    close(ws: any) { village.delete(ws.data.id); leave(ws); },
   },
 });
 console.log("Hollow Crown server listening on", server.port);
