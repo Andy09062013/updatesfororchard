@@ -2,13 +2,39 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Hollow Crown</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow:hidden;background:#050407;font-family:Inter,system-ui,sans-serif;color:#e8e2d6;user-select:none}
-canvas{display:block}
+canvas{display:block;touch-action:none}
+#touch{position:fixed;inset:0;z-index:8;touch-action:none;-webkit-user-select:none}
+#joyBase{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(255,230,190,.35);background:rgba(10,8,6,.25);display:none;pointer-events:none}
+#joyBase.on{display:block}
+#joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(242,199,90,.55);border:2px solid rgba(255,240,200,.7)}
+.tb{position:absolute;transform:translate(-50%,-50%);border-radius:50%;background:rgba(20,15,12,.7);border:2px solid #8a6a3a;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;touch-action:none}
+.tb span{position:relative;z-index:2;font-size:11px;line-height:1.1;color:#f3e6c8;padding:0 4px;font-weight:600;text-shadow:0 1px 2px #000}
+.tb em{position:absolute;bottom:4px;left:0;right:0;z-index:3;font-style:normal;font-size:11px;color:#fff;text-shadow:0 1px 2px #000}
+.tb .tcd{position:absolute;inset:0;z-index:1}
+.tb.down{background:rgba(242,199,90,.45);border-color:#f2c75a}
+.tb.ready{border-color:#f2c75a;box-shadow:0 0 16px rgba(242,199,90,.8)}
+.tb.active{border-color:#9fd8ff}
+.tb.nomana{border-color:#3a4a8a}
+.tb.edit{border-style:dashed;border-color:#f2c75a;cursor:move}
+.tsys{position:absolute;top:12px;z-index:9;font-family:Cinzel,serif;font-size:13px;padding:8px 14px;background:rgba(20,15,12,.75);color:#f3e6c8;border:1px solid #8a6a3a;border-radius:6px;touch-action:none}
+#tPause{right:12px}#tChat{right:72px}
+#tEdit{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:40;background:rgba(14,11,10,.95);border:1px solid #6a5030;border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;max-width:94vw;font-size:13px;color:#e3cfa6}
+#tEdit label{display:flex;gap:6px;align-items:center}
+#tEdit input[type=range]{width:110px}
+body.touchmode #skills,body.touchmode #crosshair,body.touchmode #hint{display:none!important}
+body.touchmode .boss{bottom:auto;top:12px;width:min(400px,42vw)}
+body.touchmode .boss .name{font-size:13px}
+body.touchmode #lockTag{display:none}
+body.tediting #hud,body.tediting #crosshair{display:none!important}
+body.touchmode #chat{bottom:auto;top:46%;left:12px}
+body.touchmode .pbars{left:12px;top:12px;width:min(220px,28vw)}
+body.touchmode #team{left:12px;top:120px}
 .hidden{display:none!important}
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:18px;z-index:20;background:radial-gradient(ellipse at center,rgba(40,18,14,.86),rgba(5,4,7,.97) 70%);overflow-y:auto;padding:24px 0}
 h1{font-family:Cinzel,serif;font-weight:900;font-size:clamp(40px,7vw,84px);letter-spacing:.12em;color:#d9c39a;text-shadow:0 0 30px rgba(255,90,40,.35),0 4px 0 #000}
@@ -149,7 +175,7 @@ button.sm:hover{filter:brightness(1.3)}
   <div class="sub">Select Your Class</div>
   <div class="cards" id="classCards"></div>
   <div class="classInfo" id="classInfo"></div>
-  <div class="row"><button class="big" id="soloBtn">Play Solo</button><button class="big alt" id="mpBtn">Multiplayer</button><button class="big alt" id="menuBindsBtn">Keybinds</button></div>
+  <div class="row"><button class="big" id="soloBtn">Play Solo</button><button class="big alt" id="mpBtn">Multiplayer</button><button class="big alt" id="menuBindsBtn">Keybinds</button><button class="big alt" id="menuTouchBtn">Touch Controls</button></div>
   <div class="status" id="menuStatus"></div>
 </div>
 
@@ -218,6 +244,11 @@ button.sm:hover{filter:brightness(1.3)}
 <div id="hurtFx"></div>
 <div id="center"><div class="t"></div><div class="s"></div></div>
 <div id="toast"></div>
+<div id="touch" class="hidden"><div id="joyBase"><div id="joyKnob"></div></div><div id="tBtns"></div><button id="tPause" class="tsys">II</button><button id="tChat" class="tsys">Chat</button></div>
+<div id="tEdit" class="hidden"><b style="font-family:Cinzel,serif;letter-spacing:.08em">Touch Layout</b><span>Drag any button to move it</span>
+  <label>Size <input type="range" id="tSize" min="60" max="160"></label><label>Opacity <input type="range" id="tOpac" min="25" max="100"></label>
+  <label>Show <select id="tMode"><option value="auto">Automatic</option><option value="on">Always</option><option value="off">Never</option></select></label>
+  <button class="sm" id="tReset">Reset Layout</button><button class="sm" id="tDone" style="border-color:#d9a74a;color:#f2c75a">Done</button></div>
 <div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="140" placeholder="Type a message and press Enter (Esc to cancel)" autocomplete="off" class="hidden"></div>
 
 <div id="pause" class="screen hidden">
@@ -225,6 +256,7 @@ button.sm:hover{filter:brightness(1.3)}
   <div class="sub" id="pauseNote"></div>
   <div class="ctrlTable" id="ctrlTable"></div>
   <button class="big" id="resumeBtn">Resume</button>
+  <div class="row"><button class="big alt" id="pauseTouchBtn">Touch Layout</button><button class="big alt" id="pauseFsBtn">Fullscreen</button></div>
   <button class="big alt" id="pauseBindsBtn">Keybinds</button>
   <button class="big alt" id="quitBtn">Leave Expedition</button>
 </div>
@@ -339,7 +371,7 @@ const MTYPE_IDX=['grunt','caster','brute'];
 
 // ==== RENDERER ====
 const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,((window.matchMedia&&matchMedia('(pointer:coarse)').matches)?1.5:2)));
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputEncoding=THREE.sRGBEncoding;
@@ -725,7 +757,7 @@ function keyName(c,short){
   if(/^Numpad/.test(c))return 'Num '+c.slice(6);
   return c;
 }
-function held(a){const b=BINDS[a];if(!b)return false;return b.startsWith('Mouse')?!!mouse[+b.slice(5)]:!!keys[b];}
+function held(a){if(typeof vheld!=='undefined'&&vheld[a])return true;const b=BINDS[a];if(!b)return false;return b.startsWith('Mouse')?!!mouse[+b.slice(5)]:!!keys[b];}
 function press(code){
   for(const a in BINDS)if(BINDS[a]===code){
     if(a==='lock')lockOn=!lockOn;
@@ -795,7 +827,7 @@ function finishRebind(code){
   if(a&&code){const other=Object.keys(BINDS).find(k=>k!==a&&BINDS[k]===code);if(other)BINDS[other]=BINDS[a];BINDS[a]=code;saveBinds();if(state==='play')buildSkillBar();renderClassCards();}
   renderBinds();
 }
-function resume(){paused=false;$('pause').classList.add('hidden');try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(err){}}
+function resume(){paused=false;$('pause').classList.add('hidden');for(const k in vheld)vheld[k]=false;try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(err){}}
 $('resumeBtn').onclick=resume;
 $('pauseBindsBtn').onclick=()=>openBinds('pause');
 $('menuBindsBtn').onclick=()=>openBinds('menu');
@@ -1348,7 +1380,8 @@ function updatePlayer(dt){
   if(P.dotT>0){P.dotT-=dt;P.dotTick=(P.dotTick||0)-dt;if(P.dotTick<=0){P.dotTick=.5;if(!B.dead){hitBoss(4,0,false,B.x,BM.root.position.y+3,B.z,true);burst(B.x+rand(-1,1),BM.root.position.y+rand(1,4),B.z+rand(-1,1),2,0x6adf4a,1.5,.12,.6,-1);}}}
   P.regen=!P.dead&&gameTime-P.lastHit>5&&P.hp<P.maxHp;
   if(P.regen)P.hp=Math.min(P.maxHp,P.hp+P.maxHp*.018*dt);
-  const ix=(held('right')?1:0)-(held('left')?1:0),iz=(held('up')?1:0)-(held('down')?1:0);
+  let ix=(held('right')?1:0)-(held('left')?1:0),iz=(held('up')?1:0)-(held('down')?1:0);
+  if(TC.x||TC.y){ix+=TC.x;iz-=TC.y;}
   const sy=Math.sin(cam.yaw),cy=Math.cos(cam.yaw);
   let mx=ix*cy-iz*sy,mz=-ix*sy-iz*cy;const ml=Math.hypot(mx,mz);if(ml>0){mx/=ml;mz/=ml;}
   const blockHeld=P.cls==='sword'&&held('block');
@@ -1863,6 +1896,7 @@ function buildSkillBar(){
   $('skills').innerHTML=`<div class="sk ultsk" id="skU"><span class="key">${esc(keyName(BINDS.ult,true))}</span><span class="nm">${CLASSES[myClass].ult}</span><div class="cdv"></div><div class="cdt"></div></div>`+sk.map((s,i)=>`<div class="sk" id="sk${i}"><span class="key">${esc(keyName(BINDS[KM[s.k]],true))}</span><span class="nm">${s.n}</span>${s.cost?`<span class="cost">${s.cost}</span>`:''}<div class="cdv"></div><div class="cdt"></div></div>`).join('');
 }
 function updateHUD(spec){
+  updateTouchHUD();
   $('hpFill').style.width=(Math.max(0,P.hp)/P.maxHp*100)+'%';$('hpChip').style.width=(P.chip/P.maxHp*100)+'%';$('hpTxt').textContent=Math.ceil(Math.max(0,P.hp))+' / '+P.maxHp;
   if(P.cls==='mage'){$('manaFill').style.width=(P.mana/P.maxMana*100)+'%';$('manaTxt').textContent=Math.floor(P.mana)+' / '+P.maxMana;}
   if(G.room&&G.room.type==='minion'){let rem=0;mins.forEach(m=>rem+=Math.max(0,m.hp));const tot=Math.max(1,G.waveHp||1);
@@ -1949,7 +1983,7 @@ function startGame(cfg){
   NET.isHost=G.mode==='solo'||cfg.host===NET.id;
   setupRoom(def,true);
   state='play';paused=false;setScreen(null);
-  $('hud').classList.remove('hidden');$('crosshair').classList.remove('hidden');
+  $('hud').classList.remove('hidden');$('crosshair').classList.remove('hidden');showTouch(touchOn());
   $('pName').textContent=(G.mode==='mp'?me.name+' · ':'')+C.name;
   $('manaBar').classList.toggle('hidden',myClass!=='mage');buildSkillBar();
   try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(e){}
@@ -2097,7 +2131,7 @@ function endGame(win){
   if(state!=='play')return;
   state='end';try{document.exitPointerLock();}catch(e){}
   const secs=Math.round((performance.now()-stats.start)/1000),tm=`${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
-  setScreen('end');$('end').classList.toggle('dead',!win);$('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
+  showTouch(false);setScreen('end');$('end').classList.toggle('dead',!win);$('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
   remotes.forEach(r=>r.tag.style.display='none');
   $('endTitle').textContent=win?(G.campaign?'CAMPAIGN COMPLETE':'VICTORY ACHIEVED'):(G.mode==='mp'?'THE PARTY HAS FALLEN':'YOU HAVE FALLEN');
   $('endStats').innerHTML=(G.campaign?`Campaign · ${G.diff.n}<br>`+(win?`All 8 chambers conquered<br>Time Elapsed: ${tm}`:`Fell in ${G.room.t}: ${G.room.s}<br>Time Survived: ${tm}`):`${G.boss.n} · ${G.diff.n}<br>`+(win?`Time Elapsed: ${tm}`:`Boss Health Remaining: ${Math.round(B.hp/B.maxHp*100)}%<br>Time Survived: ${tm}`))+
@@ -2113,10 +2147,93 @@ function leaveGame(){
   if(G&&G.mode==='mp'){nsend({t:'leave'});}
   toMenu();
 }
-function toMenu(){state='menu';try{document.exitPointerLock();}catch(e){}
+function toMenu(){showTouch(false);state='menu';try{document.exitPointerLock();}catch(e){}
   $('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
   remotes.forEach(r=>{disposeModel(r.model);r.tag.remove();});remotes.clear();
   setScreen('menu');$('menuStatus').textContent='';renderClassCards();}
+
+// ==== TOUCH CONTROLS ====
+const TOUCH_DEV=(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||('ontouchstart' in window);
+const TBTN=[{a:'light',d:[.84,.80],s:1.3},{a:'heavy',d:[.95,.66],s:1},{a:'roll',d:[.95,.88],s:.95},{a:'block',d:[.73,.90],s:.9},
+  {a:'q',d:[.72,.72],s:.85},{a:'e',d:[.77,.58],s:.85},{a:'f',d:[.86,.52],s:.85},{a:'ult',d:[.95,.43],s:.95},{a:'heal',d:[.63,.90],s:.8},{a:'lock',d:[.95,.31],s:.75}];
+let TLAY={pos:{},size:100,opac:70,mode:'auto'};
+try{const sv=JSON.parse(localStorage.getItem('hc_touch')||'null');if(sv)TLAY=Object.assign(TLAY,sv);}catch(e){}
+function saveTouch(){try{localStorage.setItem('hc_touch',JSON.stringify(TLAY));}catch(e){}}
+const touchOn=()=>TLAY.mode==='on'||(TLAY.mode==='auto'&&TOUCH_DEV);
+const TC={x:0,y:0,joyId:null,jx:0,jy:0,camId:null,cx:0,cy:0},vheld={};let tEditing=false,tEditFrom='menu',tDrag=null;
+function tLabel(a){
+  const C=CLASSES[myClass],sk=C.skills,K={light:'LMB',heavy:'RMB',q:'Q',e:'E',f:'F'};
+  if(K[a]){const s=sk.find(x=>x.k===K[a]);return s?s.n:null;}
+  if(a==='block')return myClass==='sword'?'Block':null;
+  return {roll:'Roll',ult:C.ult,heal:'Flask',lock:'Lock-On'}[a];
+}
+function tSkill(a){const K={light:'LMB',heavy:'RMB',q:'Q',e:'E',f:'F'};return K[a]?CLASSES[myClass].skills.find(x=>x.k===K[a]):null;}
+function buildTouch(){
+  const box=$('tBtns');box.innerHTML='';
+  TBTN.forEach(b=>{const lab=tLabel(b.a);if(!lab&&!tEditing)return;
+    const p=TLAY.pos[b.a]||b.d,sz=Math.round(64*b.s*TLAY.size/100);
+    const el=document.createElement('div');el.className='tb'+(tEditing?' edit':'');el.dataset.a=b.a;
+    el.style.cssText=`left:${p[0]*100}%;top:${p[1]*100}%;width:${sz}px;height:${sz}px;opacity:${TLAY.opac/100}`;
+    el.innerHTML=`<div class="tcd"></div><span>${esc(lab||b.a)}</span><em></em>`;box.appendChild(el);
+    const startDrag=(id,x,y)=>{tDrag={el,a:b.a,id};};
+    const moveDrag=(x,y)=>{const nx=clamp(x/innerWidth,.03,.97),ny=clamp(y/innerHeight,.05,.95);TLAY.pos[b.a]=[nx,ny];el.style.left=nx*100+'%';el.style.top=ny*100+'%';};
+    el.addEventListener('touchstart',ev=>{ev.preventDefault();ev.stopPropagation();const t=ev.changedTouches[0];
+      if(tEditing){startDrag(t.identifier);return;}initAudio();el._tid=t.identifier;tPress(b.a,true);el.classList.add('down');},{passive:false});
+    el.addEventListener('touchmove',ev=>{ev.preventDefault();ev.stopPropagation();if(!tDrag||tDrag.el!==el)return;for(const t of ev.changedTouches)if(t.identifier===tDrag.id)moveDrag(t.clientX,t.clientY);},{passive:false});
+    const tend=ev=>{ev.preventDefault();ev.stopPropagation();if(tDrag&&tDrag.el===el){tDrag=null;saveTouch();return;}tPress(b.a,false);el.classList.remove('down');};
+    el.addEventListener('touchend',tend,{passive:false});el.addEventListener('touchcancel',tend,{passive:false});
+    el.addEventListener('mousedown',ev=>{ev.preventDefault();ev.stopPropagation();if(tEditing){tDrag={el,a:b.a,id:'m'};return;}tPress(b.a,true);el.classList.add('down');});
+    el.addEventListener('mouseup',ev=>{if(!tEditing){tPress(b.a,false);el.classList.remove('down');}});
+  });
+}
+addEventListener('mousemove',ev=>{if(tDrag&&tDrag.id==='m'){const nx=clamp(ev.clientX/innerWidth,.03,.97),ny=clamp(ev.clientY/innerHeight,.05,.95);TLAY.pos[tDrag.a]=[nx,ny];tDrag.el.style.left=nx*100+'%';tDrag.el.style.top=ny*100+'%';}});
+addEventListener('mouseup',()=>{if(tDrag&&tDrag.id==='m'){tDrag=null;saveTouch();}});
+function tPress(a,down){
+  vheld[a]=down;if(!down||state!=='play'||paused)return;
+  if(P&&P.dead){if(a==='light')specIdx++;return;}
+  if(a==='lock')lockOn=!lockOn;else if(a in buf)buf[a]=gameTime;
+}
+function showTouch(v){$('touch').classList.toggle('hidden',!v);document.body.classList.toggle('touchmode',v&&!tEditing);document.body.classList.toggle('tediting',v&&tEditing);if(v){buildTouch();}}
+(function(){
+  const el=$('touch');
+  el.addEventListener('touchstart',e=>{if(tEditing)return;e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.clientX<innerWidth*.45&&TC.joyId===null){TC.joyId=t.identifier;TC.jx=t.clientX;TC.jy=t.clientY;const jb=$('joyBase');jb.style.left=t.clientX+'px';jb.style.top=t.clientY+'px';jb.classList.add('on');}
+      else if(TC.camId===null){TC.camId=t.identifier;TC.cx=t.clientX;TC.cy=t.clientY;}}},{passive:false});
+  el.addEventListener('touchmove',e=>{e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier===TC.joyId){const dx=t.clientX-TC.jx,dy=t.clientY-TC.jy,R=56,L=Math.hypot(dx,dy),k=L>R?R/L:1;
+        TC.x=dx*k/R;TC.y=dy*k/R;$('joyKnob').style.transform=`translate(${dx*k}px,${dy*k}px)`;}
+      else if(t.identifier===TC.camId&&state==='play'&&!paused){const dx=t.clientX-TC.cx,dy=t.clientY-TC.cy;TC.cx=t.clientX;TC.cy=t.clientY;
+        if(!(lockOn&&P&&!P.dead))cam.yaw-=dx*.007;cam.pitch=clamp(cam.pitch+dy*.005,-.05,1.1);}}},{passive:false});
+  const end=e=>{for(const t of e.changedTouches){if(t.identifier===TC.joyId){TC.joyId=null;TC.x=TC.y=0;$('joyKnob').style.transform='';$('joyBase').classList.remove('on');}if(t.identifier===TC.camId)TC.camId=null;}};
+  el.addEventListener('touchend',end);el.addEventListener('touchcancel',end);
+  for(const ev of ['touchstart','mousedown']){$('tPause').addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();if(state==='play'&&!paused)openPause();},{passive:false});
+    $('tChat').addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();if(state==='play'&&!paused)openChat();},{passive:false});}
+})();
+function openTouchEdit(from){
+  tEditFrom=from;tEditing=true;$('pause').classList.add('hidden');if(from==='menu')setScreen(null);
+  $('tEdit').classList.remove('hidden');$('tSize').value=TLAY.size;$('tOpac').value=TLAY.opac;$('tMode').value=TLAY.mode;showTouch(true);
+}
+function closeTouchEdit(){tEditing=false;saveTouch();$('tEdit').classList.add('hidden');
+  if(tEditFrom==='pause'){showTouch(touchOn());openPause();}else{showTouch(false);setScreen('menu');renderClassCards();}}
+$('tSize').oninput=()=>{TLAY.size=+$('tSize').value;buildTouch();saveTouch();};
+$('tOpac').oninput=()=>{TLAY.opac=+$('tOpac').value;buildTouch();saveTouch();};
+$('tMode').onchange=()=>{TLAY.mode=$('tMode').value;saveTouch();};
+$('tReset').onclick=()=>{TLAY.pos={};TLAY.size=100;TLAY.opac=70;$('tSize').value=100;$('tOpac').value=70;buildTouch();saveTouch();};
+$('tDone').onclick=closeTouchEdit;
+$('menuTouchBtn').onclick=()=>openTouchEdit('menu');
+$('pauseTouchBtn').onclick=()=>openTouchEdit('pause');
+$('pauseFsBtn').onclick=()=>{try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>toast('Fullscreen is not available here'));}catch(e){toast('Fullscreen is not available here');}};
+function updateTouchHUD(){
+  if($('touch').classList.contains('hidden')||tEditing)return;
+  document.querySelectorAll('#tBtns .tb').forEach(el=>{const a=el.dataset.a,s=tSkill(a),cd=el.querySelector('.tcd'),em=el.querySelector('em');let frac=0,txt='';
+    if(s&&s.id&&s.cd){const c=P.cd[s.id]||0;frac=c/s.cd;if(c>.05&&s.cd>=1)txt=c.toFixed(c<10?1:0);el.classList.toggle('nomana',!!(s.cost&&P.mana<s.cost));}
+    if(a==='ult'){const u=P.ult||0;frac=1-u/100;el.classList.toggle('ready',u>=100);txt=u>=100?'':Math.floor(u)+'%';}
+    if(a==='heal')txt=P.flasks+'';
+    if(a==='lock')el.classList.toggle('active',lockOn);
+    cd.style.background=frac>0?`conic-gradient(rgba(0,0,0,.65) ${frac*360}deg, transparent 0)`:'none';em.textContent=txt;});
+}
 
 // ==== MENUS ====
 function myName(){const v=$('nameIn').value.trim();return v||'Adventurer';}
@@ -2162,7 +2279,7 @@ function renderLobbyList(list){
   el.innerHTML=list.map(l=>`<div class="lobbyItem"><div><b>${esc(l.hostName)}'s Lobby</b> <span class="meta">· ${l.count}/5 · ${l.gm==='campaign'?'Campaign':esc(BOSSES[l.boss]?BOSSES[l.boss].n.split(',')[0]:'')} · ${esc(DIFFS[l.diff]?DIFFS[l.diff].n:'')}</span></div><button class="sm" data-code="${esc(l.code)}">Join</button></div>`).join('');
   el.querySelectorAll('button').forEach(b=>b.onclick=()=>nsend({t:'join',code:b.dataset.code,name:myName(),cls:myClass}));
 }
-function showLobby(){state='lobby';try{document.exitPointerLock();}catch(e){}$('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
+function showLobby(){showTouch(false);state='lobby';try{document.exitPointerLock();}catch(e){}$('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
   remotes.forEach(r=>{disposeModel(r.model);r.tag.remove();});remotes.clear();setScreen('lobby');$('lobbyStatus').textContent='';}
 function renderLobby(){
   const r=NET.room;if(!r)return;const me=r.players.find(p=>p.id===NET.id);
