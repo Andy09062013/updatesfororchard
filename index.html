@@ -197,6 +197,7 @@ button.big.alt{background:linear-gradient(180deg,#2d3643,#161c26);border-color:#
 button:focus-visible,.card:focus-visible{outline:2px solid #ffe1a8;outline-offset:3px}
 #upgradePanel{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:9px 14px;width:min(820px,94vw);padding:9px 14px;border:1px solid #716047;background:#101823ed;color:#d7c8ad}
 #coinBalance,#runCoins{color:#f2ca7d;font-weight:600}
+#upgradeLook{font-size:12px;color:#d8bd8d;line-height:1.5}
 #upgradeInfo{font-size:12px;line-height:1.5}
 #upgradeBtn:disabled{opacity:.5;cursor:default}
 #runCoins{font-size:12px;margin-top:4px;text-shadow:0 2px 3px #000}
@@ -217,7 +218,7 @@ body.touchmode .tb span{padding:0 7px}
   <div class="row"><span class="lbl">Name</span><input id="nameIn" maxlength="16" placeholder="Adventurer"></div>
   <div class="sub">Select Your Class</div>
   <div class="cards" id="classCards"></div>
-  <div id="upgradePanel"><span id="coinBalance"></span><span id="upgradeInfo"></span><button class="sm" id="upgradeBtn"></button></div>
+  <div id="upgradePanel"><span id="coinBalance"></span><span id="upgradeInfo"></span><span id="upgradeLook"></span><button class="sm" id="upgradeBtn"></button></div>
   <div class="classInfo" id="classInfo"></div>
   <div class="row"><button class="big" id="soloBtn">Play Solo</button><button class="big alt" id="mpBtn">Multiplayer</button><button class="big alt" id="menuBindsBtn">Keybinds</button><button class="big alt" id="menuTouchBtn">Touch Controls</button><button class="big alt" id="menuSettingsBtn">Settings</button></div>
   <div class="status" id="menuStatus"></div>
@@ -385,6 +386,16 @@ const UPGRADES={
   paladin:[['Q','Guardian Banner','Guardian Aura covers more ground and lasts 7 seconds.'],['Q','Aegis of Dawn','The larger aura lasts 8 seconds and restores 12 health to allies.']],
   sentinel:[['Q','Resonant Pulse','A wider pulse that hits harder.'],['Q','Radiant Pulse','The pulse staggers enemies and heals nearby allies.']]
 };
+const UPGRADE_GEAR={
+  sword:['Steel pauldrons and a reinforced shield','Gold plate, a royal blue cape and a broad sword'],
+  mage:['An ice-blue mantle and a ringed staff','White robes, a tall collar and a sunburst staff'],
+  archer:['A feathered cowl, a green cape and brass bow fittings','A steel crossbow and a heavier ranger mantle'],
+  warlock:['A bone mask and violet crystal gauntlets','A split horn crown, crimson cloak and larger crystals'],
+  berserker:['Crimson war paint and an iron-banded axe','Spiked shoulders, a bone crest and a double-edged axe'],
+  rogue:['Green venom daggers and a green scarf','A split black cloak, hood crest and twin venom blades'],
+  paladin:['An ivory tabard and a back-mounted banner','Gold plate, a sunburst shield and a gilded mace'],
+  sentinel:['Copper-framed armor and an emerald spear','A mint crystal crest, brighter plates and a trident']
+};
 const profileKey='hc_progression_v1';
 function readProfile(){
   try{
@@ -415,7 +426,9 @@ function buyUpgrade(){
 function renderUpgrade(){
   const level=charLevel(myClass),next=level+1,cost=GOLD_COST[next],btn=$('upgradeBtn');
   $('coinBalance').textContent=profile.coins+' coins';
+  const gear=UPGRADE_GEAR[myClass];
   $('upgradeInfo').textContent=cost?UPGRADES[myClass][next-2][1]+' · '+UPGRADES[myClass][next-2][2]:'Level 3 · '+UPGRADES[myClass][1][1];
+  $('upgradeLook').textContent=cost?'Level '+next+' gear · '+gear[next-2]:'Equipped · '+gear[1];
   btn.textContent=cost?'Upgrade to Lv. '+next+' · '+cost+' coins':'Max level';
   btn.disabled=!cost||profile.coins<cost;
 }
@@ -946,28 +959,58 @@ let toastT=0;function toast(t){$('toast').textContent=t;$('toast').style.opacity
 function box(w,h,d,mat,x,y,z,parent){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x||0,y||0,z||0);m.castShadow=true;m.receiveShadow=true;parent&&parent.add(m);return m;}
 function grp(x,y,z,parent){const g=new THREE.Group();g.position.set(x||0,y||0,z||0);parent&&parent.add(g);return g;}
 const std=(c,o)=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.8},o||{}));
+function gearGem(parent,material,x,y,z,r,scale=[1,1,1]){
+  const mesh=new THREE.Mesh(new THREE.OctahedronGeometry(r),material);
+  mesh.position.set(x,y,z);mesh.scale.set(...scale);parent.add(mesh);return mesh;
+}
+function gearSpike(parent,material,x,y,z,r,height,tilt=0){
+  const mesh=new THREE.Mesh(new THREE.ConeGeometry(r,height,5),material);
+  mesh.position.set(x,y,z);mesh.rotation.z=tilt;parent.add(mesh);
+}
+function staffHead(staff,metal,royal){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(royal?.25:.2,.028,6,12),metal);
+  ring.position.y=-1.43;staff.add(ring);
+  if(royal)for(let i=0;i<6;i++){
+    const a=i/6*TAU;
+    const ray=box(.055,.17,.046,metal,Math.sin(a)*.33,-1.43+Math.cos(a)*.33,0,staff);
+    ray.rotation.z=-a;
+  }
+}
+
 function makePlayer(cls,level=1){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
   let glow=null,bowRig=null;
+  const veteran=level>=2,royal=level===3;
   if(cls==='sword'){
-    const steel=std(0x9aa2b0,{metalness:.37,roughness:.34}),dark=std(0x2a2c33,{metalness:.6,roughness:.5}),cloth=std(0x2f4f86,{roughness:.85}),leather=std(0x4a3324),gold=std(0xc9a04a,{metalness:.8,roughness:.3});
+    const steel=std(royal?0xc3a062:veteran?0xb7c4d4:0x9aa2b0,{metalness:.37,roughness:.34}),dark=std(0x2a2c33,{metalness:.6,roughness:.5}),cloth=std(royal?0x283c91:veteran?0x365c79:0x2f4f86,{roughness:.85}),leather=std(0x4a3324),gold=std(0xc9a04a,{metalness:.8,roughness:.3});
     const blade=std(0xdfe6ee,{metalness:.9,roughness:.15,emissive:0x223344,emissiveIntensity:.3});
     box(.27,.95,.32,dark,0,-.47,0,hipL);box(.27,.95,.32,dark,0,-.47,0,hipR);
     box(.3,.18,.42,leather,0,-.9,.05,hipL);box(.3,.18,.42,leather,0,-.9,.05,hipR);
     hewnBlock(.82,.92,.48,steel,0,.48,0,upper);box(.6,.95,.5,cloth,0,.3,.02,upper);box(.86,.14,.52,leather,0,.02,0,upper);
-    hewnBlock(.34,.22,.5,steel,.5,.88,0,upper);hewnBlock(.34,.22,.5,steel,-.5,.88,0,upper);
+    for(const side of [-1,1]){
+      const shoulder=hewnBlock(veteran?.44:.34,veteran?.29:.22,veteran?.58:.5,steel,side*.5,.88,0,upper);
+      if(veteran){shoulder.rotation.z=-side*.23;hewnBlock(.3,.085,.58,gold,side*.59,.85,0,upper).rotation.z=-side*.23;}
+    }
     const head=new THREE.Mesh(new THREE.SphereGeometry(.27,14,12),steel);head.position.y=1.22;head.castShadow=true;upper.add(head);
     box(.36,.05,.08,new THREE.MeshBasicMaterial({color:0x050505}),0,1.22,.24,upper);box(.06,.3,.32,cloth,0,1.5,-.02,upper);
     box(.22,.7,.22,steel,0,-.35,0,armR);box(.24,.18,.24,leather,0,-.72,0,armR);
-    const sword=grp(0,-.78,0,armR);box(.06,.26,.06,leather,0,-.05,0,sword);box(.46,.07,.1,gold,0,-.2,0,sword);hewnBlock(.09,1.45,.035,blade,0,-.95,0,sword);
+    const sword=grp(0,-.78,0,armR);box(.06,.26,.06,leather,0,-.05,0,sword);box(.46,.07,.1,gold,0,-.2,0,sword);hewnBlock(royal?.19:veteran?.13:.09,royal?1.63:1.45,.046,blade,0,-.95,0,sword);
     box(.22,.7,.22,steel,0,-.35,0,armL);
-    bossCape(.76,1.3,std(0x294569,{side:THREE.DoubleSide}),upper,.27,-.27);
-    const shield=grp(-.16,-.45,.05,armL);box(.08,.85,.62,cloth,0,0,0,shield);box(.1,.12,.66,gold,0,.38,0,shield);box(.1,.12,.66,gold,0,-.38,0,shield);box(.11,.18,.18,gold,-.02,0,0,shield);
+    bossCape(royal?.94:.76,royal?1.56:1.3,std(royal?0x2d4993:0x294569,{side:THREE.DoubleSide}),upper,.27,-.27);
+    const shield=grp(-.16,-.45,.05,armL);
+    if(veteran){
+      hewnBlock(.12,royal?1.1:.95,royal?.76:.67,royal?gold:steel,0,0,0,shield);
+      hewnBlock(.052,royal?.95:.8,royal?.61:.53,cloth,-.075,0,0,shield);
+      gearGem(shield,gold,-.11,0,0,royal?.27:.17,[.22,1,1]);
+    }else{
+      box(.08,.85,.62,cloth,0,0,0,shield);box(.1,.12,.66,gold,0,.38,0,shield);
+      box(.1,.12,.66,gold,0,-.38,0,shield);box(.11,.18,.18,gold,-.02,0,0,shield);
+    }
   }else if(cls==='mage'){
-    const robe=std(0x4a2a7a,{roughness:.85}),trim=std(0xd9b04a,{metalness:.7,roughness:.3}),skin=std(0xd8b898),wood=std(0x5a3a22);
-    glow=new THREE.MeshBasicMaterial({color:0x9fe0ff});
+    const robe=std(royal?0xd3d1c6:veteran?0x385c80:0x4a2a7a,{roughness:.85}),trim=std(0xd9b04a,{metalness:.7,roughness:.3}),skin=std(0xd8b898),wood=std(0x5a3a22);
+    glow=new THREE.MeshBasicMaterial({color:royal?0xffda81:0x9fe0ff});
     box(.25,.95,.3,robe,0,-.47,0,hipL);box(.25,.95,.3,robe,0,-.47,0,hipR);
     const skirt=new THREE.Mesh(new THREE.CylinderGeometry(.42,.62,1.0,10),robe);skirt.position.y=.5;skirt.castShadow=true;inner.add(skirt);
     hewnBlock(.74,.9,.44,robe,0,.46,0,upper);box(.2,.92,.46,trim,0,.46,.01,upper);box(.78,.1,.48,trim,0,.04,0,upper);
@@ -975,10 +1018,17 @@ function makePlayer(cls,level=1){
     const hood=new THREE.Mesh(new THREE.ConeGeometry(.34,.75,10),robe);hood.position.set(0,1.42,-.04);hood.rotation.x=-.15;hood.castShadow=true;upper.add(hood);
     box(.2,.68,.2,robe,0,-.34,0,armR);box(.2,.68,.2,robe,0,-.34,0,armL);
     const staff=grp(0,-.72,0,armR);const sh=new THREE.Mesh(new THREE.CylinderGeometry(.04,.05,2.1,6),wood);sh.position.y=-.3;sh.castShadow=true;staff.add(sh);
-    const orb=new THREE.Mesh(new THREE.OctahedronGeometry(.16),glow);orb.position.y=-1.42;staff.add(orb);
+    gearGem(staff,glow,0,-1.42,0,veteran?.19:.16);
+    if(veteran){
+      staffHead(staff,trim,royal);
+      bossCape(royal?.98:.86,royal?1.45:1.08,std(royal?0xdad7ca:0x527f9e,{side:THREE.DoubleSide}),upper,.32,-.29);
+      for(const side of [-1,1]){
+        hewnBlock(.31,royal?.32:.19,.39,trim,side*.32,.89,-.04,upper).rotation.z=side*.32;
+      }
+    }
     const ho=new THREE.Mesh(new THREE.SphereGeometry(.09,8,8),glow);ho.position.y=-.75;armL.add(ho);
   }else if(cls==='warlock'){
-    const robe=std(0x1a0e22,{roughness:.85}),trim=std(0x6a1a2a,{roughness:.6}),skin=std(0xb8a8b0),horn=std(0x2a2026,{roughness:.5}),glowW=new THREE.MeshBasicMaterial({color:0xb06aff});
+    const robe=std(royal?0x3d1526:0x1a0e22,{roughness:.85}),trim=std(royal?0xc03f64:0x6a1a2a,{roughness:.6}),skin=std(0xb8a8b0),horn=std(0x2a2026,{roughness:.5}),glowW=new THREE.MeshBasicMaterial({color:0xb06aff});
     glow=glowW;
     box(.25,.95,.3,robe,0,-.47,0,hipL);box(.25,.95,.3,robe,0,-.47,0,hipR);
     const skirt=new THREE.Mesh(new THREE.CylinderGeometry(.4,.66,1.0,10),robe);skirt.position.y=.5;inner.add(skirt);
@@ -988,7 +1038,16 @@ function makePlayer(cls,level=1){
     box(.14,.05,.04,glowW,0,1.2,.23,upper);
     for(const sx of[-1,1]){const hn=new THREE.Mesh(new THREE.ConeGeometry(.06,.42,6),horn);hn.position.set(sx*.2,1.48,-.02);hn.rotation.z=-sx*.5;upper.add(hn);}
     box(.2,.68,.2,robe,0,-.34,0,armR);box(.2,.68,.2,robe,0,-.34,0,armL);
-    for(const arm of[armR,armL]){const o=new THREE.Mesh(new THREE.SphereGeometry(.11,8,8),glowW);o.position.y=-.76;arm.add(o);}
+    for(const arm of [armR,armL]){
+      if(veteran)gearGem(arm,glowW,0,-.68,.14,royal?.23:.16,[.85,1.2,.8]);
+      else{const orb=new THREE.Mesh(new THREE.SphereGeometry(.11,8,8),glowW);orb.position.y=-.76;arm.add(orb);}
+    }
+    if(veteran){
+      const bone=std(royal?0x94748d:0xd9c9b7),cloak=std(royal?0x70213a:0x331944,{side:THREE.DoubleSide});
+      hewnBlock(.36,.16,.13,bone,0,1.1,.24,upper);
+      bossCape(.9,royal?1.55:1.15,cloak,upper,.32,-.29);
+      if(royal)for(const side of [-1,1])gearSpike(upper,bone,side*.33,1.58,-.03,.085,.44,-side*.61);
+    }
     const book=box(.28,.06,.36,trim,0,1.0,.0,null);book.position.set(-.55,1.15,-.35);upper.add(book);
   }else if(cls==='berserker'){
     const fur=std(0x6a5038,{roughness:.95}),leather=std(0x3a2618),skin=std(0xc89878),iron=std(0x6a6e78,{metalness:.7,roughness:.4}),horn=std(0xe8dcc0,{roughness:.6}),haft=std(0x4a2e1a),blade=std(0xbfc6d0,{metalness:.85,roughness:.25});
@@ -1001,10 +1060,21 @@ function makePlayer(cls,level=1){
     for(const sx of[-1,1]){const hn=new THREE.Mesh(new THREE.ConeGeometry(.07,.45,6),horn);hn.position.set(sx*.3,1.42,0);hn.rotation.z=-sx*.9;upper.add(hn);}
     box(.26,.72,.26,skin,0,-.36,0,armR);box(.28,.2,.28,leather,0,-.66,0,armR);box(.26,.72,.26,skin,0,-.36,0,armL);box(.28,.2,.28,leather,0,-.66,0,armL);
     const axe=grp(0,-.74,0,armR);const hf=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,2,8),haft);hf.position.y=-.55;axe.add(hf);
-    hewnBlock(.9,.5,.06,blade,0,-1.45,0,axe);box(.12,.6,.1,iron,0,-1.45,0,axe);
+    hewnBlock(royal?1.15:.9,.5,.075,blade,royal?.13:0,-1.45,0,axe);
+    if(veteran){
+      const crimson=new THREE.MeshBasicMaterial({color:0x9e3139});
+      for(const side of [-1,1]){
+        box(.1,.23,.043,crimson,side*.15,1.09,.245,upper).rotation.z=side*.39;
+        hewnBlock(.31,.21,.33,iron,0,-.55,.02,side<0?armL:armR);
+        if(royal)gearSpike(upper,horn,side*.56,1.16,0,.12,.41,-side*.56);
+      }
+      box(.56,.088,.102,crimson,0,-1.43,.039,axe);
+      if(royal){hewnBlock(.59,.7,.085,blade,-.42,-1.42,0,axe);gearSpike(upper,horn,0,1.56,-.05,.11,.31);}
+    }
+    box(.12,.6,.1,iron,0,-1.45,0,axe);
     root.scale.setScalar(1.1);
   }else if(cls==='paladin'){
-    const iron=std(0x7a8b9c,{metalness:.38,roughness:.36}),gold=std(0xc7aa6a,{metalness:.42}),cloth=std(0x63363a);
+    const iron=std(royal?0xcbae72:veteran?0xa9afba:0x7a8b9c,{metalness:.38,roughness:.36}),gold=std(0xc7aa6a,{metalness:.42}),cloth=std(veteran?0xe5d9af:0x63363a);
     const light=new THREE.MeshBasicMaterial({color:0xffdfab});
     for(const leg of [hipL,hipR]){
       hewnBlock(.32,.9,.36,iron,0,-.46,0,leg);
@@ -1020,12 +1090,22 @@ function makePlayer(cls,level=1){
       hewnBlock(.26,.76,.32,iron,0,-.36,0,arm);
     }
     const shield=grp(0,-.46,.02,armL);
-    hewnBlock(.29,.89,.64,gold,-.16,0,.01,shield);
+    hewnBlock(.29,royal?1.09:.89,royal?.79:.64,gold,-.16,0,.01,shield);
     hewnBlock(.09,.79,.55,cloth,-.31,0,.01,shield);
     hewnBlock(.09,.22,.22,light,-.37,.03,.01,shield).rotation.x=Math.PI/4;
     const mace=grp(0,-.73,0,armR);
     box(.064,.69,.064,gold,0,-.29,0,mace);
-    hewnBlock(.24,.3,.24,iron,0,-.63,0,mace);
+    hewnBlock(royal?.33:.24,royal?.39:.3,royal?.33:.24,iron,0,-.63,0,mace);
+    if(veteran){
+      box(.055,.67,.055,gold,.27,1.02,-.39,upper);
+      const banner=std(royal?0xf4dc9f:0xb54e4c,{side:THREE.DoubleSide});
+      const pennant=new THREE.Mesh(new THREE.PlaneGeometry(.4,.58),banner);
+      pennant.position.set(.12,1.09,-.41);pennant.rotation.y=-.24;upper.add(pennant);
+    }
+    if(royal){
+      gearGem(shield,light,-.4,0,.01,.33,[.16,1,1]);
+      gearGem(mace,light,0,-.84,0,.15,[.65,1,.65]);
+    }
   }else if(cls==='skeleton'){
     const bone=std(0xe2ddc8,{roughness:.66}),dark=std(0x3c4039),blade=std(0x839198,{metalness:.32});
     for(const leg of [hipL,hipR]){
@@ -1041,7 +1121,7 @@ function makePlayer(cls,level=1){
     const sword=grp(0,-.7,0,armR);
     box(.28,.05,.07,dark,0,-.12,0,sword);hewnBlock(.11,.95,.045,blade,0,-.58,0,sword);
   }else if(cls==='sentinel'){
-    const iron=std(0x527879,{metalness:.32,roughness:.4}),gold=std(0xc6ae77,{metalness:.36}),cloth=std(0x123a36);
+    const iron=std(royal?0x87bcb7:veteran?0x53776c:0x527879,{metalness:.32,roughness:.4}),gold=std(veteran?0xc88754:0xc6ae77,{metalness:.36}),cloth=std(0x123a36);
     const light=new THREE.MeshBasicMaterial({color:0x9af7da});
     for(const leg of [hipL,hipR]){
       hewnBlock(.28,.85,.31,cloth,0,-.46,0,leg);hewnBlock(.33,.47,.34,iron,0,-.65,.02,leg);
@@ -1056,9 +1136,18 @@ function makePlayer(cls,level=1){
     }
     const spear=grp(0,-.7,0,armR);
     box(.071,1.74,.071,gold,0,-.43,0,spear);
-    const tip=new THREE.Mesh(new THREE.ConeGeometry(.17,.55,4),light);tip.position.y=-1.5;tip.rotation.z=Math.PI;spear.add(tip);
+    const tip=new THREE.Mesh(new THREE.ConeGeometry(veteran?.22:.17,veteran?.66:.55,4),light);
+    tip.position.y=-1.5;tip.rotation.z=Math.PI;spear.add(tip);
+    if(veteran){
+      hewnBlock(.44,.17,.13,gold,0,.71,.29,upper);
+      gearGem(upper,light,0,.65,.36,royal?.18:.12,[1,1,.46]);
+    }
+    if(royal){
+      gearGem(upper,light,0,1.53,-.025,.18,[.72,1.23,.66]);
+      for(const side of [-1,1])gearSpike(spear,light,side*.2,-1.44,0,.076,.52,Math.PI+side*.26);
+    }
   }else if(cls==='rogue'){
-    const leather=std(0x2a2026,{roughness:.8}),dark=std(0x15121a),cloth=std(0x4a1a2a,{roughness:.85}),skin=std(0xd8b898),blade=std(0xd6dce6,{metalness:.9,roughness:.2}),maskM=std(0x111015);
+    const leather=std(0x2a2026,{roughness:.8}),dark=std(0x15121a),cloth=std(royal?0x182624:veteran?0x31513a:0x4a1a2a,{roughness:.85}),skin=std(0xd8b898),blade=std(veteran?0x72c280:0xd6dce6,{metalness:.45,roughness:.28,emissive:veteran?0x2b8f42:0x000000,emissiveIntensity:royal?.65:.23}),maskM=std(0x111015);
     box(.25,.95,.3,dark,0,-.47,0,hipL);box(.25,.95,.3,dark,0,-.47,0,hipR);
     box(.28,.2,.4,leather,0,-.9,.05,hipL);box(.28,.2,.4,leather,0,-.9,.05,hipR);
     hewnBlock(.7,.88,.42,leather,0,.46,0,upper);box(.74,.12,.46,cloth,0,.08,0,upper);
@@ -1066,11 +1155,19 @@ function makePlayer(cls,level=1){
     const head=new THREE.Mesh(new THREE.SphereGeometry(.23,14,12),skin);head.position.y=1.17;upper.add(head);
     box(.4,.18,.12,maskM,0,1.08,.18,upper);
     const hood=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10,0,TAU,0,1.9),cloth);hood.position.set(0,1.21,-.03);upper.add(hood);
-    bossCape(.7,1.1,std(0x2a0e18,{side:THREE.DoubleSide}),upper,.45,-.24);
+    const cloak=std(royal?0x141b22:veteran?0x214033:0x2a0e18,{side:THREE.DoubleSide});
+    if(royal){
+      for(const side of [-1,1]){
+        const tail=bossCape(.41,1.45,cloak,upper,.31,-.26);
+        tail.position.x=side*.24;tail.rotation.z=side*.14;
+      }
+      gearGem(upper,blade,0,1.36,.19,.095,[.7,1,.5]);
+    }else bossCape(.7,1.1,cloak,upper,.45,-.24);
+    if(veteran)hewnBlock(.48,.14,.47,cloth,0,.97,0,upper);
     for(const arm of[armR,armL]){box(.2,.68,.2,leather,0,-.34,0,arm);box(.22,.14,.22,dark,0,-.68,0,arm);
-      const dg=grp(0,-.74,0,arm);box(.05,.18,.06,dark,0,-.02,0,dg);box(.2,.04,.06,cloth,0,-.12,0,dg);hewnBlock(.06,.5,.02,blade,0,-.38,0,dg);}
+      const dg=grp(0,-.74,0,arm);box(.05,.18,.06,dark,0,-.02,0,dg);box(.2,.04,.06,cloth,0,-.12,0,dg);hewnBlock(veteran?.095:.06,royal?.72:.5,.024,blade,0,royal?-.51:-.38,0,dg);}
   }else{
-    const tunic=std(0x2f5a32,{roughness:.85}),leather=std(0x5a3a22),dark=std(0x2a241e),skin=std(0xd8b898),wood=std(0x6a4a2a),str=new THREE.MeshBasicMaterial({color:0xe8e0c8});
+    const tunic=std(royal?0x303b3a:veteran?0x416d55:0x2f5a32,{roughness:.85}),leather=std(0x5a3a22),dark=std(0x2a241e),skin=std(0xd8b898),wood=std(0x6a4a2a),str=new THREE.MeshBasicMaterial({color:0xe8e0c8});
     box(.26,.95,.3,dark,0,-.47,0,hipL);box(.26,.95,.3,dark,0,-.47,0,hipR);
     box(.3,.18,.4,leather,0,-.9,.05,hipL);box(.3,.18,.4,leather,0,-.9,.05,hipR);
     hewnBlock(.74,.9,.44,tunic,0,.46,0,upper);box(.78,.12,.48,leather,0,.08,0,upper);
@@ -1080,6 +1177,13 @@ function makePlayer(cls,level=1){
     const head=new THREE.Mesh(new THREE.SphereGeometry(.24,14,12),skin);head.position.y=1.18;head.castShadow=true;upper.add(head);
     const hood=new THREE.Mesh(new THREE.SphereGeometry(.29,12,10,0,TAU,0,1.9),tunic);hood.position.set(0,1.22,-.03);hood.castShadow=true;upper.add(hood);
     box(.2,.68,.2,tunic,0,-.34,0,armR);box(.2,.68,.2,tunic,0,-.34,0,armL);
+    if(veteran){
+      const leatherTrim=std(royal?0x7b8c8d:0xa68551),feather=std(royal?0xddd9b4:0xc7a85e);
+      bossCape(.85,royal?1.34:1.19,std(royal?0x2d414a:0x315744,{side:THREE.DoubleSide}),upper,.35,-.29);
+      gearSpike(upper,feather,-.2,1.51,-.02,.075,.38,.55);
+      if(royal)hewnBlock(.39,.28,.48,leatherTrim,.44,.83,0,upper);
+      else hewnBlock(.24,.23,.27,leatherTrim,0,-.59,.025,armL);
+    }
     const bow=grp(0,-.74,0,armL);
     if(level===3){
       const steel=std(0x9aafb0,{metalness:.35}),brass=std(0xb79b61,{metalness:.38});
@@ -1094,6 +1198,10 @@ function makePlayer(cls,level=1){
     }else{
       box(.07,.07,.26,leather,0,0,0,bow);
       const lu=box(.05,.06,.78,wood,0,.04,.45,bow);lu.rotation.x=-.32;const ll=box(.05,.06,.78,wood,0,.04,-.45,bow);ll.rotation.x=.32;
+      if(veteran){
+        const brass=std(0xaf894d,{metalness:.38});
+        for(const side of [-1,1])hewnBlock(.084,.083,.2,brass,0,.12,side*.68,bow).rotation.x=-side*.32;
+      }
       const s1=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,1),str),s2=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,1),str);bow.add(s1,s2);
       const nock=grp(0,0,0,bow);const ns=new THREE.Mesh(new THREE.BoxGeometry(.035,1,.035),new THREE.MeshBasicMaterial({color:0x8a6a3a}));ns.position.y=-.48;nock.add(ns);
       const nh=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),new THREE.MeshBasicMaterial({color:0xcfd6e0}));nh.rotation.x=Math.PI;nh.position.y=-1.02;nock.add(nh);
@@ -1102,7 +1210,7 @@ function makePlayer(cls,level=1){
   }
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   scene.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,glow,bow:bowRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,glow,glowColor:glow?.color.clone(),bow:bowRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 function disposeModel(m){if(!m)return;scene.remove(m.root);m.root.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
 
@@ -2749,7 +2857,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   model.hipL.rotation.x=lerp(model.hipL.rotation.x,p.legL,s);model.hipR.rotation.x=lerp(model.hipR.rotation.x,p.legR,s);
   if(st==='roll')model.spin.rotation.x=p.spin;else model.spin.rotation.x=lerp(model.spin.rotation.x,st==='dead'?-1.45:0,st==='dead'?s*.25:1);
   model.spin.position.y=st==='roll'?.55:lerp(model.spin.position.y,st==='dead'?.25:.95,s);
-  if(model.glow){const k=(st==='cast')?1:0;model.glow.color.setRGB(.6+k*.4,.85+k*.15,1);}
+  if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
 }
 
 // ==== CAMERA ====
