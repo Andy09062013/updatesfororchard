@@ -94,6 +94,17 @@ function handle(ws: any, m: any) {
       break;
     }
     case "leave": leave(ws); break;
+    case "chat": {
+      if (!r) return;
+      const p = r.players.get(ws.data.id);
+      const text = String(m.text ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 140);
+      if (!p || !text) return;
+      const now = Date.now();
+      if (ws.data.lastChat && now - ws.data.lastChat < 400) return;
+      ws.data.lastChat = now;
+      bcast(r, { t: "chat", from: p.id, name: p.name, text });
+      break;
+    }
     case "set": {
       if (!r) return;
       const p = r.players.get(ws.data.id);

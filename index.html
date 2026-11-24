@@ -131,6 +131,14 @@ button.sm:hover{filter:brightness(1.3)}
 .ctrlTable div{align-items:center}
 .bindBtn{min-width:130px;padding:6px 12px}
 .bindBtn.on{border-color:#d9a74a;background:#3c2b18;color:#f2c75a}
+#chat{position:fixed;left:28px;bottom:150px;width:min(380px,60vw);z-index:30;pointer-events:none}
+#chatLog{display:flex;flex-direction:column;gap:3px;margin-bottom:6px}
+.cm{font-size:13px;color:#eadcc0;text-shadow:0 1px 3px #000;background:rgba(10,8,6,.55);padding:3px 8px;border-radius:3px;transition:opacity .6s;word-wrap:break-word;align-self:flex-start;max-width:100%}
+.cm b{color:#f2c75a;font-weight:600}
+.cm.sys{color:#9c907a;font-style:italic}
+#chat.open .cm{opacity:1!important}
+#chat.open{pointer-events:auto}
+#chatIn{width:100%;pointer-events:auto;background:rgba(14,11,10,.92)}
 #crosshair{position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,230,190,.45);z-index:5;pointer-events:none}
 </style>
 </head>
@@ -210,6 +218,7 @@ button.sm:hover{filter:brightness(1.3)}
 <div id="hurtFx"></div>
 <div id="center"><div class="t"></div><div class="s"></div></div>
 <div id="toast"></div>
+<div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="140" placeholder="Type a message and press Enter (Esc to cancel)" autocomplete="off" class="hidden"></div>
 
 <div id="pause" class="screen hidden">
   <h1 style="font-size:46px">PAUSED</h1>
@@ -723,10 +732,21 @@ function press(code){
     else if(a in buf)buf[a]=gameTime;
   }
 }
-let rebinding=null,rebindT=0;
+let rebinding=null,rebindT=0,chatOpen=false;
+function chatMsg(name,text,sys){const el=document.createElement('div');el.className='cm'+(sys?' sys':'');
+  if(sys)el.textContent=text;else{const b=document.createElement('b');b.textContent=name+': ';el.appendChild(b);el.appendChild(document.createTextNode(text));}
+  const log=$('chatLog');log.appendChild(el);while(log.children.length>8)log.removeChild(log.firstChild);
+  setTimeout(()=>{el.style.opacity=0;},9000);}
+function openChat(){chatOpen=true;for(const k in keys)keys[k]=false;for(const k in mouse)mouse[k]=false;$('chat').classList.add('open');const i=$('chatIn');i.classList.remove('hidden');i.value='';setTimeout(()=>i.focus(),0);}
+function closeChat(){chatOpen=false;$('chat').classList.remove('open');const i=$('chatIn');i.blur();i.classList.add('hidden');
+  if(state==='play'&&!paused){try{const r=canvas.requestPointerLock();if(r&&r.catch)r.catch(()=>{});}catch(e){}}}
+function sendChat(){const t=$('chatIn').value.trim().slice(0,140);closeChat();if(!t)return;
+  if(NET.ws&&NET.room)nsend({t:'chat',text:t});else chatMsg(myName(),t);}
 addEventListener('keydown',e=>{
   if(rebinding){e.preventDefault();finishRebind(e.code==='Escape'?null:e.code);return;}
+  if(chatOpen){if(e.code==='Enter'){e.preventDefault();sendChat();}else if(e.code==='Escape'){e.preventDefault();closeChat();}return;}
   if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
+  if((e.key==='/'||e.code==='Slash')&&(state==='play'||state==='lobby')&&!paused){e.preventDefault();openChat();return;}
   const bound=Object.values(BINDS).includes(e.code);
   if(state==='play'&&(bound||e.code==='Space'||e.code==='Tab'))e.preventDefault();
   keys[e.code]=true;if(e.repeat)return;
@@ -755,13 +775,13 @@ addEventListener('mousemove',e=>{
 });
 document.addEventListener('pointerlockchange',()=>{
   if(document.pointerLockElement===canvas)hadLock=true;
-  else if(hadLock&&state==='play'&&!paused)openPause();
+  else if(hadLock&&state==='play'&&!paused&&!chatOpen)openPause();
 });
 function ctrlRows(){return CLASSES[myClass].ctrl.map(r=>[keyName(BINDS[r[0]]),r[1]]);}
 function openPause(){paused=true;$('pause').classList.remove('hidden');
   $('pauseNote').textContent=G&&G.mode==='mp'?'The expedition continues while this menu is open':'';
   const mv=['up','left','down','right'].map(a=>keyName(BINDS[a],true)).join(' ');
-  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Arrow Keys','Rotate camera'],...ctrlRows(),[keyName(BINDS.ult),'Ultimate: '+CLASSES[myClass].ult+' (charges by dealing damage)'],[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)'],[keyName(BINDS.lock),'Toggle lock-on'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
+  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Arrow Keys','Rotate camera'],...ctrlRows(),[keyName(BINDS.ult),'Ultimate: '+CLASSES[myClass].ult+' (charges by dealing damage)'],[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)'],[keyName(BINDS.lock),'Toggle lock-on'],['/','Open chat (multiplayer)'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
   $('ctrlTable').innerHTML=rows.map(r=>`<div><b>${esc(r[0])}</b><span>${r[1]}</span></div>`).join('');}
 let bindsFrom='menu';
 function openBinds(from){bindsFrom=from;rebinding=null;renderBinds();
@@ -809,6 +829,7 @@ function onNet(m){
     else if(state==='lobby')renderLobby();
     return;}
   if(m.t==='start'){startGame({mode:'mp',gm:m.settings.gm||'boss',boss:m.settings.boss,arena:m.settings.arena,diff:m.settings.diff,players:m.players,host:m.host});return;}
+  if(m.t==='chat'){chatMsg(m.name,m.text);if(state==='play'&&G&&G.mode==='mp'&&m.from!==NET.id){const r=remotes.get(m.from);if(r)floatText(m.text.length>24?m.text.slice(0,24)+'...':m.text,r.x,3.2,r.z,'label');}return;}
   if(m.t==='host'){const was=NET.isHost;NET.isHost=m.id===NET.id;if(NET.isHost&&!was&&state==='play'&&B&&!B.dead){B.action=null;B.queue=[];B.cool=1.2;B.air=false;B.y=0;toast('You are now the host of this expedition');}return;}
   if(m.t==='left'){const r=remotes.get(m.id);if(r){disposeModel(r.model);r.tag.remove();remotes.delete(m.id);}return;}
   if(m.t==='g'){handleGame(m.from,m.d);return;}
