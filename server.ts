@@ -1,7 +1,7 @@
 // Hollow Crown multiplayer server: serves the game page and runs lobbies + game relay over WebSocket.
 const HTML: string = await Bun.file(new URL("./index.html", import.meta.url)).text();
 
-type Player = { id: string; name: string; cls: string; ready: boolean; ws: any };
+type Player = { id: string; name: string; cls: string; level: number; ready: boolean; ws: any };
 type Room = {
   code: string;
   host: string;
@@ -11,11 +11,12 @@ type Room = {
   players: Map<string, Player>;
 };
 
-const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock"];
-const BOSSES: Record<string, string> = { varkhul: "keep", sylvara: "frost", ignar: "forge", morvane: "void", thoruun: "storm" };
+const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel"];
+const BOSSES: Record<string, string> = { varkhul: "keep", sylvara: "frost", ignar: "forge", morvane: "void", thoruun: "storm", vaelis: "void" };
 const ARENAS = ["keep", "frost", "forge", "void", "storm"];
 const DIFFS = ["easy", "normal", "hard", "nightmare"];
 const MAX = 5;
+const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "wipe"]);
 const rooms = new Map<string, Room>();
 
 function makeCode(): string {
@@ -28,11 +29,12 @@ function makeCode(): string {
 }
 const clean = (s: any, n = 16) => String(s ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, n) || "Adventurer";
 const cls = (c: any) => (CLASSES.includes(c) ? c : "sword");
+const charLevel = (value: unknown) => value === 2 || value === 3 ? value : 1;
 
 function view(r: Room) {
   return {
     code: r.code, host: r.host, public: r.public, state: r.state, settings: r.settings,
-    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, ready: p.ready })),
+    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, ready: p.ready })),
   };
 }
 function send(ws: any, m: any) { try { ws.send(JSON.stringify(m)); } catch {} }
@@ -60,9 +62,9 @@ function leave(ws: any) {
   pushLobby(r);
 }
 
-function join(ws: any, r: Room, name: string, c: string) {
+function join(ws: any, r: Room, name: string, c: string, level: unknown) {
   if (ws.data.room) leave(ws);
-  const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), ready: false, ws };
+  const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), level: charLevel(level), ready: false, ws };
   r.players.set(p.id, p);
   ws.data.room = r.code;
   pushLobby(r);
@@ -82,7 +84,7 @@ function handle(ws: any, m: any) {
     case "create": {
       const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, state: "lobby", settings: { gm: "boss", boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
       rooms.set(room.code, room);
-      join(ws, room, m.name, m.cls);
+      join(ws, room, m.name, m.cls, m.level);
       break;
     }
     case "join": {
@@ -90,7 +92,7 @@ function handle(ws: any, m: any) {
       if (!room) return send(ws, { t: "error", msg: "No lobby was found with that code." });
       if (room.state !== "lobby") return send(ws, { t: "error", msg: "That expedition is already in progress." });
       if (room.players.size >= MAX) return send(ws, { t: "error", msg: "That lobby is full (5 players maximum)." });
-      join(ws, room, m.name, m.cls);
+      join(ws, room, m.name, m.cls, m.level);
       break;
     }
     case "leave": leave(ws); break;
@@ -109,7 +111,10 @@ function handle(ws: any, m: any) {
       if (!r) return;
       const p = r.players.get(ws.data.id);
       if (!p) return;
-      if (m.cls !== undefined && r.state === "lobby") p.cls = cls(m.cls);
+      if (m.cls !== undefined && r.state === "lobby") {
+        p.cls = cls(m.cls);
+        p.level = charLevel(m.level);
+      }
       if (m.ready !== undefined) p.ready = !!m.ready;
       pushLobby(r);
       break;
@@ -117,7 +122,7 @@ function handle(ws: any, m: any) {
     case "settings": {
       if (!r || r.host !== ws.data.id || r.state !== "lobby") return;
       const s = m.settings || {};
-      if (BOSSES[s.boss]) r.settings.boss = s.boss;
+      if (Object.hasOwn(BOSSES, s.boss)) r.settings.boss = s.boss;
       if (ARENAS.includes(s.arena)) r.settings.arena = s.arena;
       if (DIFFS.includes(s.diff)) r.settings.diff = s.diff;
       if (s.gm === "boss" || s.gm === "campaign") r.settings.gm = s.gm;
@@ -130,7 +135,7 @@ function handle(ws: any, m: any) {
       if (notReady) return send(ws, { t: "error", msg: "All players must be ready before starting." });
       r.state = "playing";
       pushLobby(r);
-      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls })) });
+      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level })) });
       break;
     }
     case "toLobby": {
@@ -141,8 +146,11 @@ function handle(ws: any, m: any) {
       break;
     }
     case "g": {
-      if (!r || r.state !== "playing") return;
-      const out = JSON.stringify({ t: "g", from: ws.data.id, d: m.d });
+      if (!r || r.state !== "playing" || !m.d || typeof m.d !== "object") return;
+      const d = m.d;
+      const hostMessage = d.k === "b" || d.k === "m" || (d.k === "ev" && HOST_EVENTS.has(d.e));
+      if (hostMessage && ws.data.id !== r.host) return;
+      const out = JSON.stringify({ t: "g", from: ws.data.id, d });
       if (m.host) { const h = r.players.get(r.host); if (h && h.id !== ws.data.id) { try { h.ws.send(out); } catch {} } return; }
       for (const p of r.players.values()) if (p.id !== ws.data.id) { try { p.ws.send(out); } catch {} }
       break;
