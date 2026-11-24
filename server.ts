@@ -1,11 +1,12 @@
 // Hollow Crown multiplayer server: serves the game page and runs lobbies + game relay over WebSocket.
 const HTML: string = await Bun.file(new URL("./index.html", import.meta.url)).text();
 
-type Player = { id: string; name: string; cls: string; level: number; ready: boolean; ws: any };
+type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any };
 type Room = {
   code: string;
   host: string;
   public: boolean;
+  capacity: number;
   state: "lobby" | "playing";
   settings: { gm: string; boss: string; arena: string; diff: string };
   players: Map<string, Player>;
@@ -16,6 +17,10 @@ const BOSSES: Record<string, string> = { varkhul: "keep", sylvara: "frost", igna
 const ARENAS = ["keep", "frost", "forge", "void", "storm"];
 const DIFFS = ["easy", "normal", "hard", "nightmare"];
 const MAX = 5;
+const skinType = (value: unknown) => value === "pixel" ? "pixel" : "classic";
+function roomCapacity(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= MAX ? value : fallback;
+}
 const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe"]);
 const rooms = new Map<string, Room>();
 
@@ -33,8 +38,8 @@ const charLevel = (value: unknown) => value === 2 || value === 3 ? value : 1;
 
 function view(r: Room) {
   return {
-    code: r.code, host: r.host, public: r.public, state: r.state, settings: r.settings,
-    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, ready: p.ready })),
+    code: r.code, host: r.host, public: r.public, capacity: r.capacity, state: r.state, settings: r.settings,
+    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin, ready: p.ready })),
   };
 }
 function send(ws: any, m: any) { try { ws.send(JSON.stringify(m)); } catch {} }
@@ -62,9 +67,9 @@ function leave(ws: any) {
   pushLobby(r);
 }
 
-function join(ws: any, r: Room, name: string, c: string, level: unknown) {
+function join(ws: any, r: Room, name: string, c: string, level: unknown, skin: unknown) {
   if (ws.data.room) leave(ws);
-  const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), level: charLevel(level), ready: false, ws };
+  const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), level: charLevel(level), skin: skinType(skin), ready: false, ws };
   r.players.set(p.id, p);
   ws.data.room = r.code;
   pushLobby(r);
@@ -75,24 +80,25 @@ function handle(ws: any, m: any) {
   switch (m.t) {
     case "list": {
       const list = [...rooms.values()]
-        .filter((x) => x.public && x.state === "lobby" && x.players.size < MAX)
+        .filter((x) => x.public && x.state === "lobby" && x.players.size < x.capacity)
         .slice(0, 30)
-        .map((x) => ({ code: x.code, hostName: x.players.get(x.host)?.name ?? "Unknown", count: x.players.size, boss: x.settings.boss, diff: x.settings.diff, gm: x.settings.gm }));
+        .map((x) => ({ code: x.code, hostName: x.players.get(x.host)?.name ?? "Unknown", count: x.players.size, capacity: x.capacity, boss: x.settings.boss, diff: x.settings.diff, gm: x.settings.gm }));
       send(ws, { t: "lobbies", list });
       break;
     }
     case "create": {
-      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, state: "lobby", settings: { gm: "boss", boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
+      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, capacity: roomCapacity(m.capacity, MAX), state: "lobby", settings: { gm: "boss", boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
       rooms.set(room.code, room);
-      join(ws, room, m.name, m.cls, m.level);
+      join(ws, room, m.name, m.cls, m.level, m.skin);
       break;
     }
     case "join": {
       const room = rooms.get(String(m.code || "").toUpperCase());
       if (!room) return send(ws, { t: "error", msg: "No lobby was found with that code." });
       if (room.state !== "lobby") return send(ws, { t: "error", msg: "That expedition is already in progress." });
-      if (room.players.size >= MAX) return send(ws, { t: "error", msg: "That lobby is full (5 players maximum)." });
-      join(ws, room, m.name, m.cls, m.level);
+      if (ws.data.room === room.code) return send(ws, { t: "lobby", room: view(room) });
+      if (room.players.size >= room.capacity) return send(ws, { t: "error", msg: "That party booth is full." });
+      join(ws, room, m.name, m.cls, m.level, m.skin);
       break;
     }
     case "leave": leave(ws); break;
@@ -114,6 +120,7 @@ function handle(ws: any, m: any) {
       if (m.cls !== undefined && r.state === "lobby") {
         p.cls = cls(m.cls);
         p.level = charLevel(m.level);
+        if (m.skin !== undefined) p.skin = skinType(m.skin);
       }
       if (m.ready !== undefined) p.ready = !!m.ready;
       pushLobby(r);
@@ -122,6 +129,9 @@ function handle(ws: any, m: any) {
     case "settings": {
       if (!r || r.host !== ws.data.id || r.state !== "lobby") return;
       const s = m.settings || {};
+      const capacity = roomCapacity(s.capacity, r.capacity);
+      if (capacity < r.players.size) return send(ws, { t: "error", msg: "Party size cannot be smaller than the current party." });
+      r.capacity = capacity;
       if (Object.hasOwn(BOSSES, s.boss)) r.settings.boss = s.boss;
       if (ARENAS.includes(s.arena)) r.settings.arena = s.arena;
       if (DIFFS.includes(s.diff)) r.settings.diff = s.diff;
@@ -135,7 +145,7 @@ function handle(ws: any, m: any) {
       if (notReady) return send(ws, { t: "error", msg: "All players must be ready before starting." });
       r.state = "playing";
       pushLobby(r);
-      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level })) });
+      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin })) });
       break;
     }
     case "toLobby": {
