@@ -15,7 +15,7 @@ type Room = {
   players: Map<string, Player>;
 };
 
-const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin"];
+const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin", "jester"];
 const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm" };
 const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
 const MAX = 5;
