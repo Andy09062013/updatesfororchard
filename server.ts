@@ -27,6 +27,22 @@ function roomCapacity(value: unknown, fallback: number): number {
 }
 const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "stormThrow", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe", "bossCredit", "soulLinkState"]);
 const rooms = new Map<string, Room>();
+type OnlinePlayer = { name: string; ping: number | null; probe?: number; sentAt?: number; lastRequest?: number; ws: any };
+const onlinePlayers = new Map<string, OnlinePlayer>();
+let nextProbe = 0;
+
+function setOnlineName(ws: any, name: unknown) {
+  const player = onlinePlayers.get(ws.data.id);
+  if (player) player.name = clean(name);
+  else onlinePlayers.set(ws.data.id, { name: clean(name), ping: null, ws });
+}
+
+function probePing(player: OnlinePlayer, now: number) {
+  player.probe = ++nextProbe;
+  player.sentAt = now;
+  send(player.ws, { t: "pingProbe", token: player.probe });
+}
+
 type Presence = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel";
   x: number; z: number; facing: number; moving: boolean; seen: number };
 const village = new Map<string, Presence>();
@@ -36,6 +52,7 @@ function villageUpdate(ws: any, m: any) {
   if (ws.data.room || now - (ws.data.lastVillage ?? 0) < 95) return;
   if (![m.x, m.z, m.facing].every(Number.isFinite) || Math.abs(m.x) > 24 || m.z < -22 || m.z > 20) return;
   ws.data.lastVillage = now;
+  setOnlineName(ws, m.name);
   for (const [key, p] of village) if (now - p.seen > 6500) village.delete(key);
   if (village.has(id) || village.size < VILLAGE_LIMIT) {
     village.set(id, { id, name: clean(m.name), cls: cls(m.cls), level: charLevel(m.level),
@@ -110,6 +127,7 @@ function join(ws: any, r: Room, name: string, c: string, level: unknown, skin: u
   if (ws.data.room) leave(ws);
   village.delete(ws.data.id);
   const p: Player = { id: ws.data.id, name: clean(name), cls: cls(c), level: charLevel(level), skin: skinType(skin), ready: false, ws };
+  setOnlineName(ws, p.name);
   r.players.set(p.id, p);
   ws.data.room = r.code;
   pushLobby(r);
@@ -120,6 +138,24 @@ function handle(ws: any, m: any) {
   switch (m.t) {
     case "village": villageUpdate(ws, m); break;
     case "villageLeave": village.delete(ws.data.id); break;
+    case "pingReply": {
+      const player = onlinePlayers.get(ws.data.id);
+      if (player?.sentAt === undefined || player.probe !== m.token) break;
+      const elapsed = Date.now() - player.sentAt;
+      player.ping = elapsed >= 0 && elapsed <= 8000 ? elapsed : null;
+      player.probe = undefined;
+      break;
+    }
+    case "onlineList": {
+      setOnlineName(ws, r?.players.get(ws.data.id)?.name ?? m.name);
+      const player = onlinePlayers.get(ws.data.id)!;
+      const now = Date.now();
+      if (now - (player.lastRequest ?? -Infinity) < 800) break;
+      player.lastRequest = now;
+      if (now - (player.sentAt ?? -Infinity) >= 5000) probePing(player, now);
+      send(ws, { t: "onlineList", players: [...onlinePlayers].map(([id, { name, ping }]) => ({ id, name, ping })) });
+      break;
+    }
     case "list": {
       const list = [...rooms.values()]
         .filter((x) => x.public && x.state === "lobby" && x.players.size < x.capacity)
@@ -247,6 +283,14 @@ setInterval(() => {
   }
 }, 1000);
 
+setInterval(() => {
+  const now = Date.now();
+  for (const player of onlinePlayers.values()) {
+    if (player.probe !== undefined) player.ping = null;
+    probePing(player, now);
+  }
+}, 5000);
+
 let nextId = 1;
 const server = Bun.serve({
   port: Number(Bun.env.PORT || 3000),
@@ -272,7 +316,7 @@ const server = Bun.serve({
       try { m = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw)); } catch { return; }
       if (m && typeof m.t === "string") handle(ws, m);
     },
-    close(ws: any) { village.delete(ws.data.id); leave(ws); },
+    close(ws: any) { onlinePlayers.delete(ws.data.id); village.delete(ws.data.id); leave(ws); },
   },
 });
 console.log("Hollow Crown server listening on", server.port);

@@ -24,7 +24,17 @@ canvas{display:block;touch-action:none}
 .tb.nomana{border-color:#3a4a8a}
 .tb.edit{border-style:dashed;border-color:#f2c75a;cursor:move}
 .tsys{position:absolute;top:12px;z-index:9;font-family:Cinzel,serif;font-size:13px;padding:8px 14px;background:rgba(20,15,12,.75);color:#f3e6c8;border:1px solid #8a6a3a;border-radius:6px;touch-action:none}
-#tPause{right:12px}#tChat{right:72px}
+#tPause{right:12px}#tChat{right:72px}#tOnlineBtn{right:140px}
+#hubOnlineBtn{pointer-events:auto}
+#onlineRoster{position:fixed;top:clamp(54px,10vh,96px);left:50%;transform:translateX(-50%);width:min(440px,calc(100vw - 28px));z-index:32;background:#141a23f5;border:1px solid #6b5942;border-radius:8px;padding:12px 16px;box-shadow:0 12px 36px #0009;color:#f4e7cf}
+#onlineRoster header,#onlineRoster li{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#onlineRoster header{padding-bottom:8px;border-bottom:1px solid #6b5942}
+#onlineRoster h2{font-size:16px;letter-spacing:.04em;margin:0}
+#onlineRoster ul{padding:0;margin:5px 0 0;list-style:none;max-height:44vh;overflow:auto;overscroll-behavior:contain}
+#onlineRoster li{padding:6px 4px;border-bottom:1px solid #ffffff15;font-size:13px}
+#onlineRoster .ping{white-space:nowrap;color:#b4c1cd;font-variant-numeric:tabular-nums}
+#onlineRoster .ping.good{color:#a5df9f}#onlineRoster .ping.fair{color:#f3ca77}#onlineRoster .ping.high{color:#ff9e8e}
+#onlineRoster[aria-modal="false"]:not(.pinned){pointer-events:none}
 #tEdit{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:40;background:rgba(14,11,10,.95);border:1px solid #6a5030;border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;max-width:94vw;font-size:13px;color:#e3cfa6}
 #tEdit label{display:flex;gap:6px;align-items:center}
 #tEdit input[type=range]{width:110px}
@@ -252,7 +262,7 @@ body.village-active>canvas:active{cursor:grabbing}
 </head>
 <body>
 <section id="hub" aria-label="Hollow Crown village">
-  <header class="hub-header"><h1>Hollow Crown</h1><button class="sm" id="hubSettings">Settings</button></header>
+  <header class="hub-header"><h1>Hollow Crown</h1><div><button class="sm" id="hubOnlineBtn" type="button" aria-controls="onlineRoster">Online</button> <button class="sm" id="hubSettings">Settings</button></div></header>
   <div id="hubReticle" aria-hidden="true"></div>
   <button id="hubEnter" type="button" class="hidden"></button>
   <div id="hubStick" aria-label="Drag to move"></div>
@@ -311,7 +321,7 @@ body.village-active>canvas:active{cursor:grabbing}
 
 <div id="lobby" class="screen hidden">
   <h2>Party Booth<span id="lobbyCode" class="codeShow"></span></h2>
-  <button class="sm" id="copyPartyCode">Copy Party Code</button>
+  <div class="row"><button class="sm" id="copyPartyCode">Copy Party Code</button><button class="sm" id="partyOnlineBtn" type="button" aria-controls="onlineRoster">Online</button></div>
   <div class="lobbyWrap">
     <div class="panel"><div class="panelTitle">Party (<span id="pCount">1</span>/<span id="pCap">5</span>)</div><div id="slots"></div></div>
     <div class="panel">
@@ -357,12 +367,17 @@ body.village-active>canvas:active{cursor:grabbing}
 <div id="hurtFx"></div>
 <div id="center"><div class="t"></div><div class="s"></div></div>
 <div id="toast"></div>
-<div id="touch" class="hidden"><div id="joyBase"><div id="joyKnob"></div></div><div id="tBtns"></div><button id="tPause" class="tsys">II</button><button id="tChat" class="tsys">Chat</button></div>
+<div id="touch" class="hidden"><div id="joyBase"><div id="joyKnob"></div></div><div id="tBtns"></div><button id="tPause" class="tsys">II</button><button id="tChat" class="tsys">Chat</button><button id="tOnlineBtn" class="tsys" type="button" aria-controls="onlineRoster">Online</button></div>
 <div id="tEdit" class="hidden"><b style="font-family:Cinzel,serif;letter-spacing:.08em">Touch Layout</b><span>Drag any button to move it</span>
   <label>Size <input type="range" id="tSize" min="60" max="160"></label><label>Opacity <input type="range" id="tOpac" min="25" max="100"></label>
   <label>Show <select id="tMode"><option value="auto">After touching the screen</option><option value="off">Never</option></select></label>
   <button class="sm" id="tReset">Reset Layout</button><button class="sm" id="tDone" style="border-color:#d9a74a;color:#f2c75a">Done</button></div>
 <div id="chat"><div id="chatLog"></div><input id="chatIn" maxlength="140" placeholder="Type a message and press Enter (Esc to cancel)" autocomplete="off" class="hidden"></div>
+
+<section id="onlineRoster" class="hidden" role="dialog" aria-modal="false" aria-labelledby="onlineTitle">
+  <header><h2 id="onlineTitle">Players online</h2><button id="onlineClose" class="sm hidden" type="button">Close</button></header>
+  <ul id="onlineRows"></ul>
+</section>
 
 <div id="pause" class="screen hidden">
   <h1 style="font-size:46px">PAUSED</h1>
@@ -1951,11 +1966,11 @@ const keys={},mouse={},buf={light:-9,heavy:-9,roll:-9,heal:-9,q:-9,e:-9,f:-9,ult
 const consume=n=>{if(gameTime-buf[n]<.32){buf[n]=-9;return true;}return false;};
 const ACTIONS=[['up','Move Forward','KeyW'],['down','Move Backward','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
   ['light','Primary Attack (hold to repeat)','Mouse0'],['heavy','Secondary Attack','Mouse2'],['roll','Roll','Space'],['block','Raise Shield (Paladin)','ShiftLeft'],
-  ['q','Ability 1','KeyQ'],['e','Ability 2','KeyE'],['f','Ability 3','KeyF'],['x','Sentinel Ultimate','KeyX'],['ult','Ultimate','KeyG'],['heal','Drink Flask','KeyR'],['lock','Toggle Lock-On','Tab']];
+  ['q','Ability 1','KeyQ'],['e','Ability 2','KeyE'],['f','Ability 3','KeyF'],['x','Sentinel Ultimate','KeyX'],['ult','Ultimate','KeyG'],['heal','Drink Flask','KeyR'],['lock','Toggle Lock-On','KeyL']];
 let BINDS={};
 function defaultBinds(){BINDS={};ACTIONS.forEach(a=>BINDS[a[0]]=a[2]);}
 defaultBinds();
-try{const sv=JSON.parse(localStorage.getItem('hc_binds')||'null');if(sv)for(const k in sv)if(k in BINDS&&typeof sv[k]==='string')BINDS[k]=sv[k];}catch(e){}
+try{const sv=JSON.parse(localStorage.getItem('hc_binds')||'null');if(sv)for(const k in sv)if(k in BINDS&&typeof sv[k]==='string'&&sv[k]!=='Tab')BINDS[k]=sv[k];}catch(e){}
 function saveBinds(){try{localStorage.setItem('hc_binds',JSON.stringify(BINDS));}catch(e){}}
 function keyName(c,short){
   if(!c)return 'Unbound';
@@ -1990,7 +2005,7 @@ function clearCombatInput(){
   for(const inputs of [keys,mouse,vheld])for(const k in inputs)inputs[k]=false;
   for(const k in buf)buf[k]=-9;
 }
-function openChat(){chatOpen=true;clearCombatInput();$('chat').classList.add('open');const i=$('chatIn');i.classList.remove('hidden');i.value='';setTimeout(()=>i.focus(),0);}
+function openChat(){closeOnlineRoster();chatOpen=true;clearCombatInput();$('chat').classList.add('open');const i=$('chatIn');i.classList.remove('hidden');i.value='';setTimeout(()=>i.focus(),0);}
 function closeChat(){chatOpen=false;$('chat').classList.remove('open');const i=$('chatIn');i.blur();i.classList.add('hidden');
   if(state==='play'&&!paused)requestShiftLock();}
 function sendChat(){const t=$('chatIn').value.trim().slice(0,140);closeChat();if(!t)return;
@@ -1998,7 +2013,11 @@ function sendChat(){const t=$('chatIn').value.trim().slice(0,140);closeChat();if
 addEventListener('keydown',e=>{
   if(rebinding){e.preventDefault();finishRebind(e.code==='Escape'?null:e.code);return;}
   if(chatOpen){if(e.code==='Enter'){e.preventDefault();sendChat();}else if(e.code==='Escape'){e.preventDefault();closeChat();}return;}
+  if(e.code==='Escape'&&onlinePinned){closeOnlineRoster(true);return;}
   if(document.activeElement&&document.activeElement.tagName==='INPUT')return;
+  if(e.code==='Tab'&&!e.shiftKey&&!e.ctrlKey&&!e.altKey&&!e.metaKey&&canShowOnlineRoster()){
+    e.preventDefault();if(!e.repeat&&!onlinePinned)openOnlineRoster(false);return;
+  }
   if((e.key==='/'||e.code==='Slash')&&(state==='play'||state==='lobby')&&!paused){e.preventDefault();openChat();return;}
   const bound=Object.values(BINDS).includes(e.code);
   if(state==='play'&&(bound||e.code==='Space'||e.code==='Tab'||e.code.startsWith('Arrow')))e.preventDefault();
@@ -2006,8 +2025,8 @@ addEventListener('keydown',e=>{
   if(state==='play'&&!paused&&!(P&&P.dead))press(e.code);
   if(e.code==='Escape'&&state==='play'&&!paused&&!document.pointerLockElement)openPause();
 });
-addEventListener('keyup',e=>{keys[e.code]=false;});
-addEventListener('blur',clearCombatInput);
+addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='Tab'&&!onlinePinned)closeOnlineRoster();});
+addEventListener('blur',()=>{clearCombatInput();closeOnlineRoster();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('contextmenu',e=>{if(rebinding||performance.now()-rebindT<400)e.preventDefault();});
 document.addEventListener('mousedown',e=>{if(rebinding){e.preventDefault();e.stopPropagation();finishRebind('Mouse'+e.button);}},true);
@@ -2031,11 +2050,11 @@ document.addEventListener('pointerlockchange',()=>{
   else if(hadLock&&cameraPrefs.shiftLock&&state==='play'&&!paused&&!chatOpen&&!localAway())openPause();
 });
 function ctrlRows(){return currentLoadout().ctrl.map(r=>[r[0]==='passive'?'Passive':keyName(BINDS[r[0]]),r[1]]);}
-function openPause(){paused=true;clearCombatInput();$('pause').classList.remove('hidden');
+function openPause(){closeOnlineRoster();paused=true;clearCombatInput();$('pause').classList.remove('hidden');
   $('pauseNote').textContent=G&&G.mode==='mp'?'The expedition continues while this menu is open':'';
   const mv=['up','left','down','right'].map(a=>keyName(BINDS[a],true)).join(' ');
   const kit=currentLoadout();
-  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Middle Drag','Rotate camera or look around a locked target'],['← / →','Cycle between enemies, bosses and teammates'],['↑ / ↓','Tilt camera'],...ctrlRows(),...(kit.ult?[[keyName(BINDS[ultimateBinding(kit)]),'Ultimate: '+kit.ult+(P?.cls==='soul'?'':' (charges by dealing damage)')+(kit.ultHint?' · '+kit.ultHint:P?.cls==='mage'?' · revives nearby fallen allies once with 50 max HP':'')]]:[]),[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)'],[keyName(BINDS.lock),'Toggle lock-on'],['/','Open chat (multiplayer)'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
+  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Middle Drag','Rotate camera or look around a locked target'],['← / →','Cycle between enemies, bosses and teammates'],['↑ / ↓','Tilt camera'],...ctrlRows(),...(kit.ult?[[keyName(BINDS[ultimateBinding(kit)]),'Ultimate: '+kit.ult+(P?.cls==='soul'?'':' (charges by dealing damage)')+(kit.ultHint?' · '+kit.ultHint:P?.cls==='mage'?' · revives nearby fallen allies once with 50 max HP':'')]]:[]),[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)'],[keyName(BINDS.lock),'Toggle lock-on'],['Hold Tab','Show online players and ping'],['/','Open chat (multiplayer)'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
   $('ctrlTable').innerHTML=rows.map(r=>`<div><b>${esc(r[0])}</b><span>${r[1]}</span></div>`).join('');}
 let bindsFrom='menu';
 function openBinds(from){bindsFrom=from;rebinding=null;renderBinds();
@@ -2046,6 +2065,7 @@ function renderBinds(){
 }
 function finishRebind(code){
   const a=rebinding;rebinding=null;rebindT=performance.now();
+  if(code==='Tab'){toast('Tab opens the online player list');renderBinds();return;}
   if(a&&code){const other=Object.keys(BINDS).find(k=>k!==a&&BINDS[k]===code);if(other)BINDS[other]=BINDS[a];BINDS[a]=code;saveBinds();if(state==='play')buildSkillBar();renderClassCards();}
   renderBinds();
 }
@@ -2096,6 +2116,7 @@ function netConnect(){
   return netPending;
 }
 function onDisconnect(){
+  if(onlineOpen){$('onlineTitle').textContent='Players online';$('onlineRows').innerHTML='<li>Disconnected</li>';}
   hub.connected=false;clearVillagePeers();
   if(G&&G.mode==='mp'&&state==='play'){showMsg('CONNECTION LOST','Returned to the village',3);}
   if(state==='lobby'||state==='mp'||(['play','end'].includes(state)&&G?.mode==='mp')){toMenu();$('hubStatus').textContent='Disconnected from the server.';}
@@ -2141,7 +2162,53 @@ function changeCombatHost(id){
     toast('You are now running the boss fight');
   }
 }
+let onlineOpen=false,onlinePinned=false,onlineTimer=null,onlineTrigger=null;
+function canShowOnlineRoster(){
+  return state==='hub'||state==='lobby'||(state==='play'&&!paused&&!chatOpen);
+}
+function requestOnlineRoster(){
+  if(NET.ws?.readyState===1)nsend({t:'onlineList',name:myName()});
+}
+function openOnlineRoster(pinned,trigger=null){
+  if(!canShowOnlineRoster()||onlineOpen)return;
+  onlineOpen=true;onlinePinned=pinned;onlineTrigger=trigger;
+  const panel=$('onlineRoster');
+  panel.classList.remove('hidden');panel.classList.toggle('pinned',pinned);
+  $('onlineTitle').textContent='Players online';
+  $('onlineRows').innerHTML='<li>Connecting…</li>';
+  $('onlineClose').classList.toggle('hidden',!pinned);
+  if(pinned)$('onlineClose').focus();
+  netConnect().then(()=>{if(onlineOpen)requestOnlineRoster();}).catch(()=>{
+    if(onlineOpen)$('onlineRows').innerHTML='<li>Unable to connect</li>';
+  });
+  onlineTimer=setInterval(requestOnlineRoster,2000);
+}
+function closeOnlineRoster(restoreFocus=false){
+  if(!onlineOpen)return;
+  onlineOpen=false;onlinePinned=false;
+  clearInterval(onlineTimer);
+  $('onlineRoster').classList.add('hidden');
+  if(restoreFocus)onlineTrigger?.focus();
+  onlineTrigger=null;
+}
+function renderOnlineRoster(players){
+  if(!onlineOpen||!Array.isArray(players))return;
+  const sorted=[...players].sort((a,b)=>Number(b.id===NET.id)-Number(a.id===NET.id)||a.name.localeCompare(b.name));
+  $('onlineTitle').textContent=sorted.length+' online';
+  $('onlineRows').innerHTML=sorted.map(p=>{
+    const ping=Number.isFinite(p.ping)&&p.ping>=0?p.ping:null;
+    const quality=ping===null?'':ping<100?'good':ping<200?'fair':'high';
+    return `<li><span>${esc(p.name)}${p.id===NET.id?' (you)':''}</span><span class="ping ${quality}">${ping===null?'—':ping+' ms'}</span></li>`;
+  }).join('');
+}
+for(const id of ['hubOnlineBtn','partyOnlineBtn','tOnlineBtn']){
+  $(id).onclick=e=>openOnlineRoster(true,e.currentTarget);
+}
+$('tOnlineBtn').addEventListener('touchstart',e=>e.stopPropagation());
+$('onlineClose').onclick=()=>closeOnlineRoster(true);
 function onNet(m){
+  if(m.t==='pingProbe'){nsend({t:'pingReply',token:m.token});return;}
+  if(m.t==='onlineList'){renderOnlineRoster(m.players);return;}
   if(m.t==='village'){syncVillage(m.peers);return;}
   if(m.t==='error'){const el=state==='lobby'?$('lobbyStatus'):$('mpStatus');el.textContent=m.msg;return;}
   if(m.t==='lobbies'){renderLobbyList(m.list);return;}
@@ -4254,6 +4321,7 @@ function netTick(dt,force=false){
 
 // ==== GAME FLOW ====
 function setScreen(id){
+  closeOnlineRoster();
   if(id!=='hub'&&document.body.classList.contains('village-active'))leaveVillagePresence();
   ['hub','menu','skins','solo','mp','lobby','end','pause','binds','cameraSettings'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
   document.body.classList.toggle('village-active',id==='hub');
