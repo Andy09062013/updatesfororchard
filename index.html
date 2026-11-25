@@ -374,9 +374,9 @@ const CLASSES={
 const SKELETON={name:'Skeleton',hp:10,speed:6.9,skills:[{k:'LMB',n:'Rusted Swing'}],ctrl:[['light','Sword swing deals 30 damage']]};
 const classData=id=>id==='skeleton'?SKELETON:CLASSES[id];
 const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e',F:'f'};
-const GOLD_COST={2:60,3:135};
+const MASTERY_REQ={2:150,3:400};
 const UPGRADES={
-  sword:[['Q','Shield Bash','Strike nearby enemies and stagger the target.',9,'shield'],['Q','Royal Bulwark','Shield Bash hits a wider area and grants 4 seconds of Ward.',9,'shield']],
+  sword:[['Q','Shield Bash','Strike nearby enemies and stagger the target.',10,'shield'],['Q','Royal Bulwark','Shield Bash hits a wider area, stuns, and grants 4 seconds of Ward.',13,'shield']],
   mage:[['F','Radiant Ward','Ward lasts 7 seconds and bursts for 30 damage.'],['F','Dawn Aegis','Ward lasts 8 seconds and restores 18 health to nearby allies.']],
   archer:[['Q','Hunter’s Volley','Fire five arrows in a spread.'],['Q','Siege Bolt','Fire a heavy bolt that bursts on impact. Replaces your bow with a crossbow.']],
   warlock:[['Q','Grave Rift','Create a wider rift that deals more damage.'],['Q','Soul Well','A lingering rift that heals nearby allies.']],
@@ -389,12 +389,13 @@ const profileKey='hc_progression_v1';
 function readProfile(){
   try{
     const value=JSON.parse(localStorage.getItem(profileKey));
-    if(value&&Number.isSafeInteger(value.coins)&&value.coins>=0&&value.levels&&typeof value.levels==='object')return value;
+    if(value&&value.levels&&typeof value.levels==='object'){if(!value.mastery||typeof value.mastery!=='object')value.mastery={};delete value.coins;return value;}
   }catch(e){}
   return null;
 }
-let profile=readProfile()||{coins:0,levels:{}};
-function charLevel(id){const value=profile.levels[id];return value===2||value===3?value:1;}
+let profile=readProfile()||{mastery:{},levels:{}};
+function masteryOf(id){const v=profile.mastery&&profile.mastery[id];return Number.isFinite(v)&&v>0?Math.floor(v):0;}
+function charLevel(id){const m=masteryOf(id),fromMastery=m>=MASTERY_REQ[3]?3:m>=MASTERY_REQ[2]?2:1,value=profile.levels[id];return Math.max(fromMastery,value===2||value===3?value:1);}
 function saveProfile(){try{localStorage.setItem(profileKey,JSON.stringify(profile));}catch(e){}}
 function loadout(cls,level){
   const base=CLASSES[cls],upgrade=UPGRADES[cls][level-2];
@@ -406,24 +407,21 @@ function loadout(cls,level){
   return {...base,skills,ctrl};
 }
 const currentLoadout=()=>state==='play'&&P?P.kit:loadout(myClass,charLevel(myClass));
-function buyUpgrade(){
-  profile=readProfile()||profile;
-  const next=charLevel(myClass)+1,cost=GOLD_COST[next];
-  if(!cost||profile.coins<cost){renderClassCards();return;}
-  profile.coins-=cost;profile.levels[myClass]=next;saveProfile();renderClassCards();
-}
+function buyUpgrade(){renderClassCards();}
 function renderUpgrade(){
-  const level=charLevel(myClass),next=level+1,cost=GOLD_COST[next],btn=$('upgradeBtn');
-  $('coinBalance').textContent=profile.coins+' coins';
+  const level=charLevel(myClass),next=level+1,cost=MASTERY_REQ[next],btn=$('upgradeBtn'),m=masteryOf(myClass);
+  $('coinBalance').textContent=CLASSES[myClass].name+' Mastery '+(cost?m+' / '+cost:m);
   $('upgradeInfo').textContent=cost?UPGRADES[myClass][next-2][1]+' · '+UPGRADES[myClass][next-2][2]:'Level 3 · '+UPGRADES[myClass][1][1];
-  btn.textContent=cost?'Upgrade to Lv. '+next+' · '+cost+' coins':'Max level';
-  btn.disabled=!cost||profile.coins<cost;
+  btn.textContent=cost?'Lv. '+next+' unlocks at '+cost+' mastery':'Max mastery';
+  btn.disabled=true;
 }
-const MINION_COINS={grunt:4,caster:6,brute:10};
+const MINION_MASTERY={grunt:4,caster:6,brute:10};
 function rewardKill(id,amount){
   if(!G||G.rewards.has(id))return;
-  G.rewards.add(id);profile=readProfile()||profile;profile.coins+=amount;saveProfile();
-  G.earned+=amount;$('runCoins').textContent=profile.coins+' coins · +'+G.earned+' this run';
+  G.rewards.add(id);profile=readProfile()||profile;const before=charLevel(myClass);
+  profile.mastery[myClass]=masteryOf(myClass)+amount;saveProfile();
+  G.earned+=amount;$('runCoins').textContent=CLASSES[myClass].name+' Mastery '+masteryOf(myClass)+' · +'+G.earned+' this run';
+  const after=charLevel(myClass);if(after>before)toast(CLASSES[myClass].name+' reached Mastery Lv. '+after+': '+UPGRADES[myClass][after-2][1]+' (active next run)');
 }
 function lockedAbility(action){return !!(P&&P.seal&&P.seal.until>gameTime&&P.seal.action===action);}
 function sealAbility(duration){
@@ -574,11 +572,12 @@ const BOSSES={
     moves:{near:[['reap',3],['cross',2.5],['dashes',1],['soulHarvest',2]],mid:[['dashes',3],['cage',2],['raiseDead',2.2]],far:[['dashes',2.5],['cage',1.5],['rain',1],['raiseDead',2.5]]},
     p2:{near:[['comboD',3],['cage',1.5],['raiseDead',2.4],['soulHarvest',2.5]],mid:[['comboE',2],['cage',2],['rain',1.5]],far:[['rain',2],['cage',2],['dashes',2]]},
     combos:{comboD:['reap','cross'],comboE:['dashes','reap']}},
-  thoruun:{n:'Thoruun, the Storm Tyrant',arena:'storm',hp:3000,r:1.9,speed:3.6,height:6,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:.90,model:'storm',coolMul:1.35,enrageSpeed:1.06,
+  thoruun:{n:'Thoruun, the Storm Tyrant',arena:'storm',hp:3900,r:1.9,speed:4.4,height:6,reach:4.2,slamR:3.2,sweepR:7,novaR:6.5,dmg:1.15,model:'storm',coolMul:.8,
     col:0x6ad0ff,dust:0x4a5060,fireCol:0x8ad8ff,pillar:0xbfe8ff,spikeCol:0x6ad0ff,shockCol:0x8ad8ff,rainFx:'ice',p2emis:0x0a2a4a,
     enrage:['THE TYRANT SUMMONS THE TEMPEST','Watch the ground for incoming strikes'],d:'A giant who wields lightning. Zapped slows passive recovery and reduces ability healing by 30%.',
     moves:{near:[['clap',3],['hurl',1.5],['chain',1]],mid:[['hurl',3],['chain',2.5],['bolts',2],['staticFork',2]],far:[['bolts',3],['chain',2.5]]},
-    p2:{near:[['ring',2],['bolts',1],['staticFork',1.2]],mid:[['tempest',2],['ring',1]],far:[['tempest',2.5],['staticFork',1.9]]}},
+    p2:{near:[['comboH',2.5],['bolts',1],['staticFork',1]],mid:[['tempest',2.5],['comboI',2]],far:[['tempest',3],['bolts',2],['staticFork',1.5]]},
+    combos:{comboH:['clap','ring'],comboI:['chain','bolts']}},
   vaelis:{n:'Vaelis, the Oathbreaker',arena:'void',hp:3250,r:1.5,speed:3.9,height:5.7,reach:4,slamR:3,sweepR:7,novaR:5.7,dmg:1,model:'oath',float:true,coolMul:1.1,enrageSpeed:1.12,seal:true,
     col:0xf978c3,dust:0x50334b,fireCol:0xf48ac6,pillar:0xf69acd,spikeCol:0xb25388,shockCol:0xf7a4d9,rainFx:'shadow',p2emis:0x480e34,
     enrage:['VAELIS BREAKS THE OATH','One ability is sealed for six seconds'],d:'A fallen knight who seals a special ability for six seconds on enrage. Dodge the pink sigils to avoid being sealed again.',
@@ -1519,7 +1518,7 @@ function handleEv(e,d,from,local){
       break;
     case 'enemyFelled':
       if(d.room===G.ci&&Object.hasOwn(MINION_COINS,d.type)){
-        rewardKill(d.room+':minion:'+d.id,MINION_COINS[d.type]);
+        rewardKill(d.room+':minion:'+d.id,MINION_MASTERY[d.type]);
         if(!NET.isHost){const m=mins.get(d.id);if(m)removeMinion(m);}
       }
       break;
@@ -1915,7 +1914,7 @@ function tryActions(mx,mz,ml){
       buf.q=-9;useSkill('shield');aimAtBoss();
       const royal=P.level===3,r=royal?5.1:3.5;
       startCast({dur:.61,at:.25,pose:'forward',move:.48,fn:()=>{
-        ringFx(P.x,P.z,0xdcc489,r,.42);SFX.slam();aoeHit(P.x,P.z,r,royal?48:34,22,true,true);
+        ringFx(P.x,P.z,0xdcc489,r,.42);SFX.slam();aoeHit(P.x,P.z,r,royal?48:34,22,true,royal);
         if(royal)P.ward=Math.max(P.ward,4);
       }});return true;
     }
@@ -1968,7 +1967,7 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='sentinel'){
     if(gameTime-buf.light<.32&&ready('lance')){
       buf.light=-9;useSkill('lance');P.facing=aimAngle();
-      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',27,7,46);SFX.cast();}});return true;
+      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',20,7,46);SFX.cast();}});return true;
     }
     if(gameTime-buf.heavy<.32&&ready('ringguard')){
       buf.heavy=-9;useSkill('ringguard');P.ward=Math.max(P.ward,3.5);
@@ -1984,9 +1983,9 @@ function tryActions(mx,mz,ml){
     }
   }else if(P.cls==='archer'){
     if(gameTime-buf.f<.32&&ready('vault')){buf.f=-9;useSkill('vault');P.facing=aimAngle();P.state='vault';P.t=0;P.iframe=.5;P.fired=false;SFX.roll();return true;}
-    if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.38,at:.2,pose:'bow',move:.7,fn:()=>{shoot(P.level===3?'crossbolt':'arrow',P.level===3?35:26,6,P.level===3?76:62);SFX.bow();}});return true;}
+    if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.38,at:.2,pose:'bow',move:.7,fn:()=>{shoot(P.level===3?'crossbolt':'arrow',P.level===3?28:26,6,P.level===3?76:62);SFX.bow();}});return true;}
     if(held('heavy')&&P.cd.charged<=0){buf.heavy=-9;P.state='draw';P.t=0;P.charge=0;return true;}
-    if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:.6,at:.4,pose:'bowC',move:.45,charge:true,fn:()=>{if(P.level===3)shoot('siege',112,27,75);else for(const o of P.level===2?[-.14,-.07,0,.07,.14]:[-.05,0,.05])shoot('arrowC',P.level===2?39:48,13,68,o);SFX.bow();shake(.12);}});return true;}
+    if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:.6,at:.4,pose:'bowC',move:.45,charge:true,fn:()=>{if(P.level===3)shoot('siege',90,27,75);else for(const o of P.level===2?[-.14,-.07,0,.07,.14]:[-.05,0,.05])shoot('arrowC',P.level===2?30:48,13,68,o);SFX.bow();shake(.12);}});return true;}
     if(gameTime-buf.e<.32&&ready('rain')){buf.e=-9;useSkill('rain');const tg=rainTarget();
       const preview=addDanger({type:'circle',x:tg[0],z:tg[1],r:5.5},{color:0xe8d8a0,delay:.85,dmg:0,owner:'local'});
       startCast({dur:1.05,at:.85,pose:'sky',move:.3,face:false,charge:true,fn:()=>{emit('zone',{z:{kind:'rain',x:tg[0],z:tg[1],r:5.5,dur:3,owner:NET.id||'me'}});SFX.bow();},preview});return true;}
@@ -2144,10 +2143,10 @@ function shadowStep(){
 }
 function checkPlayerHit(range,dmg,poise,heavy,stun){
   if(mins.size){let any=false;mins.forEach(m=>{if(m.hitTok===P.tok)return;const dx=m.x-P.x,dz=m.z-P.z,d=Math.hypot(dx,dz);
-    if(d-m.r<=range&&Math.abs(wrap(Math.atan2(dx,dz)-P.facing))<1.2){m.hitTok=P.tok;any=true;let dm=dmg+(P.cls==='rogue'&&P.poisonT>0?(P.level===3?9:P.level===2?6:3):0);if(P.cls==='berserker'&&P.rageT>0){dm=Math.round(dm*1.4);restoreHealth(Math.round(dm*.2));}hitMinion(m,dm,heavy);}});
+    if(d-m.r<=range&&Math.abs(wrap(Math.atan2(dx,dz)-P.facing))<1.2){m.hitTok=P.tok;any=true;let dm=dmg+(P.cls==='rogue'&&P.poisonT>0?(P.level===3?5:P.level===2?4:3):0);if(P.cls==='berserker'&&P.rageT>0){dm=Math.round(dm*1.4);restoreHealth(Math.round(dm*.2));}hitMinion(m,dm,heavy);}});
     if(any&&B.dead)P.hitDone=true;}
   if(P.hitDone||B.dead||B.air)return;
-  if(P.cls==='rogue'&&P.poisonT>0){dmg+=P.level===3?9:P.level===2?6:3;P.dotT=3;}
+  if(P.cls==='rogue'&&P.poisonT>0){dmg+=P.level===3?5:P.level===2?4:3;P.dotT=3;}
   if(P.cls==='berserker'&&P.rageT>0){dmg=Math.round(dmg*1.4);}
   const dx=B.x-P.x,dz=B.z-P.z,d=Math.hypot(dx,dz);
   if(d-B.r<=range&&Math.abs(wrap(Math.atan2(dx,dz)-P.facing))<1.15){P.hitDone=true;hitBoss(dmg,poise,heavy,lerp(P.x,B.x,.55),2.2,lerp(P.z,B.z,.55),false,stun);if(P.cls==='berserker'&&P.rageT>0){const h=restoreHealth(Math.round(dmg*.2));if(h>0)floatText('+'+Math.round(h),P.x,2.6,P.z,'heal');}}
@@ -2201,7 +2200,7 @@ function updatePlayer(dt){
     case 'simpleSwing':{
       const t=P.t,skeleton=P.cls==='skeleton';
       const h0=skeleton?.23:.16,h1=h0+.09;
-      if(t>=h0&&t<=h1)checkPlayerHit(skeleton?2.25:1.85,skeleton?30:8,skeleton?7:3,false);
+      if(t>=h0&&t<=h1)checkPlayerHit(skeleton?2.25:1.85,skeleton?10:19,skeleton?4:7,false);
       pose.armR=-1.48;pose.armL=skeleton?-.35:-.8;
       pose.upperY=t<h0?lerp(0,.86,ease(t/h0)):lerp(.86,-1.05,ease((t-h0)/.2));
       pose.legL=.29;pose.legR=-.16;
@@ -2324,7 +2323,7 @@ function updatePlayer(dt){
       if(k>=1&&Math.random()<.5)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
       if(!held('heavy')){
-        const full=k>=1,dmg=full?75:Math.round(24+33*k);shoot(P.level===3?'crossbolt':full?'arrowC':'arrow',dmg+(P.level===3?10:0),full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
+        const full=k>=1,dmg=full?75:Math.round(24+33*k);shoot(P.level===3?'crossbolt':full?'arrowC':'arrow',dmg+(P.level===3?4:0),full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
         P.cd.charged=.55;startCast({dur:.22,at:0,pose:'bow',move:.7,fired:true,fn:()=>{}});P.cast.fired=true;
       }
       break;}
@@ -2614,43 +2613,40 @@ const ATK={
       if(a.d>=a.len){B.dashId=0;a.i++;a.tele=false;if(a.i>=total){a.ph='rec';a.pt=0;}else{a.ph='aim';a.pt=0;}}
       return false;}
     p.lean=lerp(.6,0,ease(a.pt/.8));return a.pt>=.9;},
-  clap(dt,a){a.t+=dt;const c=G.boss,W=1.05,p=B.pose;
-    if(!a.tele){a.tele=true;hostDanger({type:'circle',x:B.x,z:B.z,r:c.novaR+B.r*.4},{delay:W/B.speedMul,dmg:D(34*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',color:c.col,fx:'bolt',parry:true,shock:B.phase===2?{sp:9,max:12,dmg:D(12*c.dmg)}:null});}
+  clap(dt,a){a.t+=dt;const c=G.boss,W=a.fast?.5:.65,p=B.pose;
+    if(!a.tele){a.tele=true;hostDanger({type:'circle',x:B.x,z:B.z,r:c.novaR+B.r*.4},{delay:W/B.speedMul,dmg:D(34*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',color:c.col,fx:'bolt',parry:true,shock:B.phase===2?{sp:12,max:ARENA,dmg:D(18)}:null});}
     const k=ease(a.t/W);p.armR=a.t<W?lerp(-.3,-2.6,k):-1.2;p.armL=p.armR;p.lean=a.t<W?-.2:.4;p.crouch=a.t<W?0:-.5;
-    return a.t>=W+1.05;},
-  hurl(dt,a){a.t+=dt;const c=G.boss,W=1.2,L=.34,p=B.pose;
+    return a.t>=W+.8;},
+  hurl(dt,a){a.t+=dt;const c=G.boss,W=.8,L=.45,p=B.pose;
     if(a.t<L)trackTurn(dt,3);
-    if(a.t>=L&&!a.tele){a.tele=true;const len=Math.min(23,ARENA*1.3),delay=(W-L)/B.speedMul;
-      hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.4},{color:c.col,delay,dmg:D(32*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'bolt'});
-      if(B.phase===2)hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.4},{color:c.col,delay:delay+.95,dmg:D(22*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'whoosh'});}
+    if(a.t>=L&&!a.tele){a.tele=true;const len=Math.min(24,ARENA*1.3),delay=(W-L)/B.speedMul;
+      hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.8},{color:c.col,delay,dmg:D(32*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'bolt'});
+      hostDanger({type:'rect',x:B.x,z:B.z,a:B.facing,len,w:2.8},{color:c.col,delay:delay+.65,dmg:D(30*c.dmg),srcX:B.x,srcZ:B.z,owner:'melee',fx:'whoosh'});}
     p.armR=a.t<W?lerp(-.3,-3,ease(a.t/W)):-1.4;p.lean=a.t<W?-.25:.3;p.upperY=a.t<W?.5:-.4;
-    return a.t>=W+1.85;},
-  chain(dt,a){a.t+=dt;const c=G.boss,W=.92,L=.12,p=B.pose;
+    return a.t>=W+1.4;},
+  chain(dt,a){a.t+=dt;const c=G.boss,W=.6,L=.15,p=B.pose;
     if(!a.tele&&a.t>=L){a.tele=true;
-      const players=alivePlayers(),target=players.find(pl=>pl.id===T.id)||players[0];
-      if(target){
-        const ang=Math.atan2(target.x-B.x,target.z-B.z),len=Math.hypot(target.x-B.x,target.z-B.z)+3;
-        hostDanger({type:'rect',x:B.x,z:B.z,a:ang,len,w:1.85},{color:c.col,delay:(W-L)/B.speedMul,dmg:D(28*c.dmg),srcX:B.x,srcZ:B.z,blockable:false,owner:'melee',fx:'bolt'});
-      }}
-    p.armL=-1.7;p.armR=-.5;p.lean=-.1;return a.t>=W+1.25;},
+      alivePlayers().filter(pl=>!B.taunt?.active||pl.id===T.id).forEach(pl=>{const ang=Math.atan2(pl.x-B.x,pl.z-B.z),len=Math.hypot(pl.x-B.x,pl.z-B.z)+4;
+        for(let k=0;k<(B.phase===2?2:1);k++)hostDanger({type:'rect',x:B.x,z:B.z,a:ang+k*.35*(Math.random()<.5?1:-1),len,w:2.2},{color:c.col,delay:(W-L)/B.speedMul+.15+k*.55,dmg:D(28*c.dmg),srcX:B.x,srcZ:B.z,blockable:false,owner:'melee',fx:'bolt'});});}
+    p.armL=-1.7;p.armR=-.5;p.lean=-.1;return a.t>=W+1;},
   bolts(dt,a){a.t+=dt;const c=G.boss,W=.6,p=B.pose;
     if(a.t<W){const k=ease(a.t/W);p.armL=lerp(-.3,-3,k);p.armR=lerp(-.3,-3,k);return false;}
-    if(!a.go){a.go=true;SFX.roar();alivePlayers().filter(pl=>!B.taunt?.active||pl.id===T.id).forEach(pl=>{const n=B.phase===2?3:2;for(let i=0;i<n;i++){
-      const [x,z]=clampArena(pl.x+pl.vx*(.25+i*.3),pl.z+pl.vz*(.25+i*.3),1);
-      hostDanger({type:'circle',x,z,r:1.95},{color:c.col,delay:1+i*.55,dmg:D(26*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}});}
-    p.armL=-3;p.armR=-3;return a.t>=W+3*B.speedMul;},
+    if(!a.go){a.go=true;SFX.roar();alivePlayers().filter(pl=>!B.taunt?.active||pl.id===T.id).forEach(pl=>{const n=B.phase===2?5:4;for(let i=0;i<n;i++){
+      const [x,z]=clampArena(pl.x+pl.vx*(.4+i*.35),pl.z+pl.vz*(.4+i*.35),1);
+      hostDanger({type:'circle',x,z,r:2.5},{color:c.col,delay:.6+i*.35,dmg:D(26*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}});}
+    p.armL=-3;p.armR=-3;return a.t>=W+1.8;},
   tempest(dt,a){a.t+=dt;const c=G.boss,W=.8,p=B.pose;
     if(a.t<W){const k=ease(a.t/W);p.armL=lerp(-.3,-3,k);p.armR=lerp(-.3,-3,k);p.lean=-.3*k;return false;}
-    if(!a.go){a.go=true;SFX.roar();shake(.28);const n=8+Math.min(4,alivePlayers().length),offset=Math.random()*TAU;
-      for(let i=0;i<n;i++){const an=offset+i/n*TAU,r=rand(ARENA*.28,ARENA-2),x=Math.sin(an)*r,z=Math.cos(an)*r;
-        hostDanger({type:'circle',x,z,r:2.7},{color:c.col,delay:1.15+i*.14,dmg:D(28*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}}
-    p.armL=-3;p.armR=-3;return a.t>=W+3.4*B.speedMul;},
+    if(!a.go){a.go=true;SFX.roar();shake(.4);const n=16+alivePlayers().length*2,offset=Math.random()*TAU;
+      for(let i=0;i<n;i++){const an=Math.random()*TAU,r=rand(3,ARENA-2),x=Math.sin(an)*r,z=Math.cos(an)*r;
+        hostDanger({type:'circle',x,z,r:3.6},{color:c.col,delay:.9+i*.13,dmg:D(30*c.dmg),srcX:x,srcZ:z,blockable:false,owner:'storm',fx:'bolt'});}}
+    p.armL=-3;p.armR=-3;return a.t>=W+2.2;},
   ring(dt,a){a.t+=dt;const c=G.boss,W=.5,p=B.pose;
-    if(!a.go&&a.t>=W){a.go=true;for(let i=0;i<9;i++){const an=i/9*TAU,x=B.x+Math.sin(an)*9,z=B.z+Math.cos(an)*9;
+    if(!a.go&&a.t>=W){a.go=true;for(let i=0;i<14;i++){const an=i/14*TAU,x=B.x+Math.sin(an)*9,z=B.z+Math.cos(an)*9;
       if(Math.hypot(x,z)>ARENA+1.7)continue;
-      hostDanger({type:'circle',x,z,r:1.7},{color:c.col,delay:1.05,dmg:D(26*c.dmg),srcX:B.x,srcZ:B.z,blockable:false,owner:'storm',fx:'bolt'});}
-      hostDanger({type:'circle',x:B.x,z:B.z,r:4.4},{color:c.col,delay:1.8,dmg:D(30*c.dmg),srcX:B.x,srcZ:B.z,owner:'storm',fx:'bolt'});}
-    p.armL=-2.2;p.armR=-2.2;p.crouch=-.3;return a.t>=W+2.6*B.speedMul;},
+      hostDanger({type:'circle',x,z,r:2.2},{color:c.col,delay:.8,dmg:D(26*c.dmg),srcX:B.x,srcZ:B.z,blockable:false,owner:'storm',fx:'bolt'});}
+      hostDanger({type:'circle',x:B.x,z:B.z,r:5.5},{color:c.col,delay:1.5,dmg:D(30*c.dmg),srcX:B.x,srcZ:B.z,owner:'storm',fx:'bolt'});}
+    p.armL=-2.2;p.armR=-2.2;p.crouch=-.3;return a.t>=W+1.9;},
   cross(dt,a){a.t+=dt;const c=G.boss,W=a.fast?.6:.8,L=W-.35,p=B.pose;
     if(a.t<L)trackTurn(dt,3.2);
     if(a.t>=L&&!a.tele){a.tele=true;const [tx,tz]=clampArena(T.x,T.z,1),len=16;
@@ -2675,7 +2671,7 @@ const ATK={
   },
   roar(dt,a){a.t+=dt;const p=B.pose;p.armR=-2.6;p.armL=-2.6;p.lean=-.45;p.crouch=-.2;
     if(a.t>.5&&!a.r){a.r=true;B.phase=2;B.speedMul=G.diff.spd*(G.boss.enrageSpeed||1.22);B.maxPoise=170;B.poise=170;
-      emit('roarfx',{});if(G.boss.seal)emit('oathSeal',{});emit('shock',{x:B.x,z:B.z,sp:10,max:ARENA,dmg:D(20*(G.boss.model==='storm'?G.boss.dmg:1)),col:G.boss.shockCol});emit('msg',{a:G.boss.enrage[0],b:G.boss.enrage[1],dur:3});}
+      emit('roarfx',{});if(G.boss.seal)emit('oathSeal',{});emit('shock',{x:B.x,z:B.z,sp:10,max:ARENA,dmg:D(20),col:G.boss.shockCol});emit('msg',{a:G.boss.enrage[0],b:G.boss.enrage[1],dur:3});}
     return a.t>=2.3;},
   stagger(dt,a){a.t+=dt;const p=B.pose;p.lean=lerp(.7,0,ease(a.t/a.dur));p.crouch=-.9*(1-ease(a.t/a.dur));p.armR=-.2;p.armL=.2;p.upperY=0;return a.t>=a.dur;},
   death(dt,a){a.t+=dt;const p=B.pose;p.crouch=-1.2*ease(a.t/1.2);p.lean=.6;p.armR=.3;p.armL=.3;
@@ -2904,7 +2900,7 @@ function startGame(cfg){
   state='play';paused=false;setScreen(null);
   $('hud').classList.remove('hidden');$('crosshair').classList.remove('hidden');showTouch(touchOn());
   $('pName').textContent=(G.mode==='mp'?me.name+' · ':'')+C.name+' · Lv. '+level;
-  $('runCoins').textContent=profile.coins+' coins · +0 this run';
+  $('runCoins').textContent=CLASSES[myClass].name+' Mastery '+masteryOf(myClass)+' · +0 this run';
   $('manaBar').classList.toggle('hidden',myClass!=='mage');$('ultBar').classList.remove('hidden');buildSkillBar();
   requestShiftLock();
 }
@@ -3069,7 +3065,7 @@ function endGame(win){
   showTouch(false);setScreen('end');$('end').classList.toggle('dead',!win);$('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
   remotes.forEach(r=>r.tag.style.display='none');
   $('endTitle').textContent=win?(G.campaign?'CAMPAIGN COMPLETE':'VICTORY ACHIEVED'):(G.mode==='mp'?'THE PARTY HAS FALLEN':'YOU HAVE FALLEN');
-  $('endStats').innerHTML=`<b>+${G.earned} coins earned · ${profile.coins} total</b><br>`+(G.campaign?`Campaign · ${G.diff.n}<br>`+(win?`All ${CAMPAIGN.length} chambers conquered<br>Time Elapsed: ${tm}`:`Fell in ${G.room.t}: ${G.room.s}<br>Time Survived: ${tm}`):`${G.boss.n} · ${G.diff.n}<br>`+(win?`Time Elapsed: ${tm}`:`Boss Health Remaining: ${Math.round(B.hp/B.maxHp*100)}%<br>Time Survived: ${tm}`))+
+  $('endStats').innerHTML=`<b>+${G.earned} ${CLASSES[myClass].name} mastery · ${masteryOf(myClass)} total</b><br>`+(G.campaign?`Campaign · ${G.diff.n}<br>`+(win?`All ${CAMPAIGN.length} chambers conquered<br>Time Elapsed: ${tm}`:`Fell in ${G.room.t}: ${G.room.s}<br>Time Survived: ${tm}`):`${G.boss.n} · ${G.diff.n}<br>`+(win?`Time Elapsed: ${tm}`:`Boss Health Remaining: ${Math.round(B.hp/B.maxHp*100)}%<br>Time Survived: ${tm}`))+
     `<br>Damage Dealt: ${Math.round(stats.dealt)}<br>Damage Taken: ${Math.round(stats.taken)}<br>Flasks Consumed: ${stats.flasks}`+(stats.parries?`<br>Successful Parries: ${stats.parries}`:'');
   const btns=$('endBtns');$('endNote').textContent='';
   if(G.mode==='solo'){btns.innerHTML='<button class="big" id="againBtn">Try Again</button><button class="big alt" id="toMenuBtn">Main Menu</button>';
