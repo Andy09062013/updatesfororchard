@@ -402,6 +402,7 @@ let ARENA=24;
 const CHARGE=.7;
 
 // ==== DATA ====
+const SENTINEL_DAMAGE={lance:41,aegis:49,pulse:[64,88,105],sunstrike:84,tempest:49,dawnpiercer:102,beaconfall:203};
 const CLASSES={
   sword:{ult:'Judgement',name:'Swordsman',hp:110,speed:6.8,desc:'A disciplined warrior with sword and shield. Blocks, parries and delivers crushing strikes.',
     skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
@@ -423,7 +424,7 @@ const CLASSES={
     ctrl:[['light','Mace tap deals 8 damage'],['block','Hold shield to take 70% less damage and charge Heavenfall from blocked damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack'],['f','For 6s, reflect 80% of damage taken from hits back to the attacker']]},
   sentinel:{name:'Sentinel',hp:120,speed:6.6,ult:'Beaconfall',desc:'A spear-wielding guardian with a defensive barrier and pulses of radiant energy.',
     skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10},{id:'tempest',k:'F',n:'Radiant Tempest',cd:15},{id:'dawnpiercer',k:'X',n:'Dawnpiercer',cd:12}],
-    ctrl:[['light','Light Lance bursts on impact for 58 damage in a 3.2-radius area'],['heavy','Aegis wards allies for 5s and blasts nearby enemies for 70 damage'],['q','Dawn Pulse deals 92 damage around you at Lv. 1 and gains damage and reach as you upgrade'],['e','Sunstrike deals 120 damage in an 8-radius area at your target'],['f','Radiant Tempest creates a 9-radius field that strikes three times for 70 damage each'],['x','Fire a wide piercing beam that deals 145 damage to every enemy in its path']]},
+    ctrl:[['light',`Light Lance bursts on impact for ${SENTINEL_DAMAGE.lance} damage in a 3.2-radius area`],['heavy',`Aegis wards allies for 5s and blasts nearby enemies for ${SENTINEL_DAMAGE.aegis} damage`],['q',`Dawn Pulse deals ${SENTINEL_DAMAGE.pulse[0]} damage around you at Lv. 1 and gains damage and reach as you upgrade`],['e',`Sunstrike deals ${SENTINEL_DAMAGE.sunstrike} damage in an 8-radius area at your target`],['f',`Radiant Tempest creates a 9-radius field that strikes three times for ${SENTINEL_DAMAGE.tempest} damage each`],['x',`Fire a wide piercing beam that deals ${SENTINEL_DAMAGE.dawnpiercer} damage to every enemy in its path`]]},
   rogue:{ult:'Thousand Cuts',name:'Ninja',hp:70,speed:7.4,desc:'A swift dagger fighter with piercing shuriken and a 10% chance to dodge each incoming hit.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'shuriken',k:'RMB',n:'Piercing Shuriken',cd:.85},{id:'step',k:'Q',n:'Shadow Step',cd:12},{id:'poison',k:'E',n:'Envenom',cd:18},{id:'smoke',k:'F',n:'Smoke Bomb',cd:25}],
     ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Throw a shuriken that pierces enemies for 23 damage each'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
@@ -440,7 +441,7 @@ const UPGRADES={
   berserker:[['E','Crimson Rage','Blood Rage lasts 10 seconds and damages nearby enemies on activation.'],['E','Blood Quake','Blood Rage also sends out a wider shockwave and staggers the target.']],
   rogue:[['E','Venom Coat','Poison lasts 8 seconds and deals more on-hit damage.'],['E','Night Venom','Poison is stronger and releases a burst of toxic mist.']],
   paladin:[['Q','Guardian Banner','Guardian Aura covers more ground and lasts 7 seconds.'],['Q','Aegis of Dawn','The larger aura lasts 8 seconds and restores 12 health to allies.']],
-  sentinel:[['Q','Resonant Pulse','Deals 126 damage in a 9-radius area.'],['Q','Radiant Pulse','Deals 150 damage in a 10-radius area, staggers enemies and heals nearby allies.']]
+  sentinel:[['Q','Resonant Pulse',`Deals ${SENTINEL_DAMAGE.pulse[1]} damage in a 9-radius area.`],['Q','Radiant Pulse',`Deals ${SENTINEL_DAMAGE.pulse[2]} damage in a 10-radius area, staggers enemies and heals nearby allies.`]]
 };
 const UPGRADE_GEAR={
   sword:['Steel pauldrons and a reinforced shield','Gold plate, a royal blue cape and a broad sword'],
@@ -2087,7 +2088,7 @@ function updateZones(dt){
           burst(z.x+Math.cos(a)*z.r*.64,.55,z.z+Math.sin(a)*z.r*.64,4,0xa4ffdb,4.5,.2,.43,5);
         }
         tone(330+z.pulses*90,165,.22,'triangle',.07);
-        if(z.own&&!P.dead)aoeHit(z.x,z.z,z.r,70,12,false,false);
+        if(z.own&&!P.dead)aoeHit(z.x,z.z,z.r,SENTINEL_DAMAGE.tempest,12,false,false);
       }
     }else if(z.kind==='rain'){
       for(let n=0;n<3;n++){const a=Math.random()*TAU,r=Math.sqrt(Math.random())*z.r,ax=z.x+Math.sin(a)*r,az=z.z+Math.cos(a)*r;
@@ -2355,19 +2356,19 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='sentinel'){
     if(gameTime-buf.light<.32&&ready('lance')){
       buf.light=-9;useSkill('lance');P.facing=aimAngle();
-      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',58,12,51);SFX.cast();}});return true;
+      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',SENTINEL_DAMAGE.lance,12,51);SFX.cast();}});return true;
     }
     if(gameTime-buf.heavy<.32&&ready('ringguard')){
       buf.heavy=-9;useSkill('ringguard');
       emit('ward',{x:P.x,z:P.z,r:7.5,dur:5});
       emit('ultfx',{k:'aegisImpact',x:P.x,z:P.z});
-      aoeHit(P.x,P.z,7.5,70,18,true,false);return true;
+      aoeHit(P.x,P.z,7.5,SENTINEL_DAMAGE.aegis,18,true,false);return true;
     }
     if(gameTime-buf.q<.32&&ready('pulse')){
       buf.q=-9;useSkill('pulse');const level=P.level,r=[7.5,9,10][level-1];
       startCast({dur:.64,at:.38,pose:'both',move:.35,fn:()=>{
         ringFx(P.x,P.z,0x85f5d4,r,.48);SFX.slam();
-        aoeHit(P.x,P.z,r,[92,126,150][level-1],[23,31,40][level-1],true,level===3);
+        aoeHit(P.x,P.z,r,SENTINEL_DAMAGE.pulse[level-1],[23,31,40][level-1],true,level===3);
         if(level===3)emit('healburst',{x:P.x,z:P.z,r:11,amt:24});
       }});return true;
     }
@@ -2375,7 +2376,7 @@ function tryActions(mx,mz,ml){
       buf.e=-9;useSkill('sunstrike');P.facing=aimAngle();
       const [x,z]=sentinelTarget(),r=8;
       startCast({dur:.82,at:.48,pose:'raise',move:.4,face:false,fn:()=>{
-        emit('ultfx',{k:'sunstrike',x,z,r});aoeHit(x,z,r,120,34,true,false);
+        emit('ultfx',{k:'sunstrike',x,z,r});aoeHit(x,z,r,SENTINEL_DAMAGE.sunstrike,34,true,false);
       }});return true;
     }
     if(gameTime-buf.f<.32&&ready('tempest')){
@@ -2423,8 +2424,8 @@ function fireDawnpiercer(){
   const a=P.facing;
   const area={type:'rect',x:P.x,z:P.z,a,w:5,len:19};
   emit('ultfx',{k:'dawnpiercer',x:area.x,z:area.z,a,r:area.w/2,len:area.len});
-  if(!B.dead&&!B.air&&BM&&inside(area,B.x,B.z,B.r))hitBoss(145,32,true,B.x,B.y+2.8,B.z);
-  mins.forEach(m=>{if(inside(area,m.x,m.z,m.r))hitMinion(m,145,true);});
+  if(!B.dead&&!B.air&&BM&&inside(area,B.x,B.z,B.r))hitBoss(SENTINEL_DAMAGE.dawnpiercer,32,true,B.x,B.y+2.8,B.z);
+  mins.forEach(m=>{if(inside(area,m.x,m.z,m.r))hitMinion(m,SENTINEL_DAMAGE.dawnpiercer,true);});
 }
 const ULT_DUR={sword:1.75,mage:1.2,archer:.9,rogue:1.85,berserker:1.6,sentinel:1.05,paladin:1.75};
 const BEAM_MIN=.36,BEAM_CANCEL=3,BEAM_MAX=5;
@@ -2517,7 +2518,7 @@ function updateUlt(dt,pose,mx,mz){
       break;}
     case 'sentinel':{
       pose.armL=-2.5;pose.armR=-2.5;
-      if(t>=.45&&!P.ufin){P.ufin=true;const [x,z]=rainTarget();emit('ultfx',{k:'beacon',x,z});aoeHit(x,z,11,290,75,true,true);emit('healburst',{x:P.x,z:P.z,r:15,amt:42});}
+      if(t>=.45&&!P.ufin){P.ufin=true;const [x,z]=rainTarget();emit('ultfx',{k:'beacon',x,z});aoeHit(x,z,11,SENTINEL_DAMAGE.beaconfall,75,true,true);emit('healburst',{x:P.x,z:P.z,r:15,amt:42});}
       break;}
     case 'warlock':{
       if(P.ufin){
