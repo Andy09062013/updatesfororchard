@@ -365,7 +365,12 @@ body.village-active>canvas:active{cursor:grabbing}
 </div>
 
 <div id="cameraSettings" class="screen hidden">
-  <h2>Camera Settings</h2>
+  <h2>Settings</h2>
+  <div class="row">
+    <button class="big alt" id="settingsBindsBtn">Keybinds</button>
+    <button class="big alt" id="settingsTouchBtn">Touch Controls</button>
+    <button class="big alt" id="settingsFsBtn">Fullscreen</button>
+  </div>
   <div class="panel">
     <div class="field"><label for="shiftLockSetting">Shift Lock</label><input type="checkbox" id="shiftLockSetting"></div>
     <p class="desc">Capture the mouse for camera movement. With Shift Lock off, middle-drag to look around.</p>
@@ -412,9 +417,9 @@ const JESTER_BOMBS={
   confusion:{id:'confusionBomb',key:'F',name:'Confusion Bomb',cd:19,color:0xf6a4ff,r:3.1,damage:[0,0,0],rainDamage:0}
 };
 const CLASSES={
-  sword:{ult:'Judgement',name:'Knight',hp:115,speed:6.8,desc:'A sword-and-shield fighter. Bash to break poise, or parry a frontal strike to open a quick riposte.',
-    skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{id:'shield',k:'Q',n:'Shield Bash',cd:9},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
-    ctrl:[['light','Light attack (3-hit combo)'],['heavy','Heavy strike. Within 2 seconds of a parry, deliver a faster 82-damage riposte.'],['q','Shield Bash deals 28 damage and heavy poise damage in front of you.'],['block','Hold shield to halve frontal blockable damage. Tap just before impact to parry.']]},
+  sword:{ult:'Judgement',name:'Knight',hp:135,speed:7.05,desc:'A sword-and-shield fighter. Bash to break poise, or parry a frontal strike to open a quick riposte.',
+    skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{id:'shield',k:'Q',n:'Shield Bash',cd:7},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
+    ctrl:[['light','Light attack (3-hit combo)'],['heavy','Heavy strike. Within 3 seconds of a parry, deliver a faster 132-damage riposte.'],['q','Shield Bash deals 52 damage and heavy poise damage in front of you.'],['block','Hold shield to halve frontal blockable damage. Tap just before impact to parry.']]},
   mage:{name:'Mage',hp:85,speed:6.6,mana:120,ult:'Divine Ascension',desc:'A healer who shields the party and can raise fallen allies once per expedition as 10-HP skeletons.',
     skills:[{id:'mend',k:'LMB',n:'Mending Ray',cost:9,cd:.6},{id:'fireball',k:'RMB',n:'Fireball',cost:16,cd:.9},{id:'sanct',k:'Q',n:'Sanctuary',cost:35,cd:12},{id:'burst',k:'E',n:'Healing Burst',cost:30,cd:8},{id:'ward',k:'F',n:'Arcane Ward',cost:30,cd:16}],
     ctrl:[['light','Mending Ray, small heal on the targeted ally (9 mana)'],['heavy','Fireball deals 39 damage (16 mana)'],['q','Sanctuary, healing circle placed at the targeted ally (35 mana)'],['e','Healing Burst, large instant heal around you (30 mana)'],['f','Arcane Ward, allies take reduced damage; nearby enemies are damaged and stunned (30 mana)']]},
@@ -446,7 +451,7 @@ const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e
 const GOLD_COST={2:60,3:135};
 const UPGRADES={
   jester:[['Q','Blazing Bomb','Fire Bomb hits for 56 damage before its burn.'],['E','Glacial Bomb','Ice Bomb hits for 40 damage and slows the boss for 5 seconds.']],
-  sword:[['Q','Vanguard Bash','A wider 38-damage bash that also stuns the target.'],['Q','Royal Bulwark','Shield Bash hits a wider area and grants 4 seconds of Ward.']],
+  sword:[['Q','Vanguard Bash','A wider 64-damage bash that also stuns the target.'],['Q','Royal Bulwark','Shield Bash hits a wider area and grants 4 seconds of Ward.']],
   mage:[['F','Radiant Ward','Ward lasts 7 seconds and bursts for 30 damage.'],['F','Dawn Aegis','Ward lasts 8 seconds and restores 18 health to nearby allies.']],
   archer:[['Q','Hunter’s Volley','Fire five arrows in a spread.'],['Q','Siege Bolt','Fire a heavy bolt that bursts on impact. Replaces your bow with a crossbow.']],
   warlock:[['Q','Grave Rift','Create a wider rift that deals more damage.'],['Q','Soul Well','A lingering rift that heals nearby allies.']],
@@ -547,7 +552,7 @@ function updateBossEffects(){
   }
 }
 function restoreHealth(amount,source='ability'){
-  if(!P||P.dead||amount<=0)return 0;
+  if(!P||P.dead||P.afk||amount<=0)return 0;
   const factor=activeEffect('zapped')?{ability:.7,passive:.5,flask:1}[source]:1;
   const healed=Math.min(P.maxHp-P.hp,amount*factor);
   P.hp+=healed;return healed;
@@ -568,7 +573,7 @@ function applyGuard(d){
 function requestTaunt(from){
   if(!NET.isHost||B.dead)return;
   const id=from||'me',self=id===(NET.id||'me'),p=self?P:remotes.get(id);
-  if(!p||p.cls!=='paladin'||p.dead||Math.hypot(p.x-B.x,p.z-B.z)>26)return;
+  if(!p||p.cls!=='paladin'||p.dead||p.afk||Math.hypot(p.x-B.x,p.z-B.z)>26)return;
   if(B.taunt?.active)return;
   B.taunt={id,active:false};
   const name=self?myName():p.name;
@@ -666,12 +671,12 @@ const BOSSES={
     moves:{near:[['reap',3],['cross',2.5],['dashes',1],['soulHarvest',2]],mid:[['dashes',3],['cage',2],['raiseDead',2.2]],far:[['dashes',2.5],['cage',1.5],['rain',1],['raiseDead',2.5]]},
     p2:{near:[['comboD',3],['cage',1.5],['raiseDead',2.4],['soulHarvest',2.5]],mid:[['comboE',2],['cage',2],['rain',1.5]],far:[['rain',2],['cage',2],['dashes',2]]},
     combos:{comboD:['reap','cross'],comboE:['dashes','reap']}},
-  thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:5600,r:1.9,speed:4.3,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.58,model:'storm',coolMul:.65,enrageSpeed:1.22,enrageAt:.65,poiseMul:1.35,
+  thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:7100,r:1.9,speed:5.15,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.82,model:'storm',coolMul:.48,enrageSpeed:1.25,enrageAt:.65,poiseMul:1.6,
     col:0x6ad0ff,dust:0x77786e,fireCol:0x8ad8ff,pillar:0xbfe8ff,spikeCol:0x6ad0ff,shockCol:0x8ad8ff,rainFx:'ice',p2emis:0x0a2a4a,
-    enrage:['ZEUS CALLS DOWN THE STORM','Lightning attacks inflict Zapped'],d:'Throws explosive thunderbolts, cracks electric whips, and calls down lightning. Enrages at 65% health outside Ultra. Zapped lasts 10 seconds, halves passive recovery, and reduces ability healing by 30%.',
-    moves:{near:[['thunderWhip',4],['thunderJavelin',2]],mid:[['thunderJavelin',3],['thunderWhip',2],['skyJudgment',2.5]],far:[['thunderJavelin',4],['skyJudgment',3]]},
-    p2:{near:[['ionCrossing',3],['skyJudgment',2]],mid:[['ionCrossing',3],['skyJudgment',2]],far:[['ionCrossing',2],['skyJudgment',3]]},
-    p3:[['crownOfStorms',4],['thunderRelay',4]]},
+    enrage:['ZEUS CALLS DOWN THE STORM','Lightning attacks inflict Zapped'],d:'Leaps into the party with shockwaves, charges through the arena, and calls down lightning on several players at once. Enrages at 65% health outside Ultra. Zapped lasts 10 seconds, halves passive recovery, and reduces ability healing by 30%.',
+    moves:{near:[['thunderWhip',4],['thunderVault',3.5],['skyJudgment',2]],mid:[['thunderJavelin',3],['thunderVault',4],['skyJudgment',3]],far:[['thunderVault',5],['stormRush',3],['skyJudgment',3]]},
+    p2:{near:[['ionCrossing',3],['stormRush',3]],mid:[['ionCrossing',3],['stormRush',4]],far:[['thunderJavelin',3],['ionCrossing',3]]},
+    p3:[['crownOfStorms',5.5],['thunderRelay',5.5]]},
   vaelis:{n:'Vaelis, the Oathbreaker',arena:'void',hp:3250,r:1.5,speed:3.9,height:5.7,reach:4,slamR:3,sweepR:7,novaR:5.7,dmg:1,model:'oath',float:true,coolMul:1.1,enrageSpeed:1.12,seal:true,
     col:0xf978c3,dust:0x50334b,fireCol:0xf48ac6,pillar:0xf69acd,spikeCol:0xb25388,shockCol:0xf7a4d9,rainFx:'shadow',p2emis:0x480e34,
     enrage:['VAELIS BREAKS THE OATH','One ability is sealed for six seconds'],d:'A fallen knight who seals a special ability for six seconds on enrage. Dodge the pink sigils to avoid being sealed again.',
@@ -1751,7 +1756,7 @@ function requestShiftLock(){
   try{const result=canvas.requestPointerLock();if(result&&result.catch)result.catch(()=>{});}catch(e){}
 }
 let myClass='sword',specIdx=0;
-const NET={ws:null,id:null,isHost:true,room:null,online:false};
+const NET={ws:null,id:null,isHost:true,room:null,online:false,combatHost:null};
 const D=d=>Math.round(d*G.diff.dmg);
 
 // ==== INPUT ====
@@ -1836,7 +1841,7 @@ addEventListener('mousemove',e=>{
 });
 document.addEventListener('pointerlockchange',()=>{
   if(document.pointerLockElement===canvas)hadLock=true;
-  else if(hadLock&&cameraPrefs.shiftLock&&state==='play'&&!paused&&!chatOpen)openPause();
+  else if(hadLock&&cameraPrefs.shiftLock&&state==='play'&&!paused&&!chatOpen&&!localAway())openPause();
 });
 function ctrlRows(){return currentLoadout().ctrl.map(r=>[keyName(BINDS[r[0]]),r[1]]);}
 function openPause(){paused=true;clearCombatInput();$('pause').classList.remove('hidden');
@@ -1847,7 +1852,7 @@ function openPause(){paused=true;clearCombatInput();$('pause').classList.remove(
   $('ctrlTable').innerHTML=rows.map(r=>`<div><b>${esc(r[0])}</b><span>${r[1]}</span></div>`).join('');}
 let bindsFrom='menu';
 function openBinds(from){bindsFrom=from;rebinding=null;renderBinds();
-  if(from==='pause'){$('pause').classList.add('hidden');$('binds').classList.remove('hidden');}else setScreen('binds');}
+  setScreen('binds');}
 function renderBinds(){
   $('bindTable').innerHTML=ACTIONS.map(a=>`<div><b>${a[1]}</b><button class="sm bindBtn ${rebinding===a[0]?'on':''}" data-a="${a[0]}">${rebinding===a[0]?'Press a key...':esc(keyName(BINDS[a[0]]))}</button></div>`).join('');
   $('bindTable').querySelectorAll('.bindBtn').forEach(b=>b.onclick=ev=>{ev.stopPropagation();rebinding=b.dataset.a;renderBinds();});
@@ -1862,7 +1867,7 @@ $('resumeBtn').onclick=resume;
 $('pauseBindsBtn').onclick=()=>openBinds('pause');
 $('menuBindsBtn').onclick=()=>openBinds('menu');
 $('bindReset').onclick=()=>{defaultBinds();saveBinds();rebinding=null;renderBinds();if(state==='play')buildSkillBar();renderClassCards();};
-$('bindBack').onclick=()=>{rebinding=null;if(bindsFrom==='pause'){$('binds').classList.add('hidden');openPause();}else{setScreen('menu');renderClassCards();}};
+$('bindBack').onclick=()=>{rebinding=null;if(bindsFrom==='settings')openCameraSettings(settingsFrom);else if(bindsFrom==='pause')openPause();else{setScreen('menu');renderClassCards();}};
 $('quitBtn').onclick=()=>{paused=false;$('pause').classList.add('hidden');leaveGame();};
 
 let settingsFrom='menu';
@@ -1878,6 +1883,9 @@ function saveCameraSettings(){
   if(!cameraPrefs.shiftLock&&document.pointerLockElement===canvas){hadLock=false;document.exitPointerLock();}
   try{localStorage.setItem('hc_camera_settings',JSON.stringify(cameraPrefs));}catch(e){}
 }
+$('settingsBindsBtn').onclick=()=>openBinds('settings');
+$('settingsTouchBtn').onclick=()=>openTouchEdit('settings');
+$('settingsFsBtn').onclick=()=>toggleFullscreen();
 $('menuSettingsBtn').onclick=()=>openCameraSettings('menu');
 $('pauseSettingsBtn').onclick=()=>openCameraSettings('pause');
 $('shiftLockSetting').onchange=saveCameraSettings;$('autoLockSetting').onchange=saveCameraSettings;
@@ -1905,32 +1913,83 @@ function onDisconnect(){
   if(G&&G.mode==='mp'&&state==='play'){showMsg('CONNECTION LOST','Returned to the village',3);}
   if(state==='lobby'||state==='mp'||(['play','end'].includes(state)&&G?.mode==='mp')){toMenu();$('hubStatus').textContent='Disconnected from the server.';}
 }
+let combatUnfocused=false;
+function localAway(){return document.hidden||combatUnfocused;}
+function syncCombatPresence(){
+  if(state!=='play'||G?.mode!=='mp')return;
+  const afk=localAway();
+  if(afk===!!P.afk)return;
+  if(afk){
+    netTick(0,true);
+    clearCombatInput();
+    TC.x=TC.y=0;TC.joyId=TC.camId=null;
+    if(!P.dead){P.state='idle';P.t=0;P.vx=P.vz=P.kx=P.kz=0;P.landed=false;PM.pose.jump=0;PM.pose.spin=0;}
+  }
+  P.afk=afk;
+  nsend({t:'afk',afk});
+}
+document.addEventListener('visibilitychange',syncCombatPresence);
+addEventListener('blur',()=>{combatUnfocused=true;syncCombatPresence();});
+addEventListener('focus',()=>{combatUnfocused=false;syncCombatPresence();});
+addEventListener('pagehide',()=>{combatUnfocused=true;syncCombatPresence();});
+addEventListener('pageshow',()=>{combatUnfocused=!document.hasFocus();syncCombatPresence();});
+
+function changeCombatHost(id){
+  if(NET.combatHost===id)return;
+  NET.combatHost=id;
+  NET.isHost=id===NET.id;
+  if(state!=='play'||!B||B.dead)return;
+  B.attackEpoch=(B.attackEpoch||0)+1;
+  B.dashId=0;
+  for(let i=dangers.length-1;i>=0;i--){
+    if(dangers[i].owner==='local')continue;
+    disposeDanger(dangers[i]);dangers.splice(i,1);
+  }
+  eprojs.forEach(disposeEnemyProjectile);eprojs=[];
+  if(NET.isHost){
+    B.x=B.nx??B.x;B.z=B.nz??B.z;B.facing=B.nf??B.facing;
+    B.nx=B.nz=B.ny=B.nf=undefined;
+    B.action=B.phase===1.5||B.roaring?{name:'roar',t:0,phase:B.phase===3?3:2}:null;
+    B.queue=[];B.cool=.85;B.air=false;B.y=0;B.taunt=null;B.tgtId=null;
+    toast('You are now running the boss fight');
+  }
+}
 function onNet(m){
   if(m.t==='village'){syncVillage(m.peers);return;}
   if(m.t==='error'){const el=state==='lobby'?$('lobbyStatus'):$('mpStatus');el.textContent=m.msg;return;}
   if(m.t==='lobbies'){renderLobbyList(m.list);return;}
-  if(m.t==='lobby'){NET.room=m.room;NET.isHost=m.room.host===NET.id;
+  if(m.t==='lobby'){NET.room=m.room;if(m.room.state==='lobby')NET.isHost=m.room.host===NET.id;
     if(m.room.state==='lobby'&&(state==='mp'||state==='end'||state==='lobby'||(state==='play'&&G&&G.mode==='mp'))){if(state!=='lobby')showLobby();renderLobby();}
     else if(state==='lobby')renderLobby();
     return;}
   if(m.t==='start'){startGame({mode:'mp',gm:m.settings.gm||'boss',boss:m.settings.boss,arena:m.settings.arena,diff:m.settings.diff,players:m.players,host:m.host});return;}
   if(m.t==='chat'){chatMsg(m.name,m.text);if(state==='play'&&G&&G.mode==='mp'&&m.from!==NET.id){const r=remotes.get(m.from);if(r)floatText(m.text.length>24?m.text.slice(0,24)+'...':m.text,r.x,3.2,r.z,'label');}return;}
-  if(m.t==='host'){if(NET.room)NET.room.host=m.id;const was=NET.isHost;NET.isHost=m.id===NET.id;if(NET.isHost&&!was&&state==='play'&&B&&!B.dead){B.action=null;B.queue=[];B.cool=1.2;B.air=false;B.y=0;toast('You are now the host of this expedition');}return;}
+  if(m.t==='host'){
+    if(NET.room)NET.room.host=m.id;
+    if(state==='end')renderEndButtons();
+    return;
+  }
+  if(m.t==='combatHost'){changeCombatHost(m.id);return;}
+  if(m.t==='afk'&&state==='play'){
+    if(m.id===NET.id){P.afk=m.afk||localAway();}
+    else{const r=remotes.get(m.id);if(r)r.afk=!!m.afk;}
+    return;
+  }
   if(m.t==='left'){const r=remotes.get(m.id);if(r){disposeModel(r.model);r.tag.remove();remotes.delete(m.id);}return;}
   if(m.t==='g'){handleGame(m.from,m.d);return;}
 }
 function emit(e,data){handleEv(e,data,NET.id,true);if(G&&G.mode==='mp')nsend({t:'g',d:Object.assign({k:'ev',e},data)});}
-function toHost(e,data){if(NET.isHost)handleEv(e,data,NET.id,true);else nsend({t:'g',host:true,d:Object.assign({k:'ev',e},data)});}
+function toHost(e,data){if(P?.afk)return;if(NET.isHost)handleEv(e,data,NET.id,true);else nsend({t:'g',host:true,d:Object.assign({k:'ev',e},data)});}
 function handleGame(from,d){
   if(state!=='play'||!G)return;
   if(d.k==='p'){let r=remotes.get(from);if(!r||r.cls==='skeleton'&&!d.rev||(d.restock??0)!==G.restock)return;
     const now=performance.now()/1000,dtp=Math.max(.02,now-(r.lt||now-.07));r.lt=now;
     r.vx=(d.x-r.nx)/dtp;r.vz=(d.z-r.nz)/dtp;if(!isFinite(r.vx))r.vx=0;if(!isFinite(r.vz))r.vz=0;
     r.nx=d.x;r.nz=d.z;r.nf=d.f;r.st=d.st;r.hp=d.hp;r.mhp=d.mhp;r.dead=!!d.dead;r.pose=d.p;r.spin=d.sp||0;r.inv=!!d.inv;r.zapped=!!d.zapped;r.sy=d.sy||.95;
-    if(r.first){r.x=d.x;r.z=d.z;r.f=d.f;r.first=false;}return;}
+    if(r.first){r.x=d.x;r.z=d.z;r.f=d.f;r.vx=r.vz=0;r.first=false;}return;}
   if(d.k==='m'&&!NET.isHost){syncMinions(d);return;}
   if(d.k==='b'&&!NET.isHost&&BM&&!B.dead){
-    B.nx=d.x;B.nz=d.z;B.ny=d.y;B.nf=d.f;B.hp=d.hp;B.maxHp=d.mhp;if(d.fl>B.flash)B.flash=d.fl;B.air=!!d.air;B.dashId=d.dash;B.fade=d.fa;
+    B.nx=d.x;B.nz=d.z;B.ny=d.y;B.nf=d.f;B.hp=d.hp;B.maxHp=d.mhp;B.roaring=!!d.roar;if(d.fl>B.flash)B.flash=d.fl;B.air=!!d.air;B.dashId=d.dash;B.fade=d.fa;
     if(d.ph>=2&&d.ph!==B.phase)setBossPhase(d.ph);
     else if(d.ph!==undefined)B.phase=d.ph;
     if(Array.isArray(d.jester)){
@@ -1946,7 +2005,7 @@ function handleEv(e,d,from,local){
     case 'danger':addDanger(d.s,d.o);break;
     case 'cancel':cancelDangers(d.owner);break;
     case 'msg':showMsg(d.a,d.b,d.dur||3);break;
-    case 'shock':shockwave(d.x,d.z,d.sp,d.max,d.dmg,d.col);break;
+    case 'shock':shockwave(d.x,d.z,d.sp,d.max,d.dmg,d.col,d.status);break;
     case 'stormThrow':lightningThrow(d);break;
     case 'roarfx':SFX.roar();shake(1);if(BM)BM.flashMat.emissive.setHex(G.boss.p2emis);break;
     case 'blink':burst(d.x,2,d.z,24,0xbfe8ff,6,.2,.6,2);burst(d.ox,2,d.oz,24,0xbfe8ff,6,.2,.6,2);SFX.ice();break;
@@ -1978,7 +2037,7 @@ function handleEv(e,d,from,local){
     case 'reviveRequest':requestRevival(from);break;
     case 'revive':reviveAsSkeleton(d);break;
     case 'hit':if(NET.isHost)damageBoss(d.dmg,d.poise,d.heavy,from,d.stun,d.reflected,d.charge);break;
-    case 'bossCredit':if(!NET.isHost&&from===NET.room?.host&&d.to===NET.id&&BM)creditBossHit(d.dmg,d.heavy,d.charge);break;
+    case 'bossCredit':if(!NET.isHost&&from===NET.combatHost&&d.to===NET.id&&BM)creditBossHit(d.dmg,d.heavy,d.charge);break;
     case 'parry':if(NET.isHost&&B.action&&bossCanStagger())staggerBoss(1.5);break;
     case 'bossDead':
       rewardKill(G.ci+':boss',50);
@@ -2111,7 +2170,7 @@ function detFx(d){
     case 'bolt':lightning(s.type==='circle'?s.x:s.x+Math.sin(s.a)*s.len*.5,s.type==='circle'?s.z:s.z+Math.cos(s.a)*s.len*.5);break;
     case 'shadow':SFX.whoosh();shake(.2);burst(s.x,.5,s.z,16,0xb06aff,6,.18,.6,3);burst(s.x,.5,s.z,8,0x1a0a2a,4,.25,.7,3);break;
   }
-  if(o.shock)shockwave(s.x,s.z,o.shock.sp,o.shock.max,o.shock.dmg,c.shockCol);
+  if(o.shock)shockwave(s.x,s.z,o.shock.sp,o.shock.max,o.shock.dmg,c.shockCol,o.status);
 }
 function stormHazard(shape,delay,damage,extra={}){
   hostDanger(shape,{color:G.boss.col,delay,dmg:D(damage*G.boss.dmg*(B.phase===3?1.16:1)),srcX:B.x,srcZ:B.z,
@@ -2184,11 +2243,12 @@ function lightning(x,z){
   noise(.25,3000,.12,1);tone(900,80,.3,'sawtooth',.065);shake(.15);flashT=Math.max(flashT,.11);
   addFx({dur:.3,update(dt,k){core.opacity=(1-k)**2;halo.opacity=.32*(1-k);},dispose(){scene.remove(g);g.children.forEach(c=>c.geometry.dispose());core.dispose();halo.dispose();}});
 }
-function shockwave(x,z,speed,maxR,dmg,col){
+function shockwave(x,z,speed,maxR,dmg,col,status){
+  const epoch=B.attackEpoch||0;
   const mat=new THREE.MeshBasicMaterial({color:col||0xff6a2a,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
   const m=new THREE.Mesh(new THREE.CylinderGeometry(1,1,.9,64,1,true),mat);m.position.set(x,arenaHeight(x,z)+.45,z);scene.add(m);
-  addFx({dur:maxR/speed,r:1,hit:false,update(dt,k){this.r+=speed*dt;m.scale.set(this.r,1,this.r);mat.opacity=.75*(1-k);
-    if(!this.hit&&!B.dead&&P&&!P.dead){const d=Math.hypot(P.x-x,P.z-z);if(Math.abs(d-this.r)<.7){this.hit=true;hurtPlayer(dmg,{x,z,blockable:true,parry:false,boss:true});}}},
+  addFx({dur:maxR/speed,r:1,hit:false,update(dt,k){if((B.attackEpoch||0)!==epoch)return false;const previous=this.r;this.r+=speed*dt;m.scale.set(this.r,1,this.r);mat.opacity=.75*(1-k);
+    if(!this.hit&&!B.dead&&P&&!P.dead){const d=Math.hypot(P.x-x,P.z-z);if(d>=previous-.7&&d<=this.r+.7){this.hit=true;if(hurtPlayer(dmg,{x,z,blockable:true,parry:false,boss:true})&&status)applyBossEffect(status);}}},
     dispose(){scene.remove(m);m.geometry.dispose();mat.dispose();}});
 }
 function firePillar(x,z,r,col){
@@ -2376,7 +2436,7 @@ function ninjaDodge(){
   return true;
 }
 function hurtPlayer(dmg,src){
-  if(!P||P.dead||P.iframe>0||P.hurtInv>0)return;
+  if(!P||P.dead||P.afk||P.iframe>0||P.hurtInv>0)return;
   if(ninjaDodge())return false;
   P.lastHit=gameTime;
   if(activeEffect('fracture'))dmg*=1.15;
@@ -2393,7 +2453,7 @@ function hurtPlayer(dmg,src){
     const ang=Math.atan2(src.x-P.x,src.z-P.z);
     if(Math.abs(wrap(ang-P.facing))<1.6){
       if(src.parry&&gameTime-P.blockStart<.22&&!B.air){
-        P.riposteUntil=gameTime+2;stats.parries++;SFX.parry();hitstop=.12;shake(.4);
+        P.riposteUntil=gameTime+3;gainUlt(8);stats.parries++;SFX.parry();hitstop=.12;shake(.4);
         burst(P.x+Math.sin(P.facing)*.8,1.5,P.z+Math.cos(P.facing)*.8,22,0x9fd8ff,7,.12,.5,6);
         floatText('PARRY · RIPOSTE READY',P.x,2.8,P.z,'label');toHost('parry',{});P.hurtInv=.4;return;}
       dmg*=.5;SFX.block();burst(P.x+Math.sin(P.facing)*.7,1.3,P.z+Math.cos(P.facing)*.7,10,0xffd090,5,.1,.35);
@@ -2473,7 +2533,7 @@ function bossDeathFx(){clearSeal();B.dead=true;B.action={name:'death',t:0};B.das
   showMsg('ENEMY FELLED',G.boss.n,4);if(G.campaign){if(NET.isHost)G.clearT=3.5;}else{G.won=true;endTimer=5;}}
 
 // ==== PLAYER ====
-function attackTiming(c){return [{dur:.5,h0:.15,h1:.26,dmg:24,poise:9,range:2.5},{dur:.5,h0:.15,h1:.26,dmg:26,poise:9,range:2.5},{dur:.68,h0:.27,h1:.37,dmg:38,poise:16,range:2.7}][c];}
+function attackTiming(c){return [{dur:.5,h0:.15,h1:.26,dmg:32,poise:12,range:2.65},{dur:.5,h0:.15,h1:.26,dmg:35,poise:13,range:2.7},{dur:.68,h0:.27,h1:.37,dmg:52,poise:22,range:3}][c];}
 const LT={x:0,z:0,r:1,f:0,y:0,id:null,alive:false,boss:false};
 let lockTarget=null,lockChoice=null;
 function bossLock(){
@@ -2669,7 +2729,7 @@ function tryActions(mx,mz,ml){
       const royal=P.level===3,r=[2.4,3.2,4][P.level-1];
       startCast({dur:.54,at:.22,pose:'bash',move:.48,fn:()=>{
         const x=P.x+Math.sin(P.facing)*1.55,z=P.z+Math.cos(P.facing)*1.55;
-        ringFx(x,z,0xdcc489,r,.42);SFX.slam();aoeHit(x,z,r,[28,38,48][P.level-1],32,true,P.level>=2);
+        ringFx(x,z,0xdcc489,r,.42);SFX.slam();aoeHit(x,z,r,[52,64,80][P.level-1],44,true,P.level>=2);
         if(royal)P.ward=Math.max(P.ward,4);
       }});return true;
     }
@@ -2873,8 +2933,8 @@ function updateUlt(dt,pose,mx,mz){
   switch(P.uk){
     case 'sword':{
       if(P.udash&&t<.25){const k=ease(t/.25);P.x=lerp(P.ux0,P.utx,k);P.z=lerp(P.uz0,P.utz,k);}
-      [.35,.55,.75,.95].forEach((h,i)=>{if(t>=h&&!(P.uhit&(1<<i))){P.uhit|=1<<i;aoeHit(P.x,P.z,4.8,40,8,false);SFX.swing();const a=P.facing+rand(-1,1);burst(P.x+Math.sin(a)*2,1.6,P.z+Math.cos(a)*2,14,0xffd27a,6,.12,.4,4);}});
-      if(t>=1.35&&!P.ufin){P.ufin=true;aoeHit(P.x,P.z,6.5,130,60,true,true);emit('ultfx',{k:'judge',x:P.x,z:P.z});shake(.8);SFX.slam();}
+      [.35,.55,.75,.95].forEach((h,i)=>{if(t>=h&&!(P.uhit&(1<<i))){P.uhit|=1<<i;aoeHit(P.x,P.z,4.8,50,12,false);SFX.swing();const a=P.facing+rand(-1,1);burst(P.x+Math.sin(a)*2,1.6,P.z+Math.cos(a)*2,14,0xffd27a,6,.12,.4,4);}});
+      if(t>=1.35&&!P.ufin){P.ufin=true;aoeHit(P.x,P.z,7,175,75,true,true);emit('ultfx',{k:'judge',x:P.x,z:P.z});shake(.8);SFX.slam();}
       if(t<1.1){pose.upperY=Math.sin(t*22)*1.3;pose.armR=-1.5;pose.armRz=.3;pose.armL=-.4;pose.legL=.4;pose.legR=-.3;}
       else{pose.armR=t<1.35?lerp(-.6,-3.1,ease((t-1.1)/.25)):-.7;pose.lean=t<1.35?-.25:.5;pose.armL=-.3;}
       break;}
@@ -3177,7 +3237,7 @@ function updatePlayer(dt){
       const t=P.t,h0=P.riposte?.22:.56,h1=h0+.12;
       if(t<h0)turnTo(lockTarget?faceTarget:(ml>0?Math.atan2(mx,mz):P.facing),5,dt);
       if(t>.45&&t<h1){vx=Math.sin(P.facing)*6;vz=Math.cos(P.facing)*6;}
-      if(t>=h0&&t<=h1)checkPlayerHit(P.riposte?3.5:3,P.riposte?82:68,P.riposte?26:38,true);
+      if(t>=h0&&t<=h1)checkPlayerHit(P.riposte?3.5:3,P.riposte?132:98,P.riposte?42:49,true);
       if(t>h0-.16&&!P.hs){P.hs=true;SFX.heavySwing();}
       pose.armR=t<h0?lerp(-.5,-3.15,ease(t/(h0-.05))):lerp(-3.15,-.55,ease((t-h0)/(h1-h0)));
       pose.lean=t<h0?-.2:.4;pose.armL=-.2;pose.legL=.5;pose.legR=-.3;
@@ -3266,8 +3326,8 @@ function trackTurn(dt,rate){if(T.none)return;const a=Math.atan2(T.x-B.x,T.z-B.z)
 const fwd=d=>[B.x+Math.sin(B.facing)*d,B.z+Math.cos(B.facing)*d];
 function clampArena(x,z,m){const r=Math.hypot(x,z),lim=ARENA-(m||1);if(r>lim){x*=lim/r;z*=lim/r;}return [x,z];}
 function alivePlayers(){
-  const L=[];if(P&&!P.dead)L.push({id:NET.id||'me',x:P.x,z:P.z,vx:P.vx||0,vz:P.vz||0,rolling:P.state==='roll',inv:P.smoke>0});
-  remotes.forEach((r,id)=>{if(!r.dead&&!r.first)L.push({id,x:r.x,z:r.z,vx:r.vx||0,vz:r.vz||0,rolling:r.st==='roll',inv:!!r.inv});});
+  const L=[];if(P&&!P.dead&&!P.afk)L.push({id:NET.id||'me',x:P.x,z:P.z,vx:P.vx||0,vz:P.vz||0,rolling:P.state==='roll',inv:P.smoke>0});
+  remotes.forEach((r,id)=>{if(!r.dead&&!r.afk&&!r.first)L.push({id,x:r.x,z:r.z,vx:r.vx||0,vz:r.vz||0,rolling:r.st==='roll',inv:!!r.inv});});
   return L;
 }
 function updateTarget(dt){
@@ -3285,6 +3345,9 @@ function updateTarget(dt){
     B.tgtId=cur.id;B.tgtT=rand(5,9);
   }
   Object.assign(T,cur);
+}
+function stormTargets(){
+  return alivePlayers().filter(p=>!p.inv).sort((a,b)=>Number(b.id===T.id)-Number(a.id===T.id));
 }
 function chooseAttack(dist){
   const c=G.boss,src=dist<7.5+B.r?'near':dist<15?'mid':'far';
@@ -3304,6 +3367,56 @@ function chooseAttack(dist){
   else startAction(pick);
 }
 const ATK={
+  thunderVault(dt,a){
+    a.t+=dt;
+    const p=B.pose,launch=.57,air=.92;
+    if(a.t<launch){
+      trackTurn(dt,5);p.crouch=-.66*ease(a.t/launch);p.armR=-2.75;p.armL=-2.2;
+      return false;
+    }
+    if(!a.go){
+      a.go=true;a.x=B.x;a.z=B.z;
+      const angle=Math.atan2(T.x-B.x,T.z-B.z);
+      const overshoot=Math.hypot(T.x-B.x,T.z-B.z)<5?6:0;
+      [a.tx,a.tz]=clampArena(T.x+T.vx*.19+Math.sin(angle)*overshoot,T.z+T.vz*.19+Math.cos(angle)*overshoot,B.r+1);
+      B.facing=Math.atan2(a.tx-a.x,a.tz-a.z);
+      const delay=air/B.speedMul;
+      stormHazard({type:'circle',x:a.tx,z:a.tz,r:5.2},delay,40,
+        {fx:'javelin',chillTimed:true,shock:{sp:15,max:20,dmg:D(20*G.boss.dmg)}});
+      if(B.phase>=2){
+        const flank=stormTargets().find(q=>q.id!==T.id&&Math.hypot(q.x-a.tx,q.z-a.tz)>7);
+        if(flank)stormHazard({type:'circle',x:flank.x,z:flank.z,r:3.2},delay+.47,23,{blockable:false});
+      }
+      SFX.whoosh();
+    }
+    const k=clamp((a.t-launch)/air,0,1);
+    B.x=lerp(a.x,a.tx,k);B.z=lerp(a.z,a.tz,k);B.y=Math.sin(Math.PI*k)*8.3;B.air=k<1;
+    p.armR=k<1?-2.75:-.8;p.armL=k<1?-2.35:-.6;p.crouch=k<1?-.32:-.54;p.lean=k<1?-.16:.48;
+    return a.t>=launch+air+.68*B.speedMul;
+  },
+  stormRush(dt,a){
+    a.t+=dt;
+    const p=B.pose,mark=.32,launch=1.12,dash=.46;
+    if(a.t<mark)trackTurn(dt,6);
+    if(!a.go&&a.t>=mark){
+      a.go=true;a.x=B.x;a.z=B.z;
+      const angle=Math.atan2(T.x-B.x,T.z-B.z),dx=Math.sin(angle),dz=Math.cos(angle);
+      const dist=clamp(Math.hypot(T.x-B.x,T.z-B.z)+6,10,24);
+      [a.tx,a.tz]=clampArena(B.x+dx*dist,B.z+dz*dist,B.r+1);
+      const len=Math.hypot(a.tx-B.x,a.tz-B.z);
+      B.facing=len>.1?Math.atan2(a.tx-B.x,a.tz-B.z):angle;
+      const delay=(launch-mark)/B.speedMul;
+      if(len>=2)stormHazard({type:'rect',x:a.x,z:a.z,a:B.facing,len,w:4.2},delay,32,{fx:'current',chillTimed:true});
+      stormHazard({type:'circle',x:a.tx,z:a.tz,r:4.1},delay+.58,33,
+        {chillWindup:delay,shock:{sp:17,max:17,dmg:D(17*G.boss.dmg)}});
+    }
+    if(a.t>=launch){
+      const k=clamp((a.t-launch)/dash,0,1);
+      B.x=lerp(a.x,a.tx,k);B.z=lerp(a.z,a.tz,k);
+    }
+    p.lean=a.t<launch?.32:.48;p.crouch=-.38;p.armR=-1.35;p.armL=-.9;
+    return a.t>=launch+dash+.68*B.speedMul;
+  },
   thunderJavelin(dt,a){
     a.t+=dt;const p=B.pose,W=1.12;
     if(a.t<.36)trackTurn(dt,5);
@@ -3339,18 +3452,28 @@ const ATK={
     return a.t>=W+1.15*B.speedMul;
   },
   skyJudgment(dt,a){
-    a.t+=dt;const p=B.pose,W=.48;
-    if(a.t>=W&&!a.go){
-      a.go=true;
-      const dir=Math.atan2(T.x-B.x,T.z-B.z);
-      const [x,z]=clampArena(T.x,T.z,1.8);
-      for(let i=0;i<(B.phase>=2?5:3);i++){
-        const [sx,sz]=clampArena(x+Math.sin(dir)*i*3.4,z+Math.cos(dir)*i*3.4,1);
-        stormHazard({type:'circle',x:sx,z:sz,r:2.9},.83+i*.37,29,{blockable:false});
+    a.t+=dt;const p=B.pose;
+    a.wave??=0;
+    const waves=B.phase>=2?3:2;
+    if(a.wave<waves&&a.t>=.38+a.wave*.7*B.speedMul){
+      const wave=a.wave++,spots=[];
+      const strike=(x,z,r,delay,damage)=>{
+        [x,z]=clampArena(x,z,1.2);
+        if(spots.some(([sx,sz])=>Math.hypot(x-sx,z-sz)<3.5))return;
+        spots.push([x,z]);
+        stormHazard({type:'circle',x,z,r},delay,damage,{blockable:false});
+      };
+      const players=stormTargets();
+      for(const q of players)strike(q.x+q.vx*.17,q.z+q.vz*.17,3.15,.85,29);
+      const count=(B.phase>=2?6:4)+Math.max(0,players.length-1);
+      const offset=rand(0,TAU)+wave*.35;
+      for(let i=0;i<count;i++){
+        const angle=offset+i*TAU/count,radius=i%2===0?ARENA*.65:ARENA*.39;
+        strike(Math.sin(angle)*radius,Math.cos(angle)*radius,3,.94+(i%3)*.13,23);
       }
     }
     p.armL=-2.98;p.armR=-1.6;p.lean=-.26;
-    return a.t>=W+2.55*B.speedMul;
+    return a.t>=.38+(waves-1)*.7*B.speedMul+1.32*B.speedMul;
   },
   ionCrossing(dt,a){
     a.t+=dt;const p=B.pose,W=.37;
@@ -3390,11 +3513,14 @@ const ATK={
     a.t+=dt;const p=B.pose;
     if(a.i===undefined)a.i=0;
     if(a.i<4&&a.t>=.35+a.i*.71*B.speedMul){
-      const [x,z]=clampArena(T.x,T.z,1.8);
+      const targets=stormTargets(),target=targets[a.i%targets.length]||T;
+      const [x,z]=clampArena(target.x+target.vx*.12,target.z+target.vz*.12,1.8);
       const from=a.last||{x:B.x,z:B.z};
       const r=3.1+a.i*.46,warning=.76+a.i*.075;
       stormHazard({type:'circle',x,z,r},warning,25+a.i*3,{fx:'javelin'});
       emit('stormThrow',{...from,tx:x,tz:z,duration:warning});
+      const other=targets[(a.i+1)%targets.length];
+      if(other&&other!==target&&Math.hypot(other.x-x,other.z-z)>6)stormHazard({type:'circle',x:other.x,z:other.z,r:3.1},warning+.18,25,{blockable:false});
       a.last={x,z};a.i++;
     }
     p.armR=-2.45;p.armL=-1.9;p.upperY=Math.sin(a.t*7)*.34;
@@ -3678,7 +3804,7 @@ function updateBoss(dt){
   updateJesterBurn();
   if(B.dead)return;
   const sdt=dt*B.speedMul*(B.jesterChillUntil>gameTime?.78:1);
-  if(!B.action||B.action.name!=='leap'){B.air=false;B.y=0;}
+  if(!['leap','thunderVault'].includes(B.action?.name)){B.air=false;B.y=0;}
   if(!B.action||(B.action.name!=='charge'&&B.action.name!=='dashes'))B.dashId=0;
   if(!B.action||B.action.name!=='blink')B.fade=1;
   B.poiseT-=dt;if(B.poiseT<=0)B.poise=Math.min(B.maxPoise,B.poise+14*dt);
@@ -3821,7 +3947,7 @@ function updateHUD(spec){
   const uv=Math.floor(P.ult||0);$('ultFill').style.width=uv+'%';$('ultTxt').textContent=uv>=100?P.kit.ult+' ready ('+keyName(BINDS[ultimateBinding(P.kit)],true)+')':'Ultimate '+uv+'%';$('ultBar').classList.toggle('ready',uv>=100);
   const us=$('skU');if(us){us.classList.toggle('ready',uv>=100);us.querySelector('.cdv').style.background=uv<100?`conic-gradient(rgba(0,0,0,.72) ${(1-uv/100)*360}deg, transparent 0)`:'none';}
   $('flasks').innerHTML=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level===3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
-  $('buffs').textContent=[P.riposteUntil>gameTime?'Riposte ready':'',P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
+  $('buffs').textContent=[P.afk?'AFK · Protected':'',G.mode==='mp'&&!NET.combatHost?'Waiting for an active player':'',P.riposteUntil>gameTime?'Riposte ready':'',P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
   $('lockTag').innerHTML=(lockTarget?'Locked: '+esc(lockTarget.name):lockOn?'Lock-On: Seeking target':'Lock-On: Off')+'<br>'+G.diff.n+' · '+ARENAS[G.arena].n+(G.campaign?`<br>Campaign · Chamber ${G.ci+1} of ${CAMPAIGN.length}`:'');
   P.kit.skills.forEach((s,i)=>{const el=$('sk'+i);if(!el)return;
     const cd=s.id?P.cd[s.id]||0:0,frac=s.id&&s.cd?cd/s.cd:0;
@@ -3831,7 +3957,7 @@ function updateHUD(spec){
     el.querySelector('.cdt').textContent=sealed?Math.ceil(P.seal.until-gameTime)+'s':cd>.05&&s.cd>=1?cd.toFixed(cd<10?1:0):'';
     el.classList.toggle('nomana',!!(s.cost&&P.mana<s.cost));});
   let teamH='';
-  remotes.forEach(r=>{teamH+=`<div class="tm ${r.dead?'dead':''}">${esc(r.name)} <span style="color:#8a806a">·  ${classData(r.cls).name}${r.dead?' · Fallen':''}</span><div class="tb"><i style="width:${r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100)}%"></i></div></div>`;});
+  remotes.forEach(r=>{teamH+=`<div class="tm ${r.dead?'dead':''}">${esc(r.name)} <span style="color:#8a806a">·  ${classData(r.cls).name}${r.dead?' · Fallen':r.afk?' · AFK':''}</span><div class="tb"><i style="width:${r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100)}%"></i></div></div>`;});
   $('team').innerHTML=teamH;
   const sp=$('specTag');
   if(P.dead&&G.mode==='mp'){sp.classList.remove('hidden');sp.innerHTML=spec?`Spectating ${esc(spec.name)}<small>Left click to switch ally</small>`:'All allies have fallen';}else sp.classList.add('hidden');
@@ -3842,7 +3968,7 @@ function updateHUD(spec){
   const htg=lockTarget?.kind==='ally'&&!P.dead?lockTarget.id:P.cls==='mage'&&!P.dead?allyTarget().id:null;
   remotes.forEach(r=>{r.tag.style.color=r.id===htg?'#8af0a0':'';r.tag.style.fontWeight=r.id===htg?'700':'';})
   remotes.forEach(r=>{const p=project(r.x,r.model.root.position.y+2.6,r.z);if(!p||r.dead&&false){r.tag.style.display='none';return;}r.tag.style.display='block';
-    r.tag.style.transform=`translate(${p[0]}px,${p[1]}px) translate(-50%,-100%)`;r.tag.querySelector('i').style.width=(r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100))+'%';r.tag.style.opacity=r.dead?.4:1;});
+    r.tag.style.transform=`translate(${p[0]}px,${p[1]}px) translate(-50%,-100%)`;r.tag.querySelector('i').style.width=(r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100))+'%';r.tag.style.opacity=r.dead||r.afk?.55:1;r.tag.firstChild.nodeValue=r.name+(r.afk&&!r.dead?' · AFK':'');});
 }
 
 // ==== REMOTES ====
@@ -3858,18 +3984,18 @@ function updateRemotes(dt){
     const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0};
     applyPose(r.model,p,r.st,dt,r.x,r.z,r.f);
     if(r.zapped&&!r.dead&&gameTime>=(r.sparkAt||0)){r.sparkAt=gameTime+.23;zappedArcs(r.x,r.model.root.position.y,r.z);}
-    setOpacity(r.model,r.inv?.25:1);});
+    setOpacity(r.model,r.afk?.4:r.inv?.25:1);});
 }
 let sendT=0;
-function netTick(dt){
-  if(G.mode!=='mp')return;sendT-=dt;if(sendT>0)return;sendT=1/15;
+function netTick(dt,force=false){
+  if(G.mode!=='mp')return;sendT-=dt;if(!force&&sendT>0)return;sendT=1/15;
   const p=PM.pose,r2=v=>Math.round(v*100)/100;
-  nsend({t:'g',d:{k:'p',x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,rev:P.cls==='skeleton',restock:G.restock,inv:P.smoke>0?1:0,zapped:activeEffect('zapped')?1:0,
+  nsend({t:'g',d:{k:'p',active:!localAway(),x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,rev:P.cls==='skeleton',restock:G.restock,inv:P.smoke>0?1:0,zapped:activeEffect('zapped')?1:0,
     p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0].map(r2)}});
   if(NET.isHost&&(mins.size||G.bossId==='morvane'||(G.room&&G.room.type==='minion'))){nsend({t:'g',d:{k:'m',w:G.wave,wt:G.waveTotal,seq:minId,wh:Math.round(G.waveHp||1),l:[...mins.values()].map(m=>[m.id,MTYPE_IDX.indexOf(m.type),r2(m.x),r2(m.z),r2(m.f),Math.round(m.hp),Math.round(m.maxHp),m.st==='wind'?1:0])}});}
   if(NET.isHost){
   if(BM){const q=B.pose;
-    nsend({t:'g',d:{k:'b',x:r2(B.x),z:r2(B.z),y:r2(B.y),f:r2(B.facing),hp:Math.round(B.hp),mhp:B.maxHp,ph:B.phase,jester:[Math.max(0,(B.jesterBurnUntil||0)-gameTime),Math.max(0,(B.jesterChillUntil||0)-gameTime),B.action?.name==='confused'?Math.max(0,B.action.dur-B.action.t):0,Math.max(0,(B.jesterConfusionReady||0)-gameTime),Math.max(0,(B.controlReady||0)-gameTime),Math.max(0,(B.jesterBurnNext||0)-gameTime)].map(r2),burnOwner:B.jesterBurnOwner,burnUlt:!!B.jesterBurnFromUlt,fl:r2(B.flash),air:B.air?1:0,dash:B.dashId||0,fa:r2(B.fade===undefined?1:B.fade),
+    nsend({t:'g',d:{k:'b',x:r2(B.x),z:r2(B.z),y:r2(B.y),f:r2(B.facing),hp:r2(B.hp),mhp:B.maxHp,ph:B.phase,roar:B.action?.name==='roar',jester:[Math.max(0,(B.jesterBurnUntil||0)-gameTime),Math.max(0,(B.jesterChillUntil||0)-gameTime),B.action?.name==='confused'?Math.max(0,B.action.dur-B.action.t):0,Math.max(0,(B.jesterConfusionReady||0)-gameTime),Math.max(0,(B.controlReady||0)-gameTime),Math.max(0,(B.jesterBurnNext||0)-gameTime)].map(r2),burnOwner:B.jesterBurnOwner,burnUlt:!!B.jesterBurnFromUlt,fl:r2(B.flash),air:B.air?1:0,dash:B.dashId||0,fa:r2(B.fade===undefined?1:B.fade),
       p:[q.armR,q.armL,q.upperY,q.lean,q.crouch,q.legL,q.legR].map(r2)}});}
     const anyAlive=(!P.dead)||[...remotes.values()].some(r=>!r.dead);
     if(!anyAlive&&!G.won&&!G.wiped&&!chamberClearPending()){G.wiped=true;emit('wipe',{});}
@@ -3913,7 +4039,7 @@ function startGame(cfg){
   stats={start:performance.now(),taken:0,flasks:0,parries:0,dealt:0};
   lockOn=cameraPrefs.autoLock;hadLock=false;endTimer=-1;timeScale=1;specIdx=0;
   clearCombatInput();
-  NET.isHost=G.mode==='solo'||cfg.host===NET.id;
+  NET.combatHost=cfg.host??null;NET.isHost=G.mode==='solo'||cfg.host===NET.id;
   setupRoom(def,true);
   const touchLaunch=usingTouch;
   state='play';paused=false;setScreen(null);
@@ -3921,7 +4047,8 @@ function startGame(cfg){
   $('pName').textContent=(G.mode==='mp'?me.name+' · ':'')+C.name+' · Lv. '+level;
   $('runCoins').textContent=profile.coins+' coins · +0 this run';
   $('manaBar').classList.toggle('hidden',myClass!=='mage');$('ultBar').classList.remove('hidden');buildSkillBar();
-  if(!touchLaunch)requestShiftLock();
+  syncCombatPresence();
+  if(!touchLaunch&&!P.afk)requestShiftLock();
 }
 let doorGroup=null,doorMat=null;
 function buildDoor(){
@@ -4117,11 +4244,14 @@ function endGame(win){
   $('endTitle').textContent=win?(G.campaign?'CAMPAIGN COMPLETE':'VICTORY ACHIEVED'):(G.mode==='mp'?'THE PARTY HAS FALLEN':'YOU HAVE FALLEN');
   $('endStats').innerHTML=`<b>+${G.earned} coins earned · ${profile.coins} total</b><br>`+(G.campaign?`Campaign · ${G.diff.n}<br>`+(win?`All ${CAMPAIGN.length} chambers conquered<br>Time Elapsed: ${tm}`:`Fell in ${G.room.t}: ${G.room.s}<br>Time Survived: ${tm}`):`${G.boss.n} · ${G.diff.n}<br>`+(win?`Time Elapsed: ${tm}`:`Boss Health Remaining: ${Math.round(B.hp/B.maxHp*100)}%<br>Time Survived: ${tm}`))+
     `<br>Damage Dealt: ${Math.round(stats.dealt)}<br>Damage Taken: ${Math.round(stats.taken)}<br>Flasks Consumed: ${stats.flasks}`+(stats.parries?`<br>Successful Parries: ${stats.parries}`:'');
+  renderEndButtons();
+}
+function renderEndButtons(){
   const btns=$('endBtns');$('endNote').textContent='';
   if(G.mode==='solo'){btns.innerHTML='<button class="big" id="againBtn">Try Again</button><button class="big alt" id="toMenuBtn">Main Menu</button>';
     $('againBtn').onclick=()=>startGame(G.cfg);$('toMenuBtn').onclick=toMenu;}
-  else{btns.innerHTML=(NET.isHost?'<button class="big" id="toLobbyBtn">Return to Lobby</button>':'')+'<button class="big alt" id="leaveEndBtn">Leave Lobby</button>';
-    if(NET.isHost)$('toLobbyBtn').onclick=()=>nsend({t:'toLobby'});else $('endNote').textContent='Waiting for the host to return to the lobby.';
+  else{const owner=NET.room?.host===NET.id;btns.innerHTML=(owner?'<button class="big" id="toLobbyBtn">Return to Lobby</button>':'')+'<button class="big alt" id="leaveEndBtn">Leave Lobby</button>';
+    if(owner)$('toLobbyBtn').onclick=()=>nsend({t:'toLobby'});else $('endNote').textContent='Waiting for the host to return to the lobby.';
     $('leaveEndBtn').onclick=()=>{nsend({t:'leave'});toMenu();};}
 }
 function leaveGame(){
@@ -4218,11 +4348,11 @@ function showTouch(v){
     $('tChat').addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();if(state==='play'&&!paused)openChat();},{passive:false});}
 })();
 function openTouchEdit(from){
-  tEditFrom=from;tEditing=true;$('pause').classList.add('hidden');if(from==='menu')setScreen(null);
+  tEditFrom=from;tEditing=true;$('pause').classList.add('hidden');if(from!=='pause')setScreen(null);
   $('tEdit').classList.remove('hidden');$('tSize').value=TLAY.size;$('tOpac').value=TLAY.opac;$('tMode').value=TLAY.mode;showTouch(true);
 }
 function closeTouchEdit(){tEditing=false;saveTouch();$('tEdit').classList.add('hidden');
-  if(tEditFrom==='pause'){showTouch(touchOn());openPause();}else{showTouch(false);setScreen('menu');renderClassCards();}}
+  if(tEditFrom==='settings'){showTouch(false);openCameraSettings(settingsFrom);}else if(tEditFrom==='pause'){showTouch(touchOn());openPause();}else{showTouch(false);setScreen('menu');renderClassCards();}}
 $('tSize').oninput=()=>{TLAY.size=+$('tSize').value;buildTouch();saveTouch();};
 $('tOpac').oninput=()=>{TLAY.opac=+$('tOpac').value;buildTouch();saveTouch();};
 $('tMode').onchange=()=>{TLAY.mode=$('tMode').value;saveTouch();};
@@ -4230,7 +4360,11 @@ $('tReset').onclick=()=>{TLAY.pos={};TLAY.size=100;TLAY.opac=70;$('tSize').value
 $('tDone').onclick=closeTouchEdit;
 $('menuTouchBtn').onclick=()=>openTouchEdit('menu');
 $('pauseTouchBtn').onclick=()=>openTouchEdit('pause');
-$('pauseFsBtn').onclick=()=>{try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>toast('Fullscreen is not available here'));}catch(e){toast('Fullscreen is not available here');}};
+async function toggleFullscreen(){
+  try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}
+  catch(e){toast('Fullscreen is not available here');}
+}
+$('pauseFsBtn').onclick=toggleFullscreen;
 function updateTouchHUD(){
   if($('touch').classList.contains('hidden')||tEditing)return;
   document.querySelectorAll('#tBtns .tb').forEach(el=>{const a=el.dataset.a,s=tSkill(a),cd=el.querySelector('.tcd'),em=el.querySelector('em');let frac=0,txt='';
@@ -4795,7 +4929,7 @@ function loop(now){
     if(!(solo&&paused)){
       if(hitstop>0){hitstop-=dt;if(solo)dt*=.06;}
       dt*=timeScale;gameTime+=real;
-      updateLT();updatePlayer(dt);updateRemotes(real);updateBoss(dt);updateMinions(dt);updateEProjs(dt);campaignTick(real);
+      updateLT();if(!P.afk)updatePlayer(dt);updateRemotes(real);updateBoss(dt);updateMinions(dt);updateEProjs(dt);campaignTick(real);
       if(doorGroup){const tgt=G.cleared&&G.campaign&&G.ci<CAMPAIGN.length-1?1:0;doorMat.opacity=lerp(doorMat.opacity,tgt*(.55+Math.sin(now*.004)*.15),.05);doorGroup.userData.light.intensity=doorMat.opacity*3;}updateDangers(dt);updateProjs(dt);updateZones(dt);updateFx(dt);updateParts(dt);
       if(P.skin==='pixel'&&P.state==='roll'&&Math.floor(gameTime*12)!==Math.floor((gameTime-real)*12))
         burst(P.x,.14,P.z,3,PIXEL_COLORS[P.cls][1],2.4,.17,.28,4);
@@ -4803,7 +4937,7 @@ function loop(now){
       if(!P.dead&&activeEffect('zapped')&&gameTime>=(P.sparkAt||0)){
         P.sparkAt=gameTime+.19;zappedArcs(P.x,PM.root.position.y,P.z);
       }
-      netTick(real);
+      if(!localAway())netTick(real);
       const spec=updateCamera(real);updateFloats(real);updateHUD(spec);
       hurtFlash=Math.max(0,hurtFlash-real*2.5);hurtFx.style.opacity=Math.max(hurtFlash,!P.dead&&P.hp<P.maxHp*.3?.35+Math.sin(now*.006)*.15:0);
       if(endTimer>0){if(!G.won&&chamberClearPending())endTimer=-1;else{endTimer-=real;if(endTimer<=0)endGame(!!G.won);}}

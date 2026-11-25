@@ -4,10 +4,12 @@ const clientDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().enc
 const clientVersion = Array.from(new Uint8Array(clientDigest), byte => byte.toString(16).padStart(2, "0")).join("");
 const HTML = clientSource.replace('<meta name="hc-build" content="">', `<meta name="hc-build" content="${clientVersion}">`);
 
-type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any };
+type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any; afk?: boolean; lastFrame?: number; dead?: boolean };
 type Room = {
   code: string;
   host: string;
+  combatHost?: string | null;
+  finished?: boolean;
   public: boolean;
   capacity: number;
   state: "lobby" | "playing";
@@ -23,7 +25,7 @@ const skinType = (value: unknown) => value === "pixel" ? "pixel" : "classic";
 function roomCapacity(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= MAX ? value : fallback;
 }
-const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "stormThrow", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe"]);
+const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "stormThrow", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe", "bossCredit"]);
 const rooms = new Map<string, Room>();
 type Presence = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel";
   x: number; z: number; facing: number; moving: boolean; seen: number };
@@ -68,6 +70,23 @@ function bcast(r: Room, m: any, except?: string) {
 }
 function pushLobby(r: Room) { bcast(r, { t: "lobby", room: view(r) }); }
 
+function selectCombatHost(r: Room) {
+  if (r.finished) return;
+  const current = r.players.get(r.combatHost ?? "");
+  if (current && !current.afk) return;
+  const active = [...r.players.values()].filter(p => !p.afk);
+  const replacement = (active.find(p => !p.dead) ?? active[0])?.id ?? null;
+  if (r.combatHost === replacement) return;
+  r.combatHost = replacement;
+  bcast(r, { t: "combatHost", id: replacement });
+}
+
+function setAfk(r: Room, p: Player, afk: boolean) {
+  if (!!p.afk === afk) return;
+  p.afk = afk;
+  bcast(r, { t: "afk", id: p.id, afk });
+}
+
 function leave(ws: any) {
   const code = ws.data.room;
   if (!code) return;
@@ -83,6 +102,7 @@ function leave(ws: any) {
     if (h) h.ready = false;
     bcast(r, { t: "host", id: r.host });
   }
+  if (r.state === "playing") selectCombatHost(r);
   pushLobby(r);
 }
 
@@ -168,6 +188,9 @@ function handle(ws: any, m: any) {
       const notReady = [...r.players.values()].some((p) => p.id !== r.host && !p.ready);
       if (notReady) return send(ws, { t: "error", msg: "All players must be ready before starting." });
       r.state = "playing";
+      r.combatHost = r.host;
+      r.finished = false;
+      for (const p of r.players.values()) { p.afk = false; p.lastFrame = Date.now(); p.dead = false; }
       pushLobby(r);
       bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin })) });
       break;
@@ -175,22 +198,54 @@ function handle(ws: any, m: any) {
     case "toLobby": {
       if (!r || r.host !== ws.data.id) return;
       r.state = "lobby";
+      r.combatHost = undefined;
       for (const p of r.players.values()) p.ready = false;
       pushLobby(r);
+      break;
+    }
+    case "afk": {
+      const p = r?.players.get(ws.data.id);
+      if (!r || !p || r.state !== "playing" || r.finished) return;
+      p.lastFrame = Date.now();
+      setAfk(r, p, m.afk === true);
+      selectCombatHost(r);
       break;
     }
     case "g": {
       if (!r || r.state !== "playing" || !m.d || typeof m.d !== "object") return;
       const d = m.d;
+      const player = r.players.get(ws.data.id);
+      if (!player || r.finished) return;
+      if (d.k === "p") {
+        player.lastFrame = Date.now();
+        player.dead = !!d.dead;
+        if (player.afk && d.active === true) {
+          setAfk(r, player, false);
+          selectCombatHost(r);
+        }
+      }
+      if (player.afk) return;
       const hostMessage = d.k === "b" || d.k === "m" || (d.k === "ev" && HOST_EVENTS.has(d.e));
-      if (hostMessage && ws.data.id !== r.host) return;
+      if (hostMessage && ws.data.id !== r.combatHost) return;
+      if (hostMessage && d.k === "ev" && (d.e === "bossDead" || d.e === "wipe")) r.finished = true;
       const out = JSON.stringify({ t: "g", from: ws.data.id, d });
-      if (m.host) { const h = r.players.get(r.host); if (h && h.id !== ws.data.id) { try { h.ws.send(out); } catch {} } return; }
+      if (m.host) { const h = r.players.get(r.combatHost ?? ""); if (h && h.id !== ws.data.id) { try { h.ws.send(out); } catch {} } return; }
       for (const p of r.players.values()) if (p.id !== ws.data.id) { try { p.ws.send(out); } catch {} }
       break;
     }
   }
 }
+
+setInterval(() => {
+  const cutoff = Date.now() - 4500;
+  for (const r of rooms.values()) {
+    if (r.state !== "playing" || r.finished) continue;
+    for (const p of r.players.values()) {
+      if (!p.afk && (p.lastFrame ?? 0) < cutoff) setAfk(r, p, true);
+    }
+    selectCombatHost(r);
+  }
+}, 1000);
 
 let nextId = 1;
 const server = Bun.serve({
