@@ -435,16 +435,16 @@ const CHARGE=.7;
 // ==== DATA ====
 const SENTINEL_DAMAGE={lance:21,aegis:25,pulse:[32,44,53],sunstrike:42,tempest:25,dawnpiercer:[51,140]};
 const NINJA_STAB_DAMAGE=15;
-const JESTER_CARD_DAMAGE=10;
+const JESTER_CARD_DAMAGE=13;
 const JESTER_BOMBS={
   fire:{id:'fireBomb',key:'Q',name:'Fire Bomb',cd:7,color:0xff7540,r:3.2,damage:[47,56,56],rainDamage:32},
   ice:{id:'iceBomb',key:'E',name:'Ice Bomb',cd:10,color:0x7de5ff,r:3.3,damage:[32,32,40],rainDamage:22},
   confusion:{id:'confusionBomb',key:'F',name:'Confusion Bomb',cd:19,color:0xf6a4ff,r:3.1,damage:[0,0,0],rainDamage:0}
 };
 const CLASSES={
-  sword:{name:'Blacksmith',hp:125,speed:6.8,desc:'Forge better swords by dealing damage. Empower adds 2% damage per use for the round.',
+  sword:{name:'Blacksmith',hp:125,speed:6.8,desc:'Forge better swords by dealing damage. Empower adds 2% damage per use for the round, up to 30%.',
     skills:[{k:'LMB',n:'Forge Strike'},{id:'forge',k:'Q',n:'Empower',cd:10}],
-    ctrl:[['light','Forge Wood → Iron → Gold → Diamond → Doombringer by landing hits'],['q','Gain +2% damage for this round per use'],['passive','Last Stand · Survive one fatal hit at 1 HP with a 30 HP shield']]},
+    ctrl:[['light','Forge Wood → Iron → Gold → Diamond → Doombringer by landing hits'],['q','Gain +2% damage for this round per use, up to +30%'],['passive','Last Stand · Survive one fatal hit at 1 HP with a 30 HP shield']]},
   soul:{name:'Soul Link',hp:135,speed:6.8,ult:'Soul Sanctuary',ultHint:'Linked damage charges the ultimate. Grants invincibility and restores 20 HP per second for 7 seconds.',
     desc:'A green-robed support who shares attacks and empowers linked allies.',
     skills:[{id:'link',k:'LMB',n:'Soul Link',cd:.65},{id:'unlink',k:'RMB',n:'Unlink',cd:.35},{id:'renewSelf',k:'Q',n:'Mend Soul',cd:9},{id:'soulEmpower',k:'E',n:'Empower',cd:14},{id:'saturate',k:'F',n:'Saturate',cd:18}],
@@ -463,7 +463,7 @@ const CLASSES={
     ctrl:[['light','Cleave (wide alternating swings)'],['heavy','Crushing Blow, slow overhead strike'],['q','Whirlwind, become a tornado for 3 seconds (reduced damage taken)'],['e','Blood Rage, more damage, lifesteal, speed and damage reduction for 8 seconds'],['f','Leap Slam onto the boss (invulnerable in the air)']]},
   paladin:{name:'Paladin',hp:145,speed:6.15,ult:'Heavenfall',ultHint:'Landing grants a shield bubble with 95% damage reduction for 7 seconds.',desc:'A shield-bearing tank who protects allies, taunts bosses and crashes down from above.',
     skills:[{k:'LMB',n:'Mace Tap'},{k:'Shift',n:'Raise Shield'},{id:'aura',k:'Q',n:'Guardian Aura',cd:13},{id:'taunt',k:'E',n:'Challenge',cd:14},{id:'thorns',k:'F',n:'Thorns',cd:14}],
-    ctrl:[['light','Mace tap deals 16 damage'],['block','Hold shield to take 70% less damage and charge Heavenfall from blocked damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack'],['f','For 6s, reflect 80% of damage taken from hits back to the attacker']]},
+    ctrl:[['light','Mace tap deals 19 damage'],['block','Hold shield to take 70% less damage and charge Heavenfall from blocked damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack'],['f','For 6s, reflect 80% of damage taken from hits back to the attacker']]},
   sentinel:{name:'Sentinel',hp:120,speed:6.6,ult:'Dawnpiercer',ultBinding:'x',ultHint:'Hold, then release to fire a piercing beam and heal nearby allies',desc:'A spear-wielding guardian with a defensive barrier and pulses of radiant energy.',
     skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:10},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10},{id:'tempest',k:'F',n:'Radiant Tempest',cd:15}],
     ctrl:[['light',`Light Lance bursts on impact for ${SENTINEL_DAMAGE.lance} damage in a 3.2-radius area`],['heavy',`Aegis wards allies for 4s and blasts nearby enemies for ${SENTINEL_DAMAGE.aegis} damage`],['q',`Dawn Pulse deals ${SENTINEL_DAMAGE.pulse[0]} damage around you at Mastery 1 and gains damage and reach as you upgrade`],['e',`Sunstrike deals ${SENTINEL_DAMAGE.sunstrike} damage in an 8-radius area at your target`],['f',`Radiant Tempest creates a 9-radius field that strikes three times for ${SENTINEL_DAMAGE.tempest} damage each`]]},
@@ -480,10 +480,10 @@ const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e
 const MASTERY_THRESHOLDS=[0,60,195];
 const FORGE_BLADES=[
   {name:'Wood',damage:15,time:.54,threshold:0,color:0xa56536},
-  {name:'Iron',damage:25,time:.50,threshold:240,color:0xb7c4d0},
-  {name:'Gold',damage:37,time:.48,threshold:720,color:0xffc747},
-  {name:'Diamond',damage:50,time:.44,threshold:1450,color:0x69e9ec},
-  {name:'Doombringer',damage:60,time:.40,threshold:2450,color:0xd65eff}
+  {name:'Iron',damage:21,time:.50,threshold:240,color:0xb7c4d0},
+  {name:'Gold',damage:27,time:.48,threshold:720,color:0xffc747},
+  {name:'Diamond',damage:32,time:.44,threshold:1450,color:0x69e9ec},
+  {name:'Doombringer',damage:36,time:.40,threshold:2450,color:0xd65eff}
 ];
 const UPGRADES={
   jester:[['Q','Blazing Bomb','Fire Bomb hits for 56 damage before igniting the ground.'],['E','Glacial Bomb','Ice Bomb hits for 40 damage and slows the boss for 5 seconds.']],
@@ -3002,7 +3002,7 @@ function tryActions(mx,mz,ml){
       P.swingBlade=FORGE_BLADES[P.bladeTier||0];startSimpleSwing();return true;
     }
     if(gameTime-buf.q<.32&&ready('forge')){
-      buf.q=-9;useSkill('forge');P.forgePower=(P.forgePower||0)+1;
+      buf.q=-9;useSkill('forge');P.forgePower=Math.min(15,(P.forgePower||0)+1);
       ringFx(P.x,P.z,0xffae53,3,.42);
       floatText('EMPOWER +'+(P.forgePower*2)+'%',P.x,2.8,P.z,'label');return true;
     }
@@ -3377,7 +3377,9 @@ function queueHeldPrimary(blockHeld){
   if(paused||chatOpen||P.dead||P.cls==='soul'||blockHeld||!held('light')||gameTime-buf.light<.32)return false;
   if(!['idle','cleave','stab'].includes(P.state))return false;
   if(P.cls==='archer'&&held('heavy'))return false;
-  for(const action in buf)if(action!=='light'&&gameTime-buf[action]<.32)return false;
+  for(const action in buf){if(action==='light'||gameTime-buf[action]>=.32)continue;
+    if(['q','e','f'].includes(action)){const sk=P.kit.skills.find(s=>s.id&&ACTION_KEYS[s.k]===action);if(!sk||P.cd[sk.id]>0)continue;}
+    return false;}
   const skill=P.kit.skills.find(s=>s.k==='LMB');
   if(!skill||P.cd[skill.id]>0||(skill.cost||0)>P.mana)return false;
   buf.light=gameTime;
@@ -3432,7 +3434,7 @@ function updatePlayer(dt){
     case 'simpleSwing':{
       const t=P.t,skeleton=P.cls==='skeleton',blade=P.cls==='sword'?P.swingBlade:null;
       const h0=skeleton?.23:.16,h1=h0+.09;
-      if(t>=h0&&t<=h1)checkPlayerHit(blade?2.65:skeleton?2.25:1.85,blade?.damage??(skeleton?30:16),blade?8:skeleton?7:3,false);
+      if(t>=h0&&t<=h1)checkPlayerHit(blade?2.65:skeleton?2.25:1.85,blade?.damage??(skeleton?30:19),blade?8:skeleton?7:3,false);
       pose.armR=-1.48;pose.armL=skeleton?-.35:-.8;
       pose.upperY=t<h0?lerp(0,.86,ease(t/h0)):lerp(.86,-1.05,ease((t-h0)/.2));
       pose.legL=.29;pose.legR=-.16;
