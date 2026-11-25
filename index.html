@@ -1758,7 +1758,7 @@ const D=d=>Math.round(d*G.diff.dmg);
 const keys={},mouse={},buf={light:-9,heavy:-9,roll:-9,heal:-9,q:-9,e:-9,f:-9,ult:-9};
 const consume=n=>{if(gameTime-buf[n]<.32){buf[n]=-9;return true;}return false;};
 const ACTIONS=[['up','Move Forward','KeyW'],['down','Move Backward','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
-  ['light','Primary Attack','Mouse0'],['heavy','Secondary Attack','Mouse2'],['roll','Roll','Space'],['block','Block / Parry (Knight / Paladin)','ShiftLeft'],
+  ['light','Primary Attack (hold to repeat)','Mouse0'],['heavy','Secondary Attack','Mouse2'],['roll','Roll','Space'],['block','Block / Parry (Knight / Paladin)','ShiftLeft'],
   ['q','Ability 1','KeyQ'],['e','Ability 2','KeyE'],['f','Ability 3','KeyF'],['x','Sentinel Ultimate','KeyX'],['ult','Ultimate','KeyG'],['heal','Drink Flask','KeyR'],['lock','Toggle Lock-On','Tab']];
 let BINDS={};
 function defaultBinds(){BINDS={};ACTIONS.forEach(a=>BINDS[a[0]]=a[2]);}
@@ -1794,7 +1794,11 @@ function chatMsg(name,text,sys){const el=document.createElement('div');el.classN
   if(sys)el.textContent=text;else{const b=document.createElement('b');b.textContent=name+': ';el.appendChild(b);el.appendChild(document.createTextNode(text));}
   const log=$('chatLog');log.appendChild(el);while(log.children.length>8)log.removeChild(log.firstChild);
   setTimeout(()=>{el.style.opacity=0;},9000);}
-function openChat(){chatOpen=true;for(const k in keys)keys[k]=false;for(const k in mouse)mouse[k]=false;$('chat').classList.add('open');const i=$('chatIn');i.classList.remove('hidden');i.value='';setTimeout(()=>i.focus(),0);}
+function clearCombatInput(){
+  for(const inputs of [keys,mouse,vheld])for(const k in inputs)inputs[k]=false;
+  for(const k in buf)buf[k]=-9;
+}
+function openChat(){chatOpen=true;clearCombatInput();$('chat').classList.add('open');const i=$('chatIn');i.classList.remove('hidden');i.value='';setTimeout(()=>i.focus(),0);}
 function closeChat(){chatOpen=false;$('chat').classList.remove('open');const i=$('chatIn');i.blur();i.classList.add('hidden');
   if(state==='play'&&!paused)requestShiftLock();}
 function sendChat(){const t=$('chatIn').value.trim().slice(0,140);closeChat();if(!t)return;
@@ -1811,13 +1815,13 @@ addEventListener('keydown',e=>{
   if(e.code==='Escape'&&state==='play'&&!paused&&!document.pointerLockElement)openPause();
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
-addEventListener('blur',()=>{for(const k in keys)keys[k]=false;for(const k in mouse)mouse[k]=false;});
+addEventListener('blur',clearCombatInput);
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('contextmenu',e=>{if(rebinding||performance.now()-rebindT<400)e.preventDefault();});
 document.addEventListener('mousedown',e=>{if(rebinding){e.preventDefault();e.stopPropagation();finishRebind('Mouse'+e.button);}},true);
 canvas.addEventListener('mousedown',e=>{
   if(state!=='play')return;initAudio();
-  if(paused)return;
+  if(paused||chatOpen)return;
   requestShiftLock();
   mouse[e.button]=true;if(e.button===1)e.preventDefault();
   if(P&&P.dead){if(e.button===0)specIdx++;return;}
@@ -1835,7 +1839,7 @@ document.addEventListener('pointerlockchange',()=>{
   else if(hadLock&&cameraPrefs.shiftLock&&state==='play'&&!paused&&!chatOpen)openPause();
 });
 function ctrlRows(){return currentLoadout().ctrl.map(r=>[keyName(BINDS[r[0]]),r[1]]);}
-function openPause(){paused=true;$('pause').classList.remove('hidden');
+function openPause(){paused=true;clearCombatInput();$('pause').classList.remove('hidden');
   $('pauseNote').textContent=G&&G.mode==='mp'?'The expedition continues while this menu is open':'';
   const mv=['up','left','down','right'].map(a=>keyName(BINDS[a],true)).join(' ');
   const kit=currentLoadout();
@@ -2419,7 +2423,7 @@ function reflectDamage(src,dmg){
   if(enemy===B)toHost('hit',{dmg,poise:0,reflected:true});
   else toHost('mhit',{id:minion.id,dmg});
 }
-function killPlayer(){P.hp=0;P.dead=true;P.state='dead';P.t=0;if(P.skin==='pixel')pixelDeath(P.x,P.z,P.cls);else SFX.hurt();shake(.6);
+function killPlayer(){clearCombatInput();P.hp=0;P.dead=true;P.state='dead';P.t=0;if(P.skin==='pixel')pixelDeath(P.x,P.z,P.cls);else SFX.hurt();shake(.6);
   if(G.mode==='solo')endTimer=2.4;else{emit('fallen',{x:P.x,z:P.z});showMsg('YOU HAVE FALLEN','Death is permanent. You will now spectate your allies.',3.5);}}
 function gainUlt(n){if(P&&!P.dead&&P.cls!=='skeleton'&&P.state!=='ult'&&!(P.ultNo>gameTime))P.ult=Math.min(100,(P.ult||0)+n*(activeEffect('withered') ? .65 : 1));}
 function hitBoss(dmg,poise,heavy,hx,hy,hz,quiet,stun){
@@ -3032,6 +3036,16 @@ function checkPlayerHit(range,dmg,poise,heavy,stun){
   const dx=B.x-P.x,dz=B.z-P.z,d=Math.hypot(dx,dz);
   if(d-B.r<=range&&Math.abs(wrap(Math.atan2(dx,dz)-P.facing))<1.15){P.hitDone=true;if(P.cls==='rogue'&&P.poisonT>0){dmg+=venomBonus();applyVenom(B);}hitBoss(dmg,poise,heavy,lerp(P.x,B.x,.55),2.2,lerp(P.z,B.z,.55),false,stun);if(P.cls==='berserker'&&P.rageT>0){const h=restoreHealth(Math.round(dmg*.15));if(h>0)floatText('+'+Math.round(h),P.x,2.6,P.z,'heal');}}
 }
+function queueHeldPrimary(blockHeld){
+  if(paused||chatOpen||P.dead||blockHeld||!held('light')||gameTime-buf.light<.32)return false;
+  if(!['idle','attack','cleave','stab'].includes(P.state))return false;
+  if(P.cls==='archer'&&held('heavy'))return false;
+  for(const action in buf)if(action!=='light'&&gameTime-buf[action]<.32)return false;
+  const skill=P.kit.skills.find(s=>s.k==='LMB');
+  if(!skill||P.cd[skill.id]>0||(skill.cost||0)>P.mana)return false;
+  buf.light=gameTime;
+  return true;
+}
 function updatePlayer(dt){
   P.iframe=Math.max(0,P.iframe-dt);P.hurtInv=Math.max(0,P.hurtInv-dt);P.t+=dt;P.ward=Math.max(0,P.ward-dt);P.guard=Math.max(0,(P.guard||0)-dt);P.rollCd-=dt;
   if(!P.dead)updateBossEffects();
@@ -3053,6 +3067,7 @@ function updatePlayer(dt){
   const blockHeld=(P.cls==='sword'||P.cls==='paladin')&&held('block');
   if(blockHeld&&!P.blockWasHeld)P.blockStart=gameTime;
   P.blockWasHeld=blockHeld;
+  const repeatPrimary=queueHeldPrimary(blockHeld);
   const bA=bossAngle(),faceTarget=lockTarget?Math.atan2(lockTarget.x-P.x,lockTarget.z-P.z):bA,SPD=classData(P.cls).speed*(P.rageT>0?1.3:1)*(activeEffect('frostbite') ? .92 : 1);
   let vx=0,vz=0;const pose=PM.pose;
   pose.spin=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;pose.yaw=0;pose.jump=0;
@@ -3233,6 +3248,8 @@ function updatePlayer(dt){
     case 'hurt':{pose.lean=-.35;pose.armR=-.3;pose.armL=-.2;if(P.t>=.42)P.state='idle';break;}
     case 'dead':{pose.lean=-1.5*ease(P.t/.8);pose.armR=.2;pose.armL=.2;break;}
   }
+  // A held input lasts one frame. Only actual presses may carry over after release.
+  if(repeatPrimary)buf.light=-9;
   if(P.state!=='idle'){P.vx=vx;P.vz=vz;}
   vx+=P.kx;vz+=P.kz;const kd=Math.exp(-7*dt);P.kx*=kd;P.kz*=kd;
   if(P.state!=='dead'){P.x+=vx*dt;P.z+=vz*dt;}
@@ -3895,7 +3912,7 @@ function startGame(cfg){
   C.skills.forEach(s=>{if(s.id)P.cd[s.id]=0;});
   stats={start:performance.now(),taken:0,flasks:0,parries:0,dealt:0};
   lockOn=cameraPrefs.autoLock;hadLock=false;endTimer=-1;timeScale=1;specIdx=0;
-  for(const k in buf)buf[k]=-9;
+  clearCombatInput();
   NET.isHost=G.mode==='solo'||cfg.host===NET.id;
   setupRoom(def,true);
   const touchLaunch=usingTouch;
@@ -4169,7 +4186,7 @@ addEventListener('mousemove',ev=>{if(tDrag&&tDrag.id==='m'){const nx=clamp(ev.cl
 addEventListener('mouseup',()=>{if(tDrag&&tDrag.id==='m'){tDrag=null;saveTouch();}});
 function tPress(a,down){
   if(down&&lockedAbility(a))return;
-  vheld[a]=down;if(!down||state!=='play'||paused)return;
+  vheld[a]=down&&state==='play'&&!paused&&!chatOpen&&!P?.dead;if(!down||state!=='play'||paused||chatOpen)return;
   if(P&&P.dead){if(a==='light')specIdx++;return;}
   if(a==='lock')toggleLock();else if(a==='prevTarget'||a==='nextTarget')cycleTarget(a==='nextTarget'?1:-1);else if(a in buf)buf[a]=gameTime;
 }
@@ -4255,6 +4272,7 @@ function renderClassCards(){
     disposeModel(PM);PM=makePlayer(myClass,charLevel(myClass),skinFor());
   }
   const kit=currentLoadout(),rows=ctrlRows();
+  const primary=rows.find(row=>row[0]===keyName(BINDS.light));if(primary)primary[1]+=' (hold to repeat)';
   if(kit.ultHint)rows.push([keyName(BINDS[ultimateBinding(kit)]),kit.ult+' · '+kit.ultHint]);
   $('classInfo').innerHTML=rows.map(r=>`<b>${esc(r[0])}</b> ${r[1]}`).join(' &nbsp;·&nbsp; ')+` &nbsp;·&nbsp; <b>${esc(keyName(BINDS.roll))}</b> Roll &nbsp;·&nbsp; <b>${esc(keyName(BINDS.heal))}</b> Flask`;
 }
