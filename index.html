@@ -422,8 +422,8 @@ const CLASSES={
     skills:[{k:'LMB',n:'Mace Tap'},{k:'Shift',n:'Raise Shield'},{id:'aura',k:'Q',n:'Guardian Aura',cd:13},{id:'taunt',k:'E',n:'Challenge',cd:14}],
     ctrl:[['light','Mace tap deals 8 damage'],['block','Hold shield to take 90% less damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack']]},
   sentinel:{name:'Sentinel',hp:120,speed:6.6,ult:'Beaconfall',desc:'A spear-wielding guardian with a defensive barrier and pulses of radiant energy.',
-    skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10}],
-    ctrl:[['light','Throw a lance of light'],['heavy','Aegis reduces incoming damage for 3.5s'],['q','Dawn Pulse strikes enemies around you'],['e','Sunstrike deals 52 damage in a circle around your locked target or ahead of you']]},
+    skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10},{id:'tempest',k:'F',n:'Radiant Tempest',cd:15}],
+    ctrl:[['light','Light Lance bursts on impact for 58 damage in a 3.2-radius area'],['heavy','Aegis wards allies for 5s and blasts nearby enemies for 70 damage'],['q','Dawn Pulse deals 92 damage around you at Lv. 1 and gains damage and reach as you upgrade'],['e','Sunstrike deals 120 damage in an 8-radius area at your target'],['f','Radiant Tempest creates a 9-radius field that strikes three times for 70 damage each']]},
   rogue:{ult:'Thousand Cuts',name:'Ninja',hp:70,speed:7.4,desc:'A swift dagger fighter with piercing shuriken and a 10% chance to dodge each incoming hit.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'shuriken',k:'RMB',n:'Piercing Shuriken',cd:.85},{id:'step',k:'Q',n:'Shadow Step',cd:12},{id:'poison',k:'E',n:'Envenom',cd:18},{id:'smoke',k:'F',n:'Smoke Bomb',cd:25}],
     ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Throw a shuriken that pierces enemies for 23 damage each'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
@@ -440,7 +440,7 @@ const UPGRADES={
   berserker:[['E','Crimson Rage','Blood Rage lasts 10 seconds and damages nearby enemies on activation.'],['E','Blood Quake','Blood Rage also sends out a wider shockwave and staggers the target.']],
   rogue:[['E','Venom Coat','Poison lasts 8 seconds and deals more on-hit damage.'],['E','Night Venom','Poison is stronger and releases a burst of toxic mist.']],
   paladin:[['Q','Guardian Banner','Guardian Aura covers more ground and lasts 7 seconds.'],['Q','Aegis of Dawn','The larger aura lasts 8 seconds and restores 12 health to allies.']],
-  sentinel:[['Q','Resonant Pulse','A wider pulse that hits harder.'],['Q','Radiant Pulse','The pulse staggers enemies and heals nearby allies.']]
+  sentinel:[['Q','Resonant Pulse','Deals 126 damage in a 9-radius area.'],['Q','Radiant Pulse','Deals 150 damage in a 10-radius area, staggers enemies and heals nearby allies.']]
 };
 const UPGRADE_GEAR={
   sword:['Steel pauldrons and a reinforced shield','Gold plate, a royal blue cape and a broad sword'],
@@ -2003,6 +2003,11 @@ function spawnProj(o){
   const m=projMesh(o.kind);m.position.set(o.x,o.y,o.z);m.rotation.y=Math.atan2(o.vx,o.vz);scene.add(m);
   projs.push({m,x:o.x,y:o.y,z:o.z,vx:o.vx,vz:o.vz,kind:o.kind,dmg:o.dmg||0,poise:o.poise||0,own:o.own,hits:o.kind==='shuriken'?new Set():null,life:2.5});
 }
+function lanceBurst(x,z,projectile,airborneHit=false){
+  emit('ultfx',{k:'lanceImpact',x,z});
+  if(airborneHit)hitBoss(projectile.dmg,projectile.poise,false,x,projectile.y,z);
+  aoeHit(x,z,3.2,projectile.dmg,projectile.poise,false,false);
+}
 function siegeBurst(x,z,dmg,poise){
   emit('ultfx',{k:'siege',x,z});aoeHit(x,z,4.2,dmg,poise,true,false);
 }
@@ -2035,6 +2040,7 @@ function updateProjs(dt){
     else if(p.kind==='bolt'&&Math.random()<.7)burst(p.x,p.y,p.z,1,0x9a4aff,.6,.12,.35,0);
     let hit=false;
     let hm=null;if(mins.size){mins.forEach(m=>{if(!hm&&segD(m.x,m.z)<m.r+.5)hm=m;});}
+    if(hm&&p.kind==='lance'){if(p.own)lanceBurst(hm.x,hm.z,p);scene.remove(p.m);projs.splice(i,1);continue;}
     if(hm&&p.kind==='siege'){if(p.own)siegeBurst(p.x,p.z,p.dmg,p.poise);scene.remove(p.m);projs.splice(i,1);continue;}
     if(hm&&p.kind==='arrowU'){if(p.own)archerUltBoom(p.x,p.z);scene.remove(p.m);projs.splice(i,1);continue;}
     if(hm){if(p.own)hitMinion(hm,p.dmg,p.kind==='arrowC');burst(p.x,p.y,p.z,8,0xffd27a,5,.12,.4,8);scene.remove(p.m);projs.splice(i,1);continue;}
@@ -2045,6 +2051,7 @@ function updateProjs(dt){
       else if(p.kind==='fire'){burst(p.x,p.y,p.z,12,0xffa040,6,.16,.5,6);}
       if(p.kind==='arrowU'){if(p.own)archerUltBoom(p.x,p.z);}
       else if(p.kind==='siege'){if(p.own)siegeBurst(p.x,p.z,p.dmg,p.poise);}
+      else if(p.kind==='lance'){if(p.own)lanceBurst(B.x,B.z,p,B.air);}
       else if(p.own)hitBoss(p.dmg,p.poise,p.kind==='inferno'||p.kind==='arrowC',p.x,p.y,p.z);
     }
     if(!hit&&p.kind==='arrowU'&&(p.life<=0||Math.hypot(p.x,p.z)>ARENA)){if(p.own)archerUltBoom(p.x,p.z);scene.remove(p.m);projs.splice(i,1);continue;}
@@ -2053,13 +2060,14 @@ function updateProjs(dt){
   }
 }
 function addZone(z){
-  const col=z.kind==='heal'?0x8af0a0:z.kind==='rift'?0x9a3aff:0xe8d8a0;
+  const col=z.kind==='heal'?0x8af0a0:z.kind==='rift'?0x9a3aff:z.kind==='tempest'?0x84ffda:0xe8d8a0;
   const mat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.22,depthWrite:false,side:THREE.DoubleSide});
   const m=new THREE.Mesh(new THREE.CircleGeometry(z.r,48).rotateX(-Math.PI/2),mat);m.position.set(z.x,.06,z.z);scene.add(m);
   const ringMat=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.7,depthWrite:false,side:THREE.DoubleSide});
   const ring=new THREE.Mesh(new THREE.RingGeometry(z.r-.15,z.r,64).rotateX(-Math.PI/2),ringMat);ring.position.set(z.x,.07,z.z);scene.add(ring);
   const o=Object.assign({},z,{m,ring,mat,ringMat,t:0,tick:0,own:z.owner===(NET.id||'me')});zones.push(o);
   if(z.kind==='heal')SFX.heal();
+  if(z.kind==='tempest'){o.pulses=0;SFX.cast();}
 }
 function updateZones(dt){
   for(let i=zones.length-1;i>=0;i--){const z=zones[i];z.t+=dt;const k=z.t/z.dur;
@@ -2070,6 +2078,17 @@ function updateZones(dt){
     }else if(z.kind==='rift'){
       for(let n=0;n<2;n++){const a=Math.random()*TAU,r=Math.random()*z.r;burst(z.x+Math.sin(a)*r,.2,z.z+Math.cos(a)*r,1,n?0x9a3aff:0x2a0a4a,1.5,.18,.7,-3);}
       if(z.own){z.tick-=dt;if(z.tick<=0){z.tick=.4;if(!B.dead&&BM&&Math.hypot(B.x-z.x,B.z-z.z)<z.r+B.r)hitBoss(z.dmg,2,false,B.x,BM.root.position.y+2,B.z,true);mins.forEach(m=>{if(Math.hypot(m.x-z.x,m.z-z.z)<z.r+m.r)hitMinion(m,z.dmg,false,true);});}}
+    }else if(z.kind==='tempest'){
+      if(z.pulses<3&&z.t>=.08+z.pulses*.7){
+        z.pulses++;
+        ringFx(z.x,z.z,0x83ffcf,z.r,.42);
+        for(let j=0;j<8;j++){
+          const a=j*TAU/8+z.pulses*.35;
+          burst(z.x+Math.cos(a)*z.r*.64,.55,z.z+Math.sin(a)*z.r*.64,4,0xa4ffdb,4.5,.2,.43,5);
+        }
+        tone(330+z.pulses*90,165,.22,'triangle',.07);
+        if(z.own&&!P.dead)aoeHit(z.x,z.z,z.r,70,12,false,false);
+      }
     }else if(z.kind==='rain'){
       for(let n=0;n<3;n++){const a=Math.random()*TAU,r=Math.sqrt(Math.random())*z.r,ax=z.x+Math.sin(a)*r,az=z.z+Math.cos(a)*r;
         const ar=projMesh('arrow');ar.rotation.x=Math.PI/2;ar.position.set(ax,14,az);scene.add(ar);
@@ -2235,6 +2254,11 @@ function rainTarget(){
   if(LT.alive&&(lockOn||Math.hypot(LT.x-P.x,LT.z-P.z)<24))return [LT.x,LT.z];
   const a=aimAngle();return [P.x+Math.sin(a)*14,P.z+Math.cos(a)*14];
 }
+function sentinelTarget(){
+  const hostile=lockTarget&&lockTarget.kind!=='ally';
+  const a=aimAngle();
+  return clampArena(hostile?LT.x:P.x+Math.sin(a)*12,hostile?LT.z:P.z+Math.cos(a)*12,1);
+}
 function startSimpleSwing(){
   P.state='simpleSwing';P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();SFX.swing();
 }
@@ -2310,27 +2334,34 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='sentinel'){
     if(gameTime-buf.light<.32&&ready('lance')){
       buf.light=-9;useSkill('lance');P.facing=aimAngle();
-      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',27,7,46);SFX.cast();}});return true;
+      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',58,12,51);SFX.cast();}});return true;
     }
     if(gameTime-buf.heavy<.32&&ready('ringguard')){
-      buf.heavy=-9;useSkill('ringguard');P.ward=Math.max(P.ward,3.5);
-      ringFx(P.x,P.z,0x80f4cc,3.5,.45);SFX.parry();return true;
+      buf.heavy=-9;useSkill('ringguard');
+      emit('ward',{x:P.x,z:P.z,r:7.5,dur:5});
+      emit('ultfx',{k:'aegisImpact',x:P.x,z:P.z});
+      aoeHit(P.x,P.z,7.5,70,18,true,false);return true;
     }
     if(gameTime-buf.q<.32&&ready('pulse')){
-      buf.q=-9;useSkill('pulse');const level=P.level,r=level===1?4.5:6.5;
+      buf.q=-9;useSkill('pulse');const level=P.level,r=[7.5,9,10][level-1];
       startCast({dur:.64,at:.38,pose:'both',move:.35,fn:()=>{
         ringFx(P.x,P.z,0x85f5d4,r,.48);SFX.slam();
-        aoeHit(P.x,P.z,r,level===1?43:61,level===1?16:23,true,level===3);
-        if(level===3)emit('healburst',{x:P.x,z:P.z,r:8,amt:15});
+        aoeHit(P.x,P.z,r,[92,126,150][level-1],[23,31,40][level-1],true,level===3);
+        if(level===3)emit('healburst',{x:P.x,z:P.z,r:11,amt:24});
       }});return true;
     }
     if(gameTime-buf.e<.32&&ready('sunstrike')){
       buf.e=-9;useSkill('sunstrike');P.facing=aimAngle();
-      const dir=P.facing,r=4.8;
-      const [x,z]=clampArena(lockTarget&&lockTarget.kind!=='ally'?LT.x:P.x+Math.sin(dir)*12,
-        lockTarget&&lockTarget.kind!=='ally'?LT.z:P.z+Math.cos(dir)*12,1);
+      const [x,z]=sentinelTarget(),r=8;
       startCast({dur:.82,at:.48,pose:'raise',move:.4,face:false,fn:()=>{
-        emit('ultfx',{k:'sunstrike',x,z,r});aoeHit(x,z,r,52,19,true,false);
+        emit('ultfx',{k:'sunstrike',x,z,r});aoeHit(x,z,r,120,34,true,false);
+      }});return true;
+    }
+    if(gameTime-buf.f<.32&&ready('tempest')){
+      buf.f=-9;useSkill('tempest');P.facing=aimAngle();
+      const [x,z]=sentinelTarget();
+      startCast({dur:.96,at:.55,pose:'raise',move:.3,face:false,fn:()=>{
+        emit('zone',{z:{kind:'tempest',x,z,r:9,dur:1.85,owner:NET.id||'me'}});
       }});return true;
     }
   }else if(P.cls==='archer'){
@@ -2453,7 +2484,7 @@ function updateUlt(dt,pose,mx,mz){
       break;}
     case 'sentinel':{
       pose.armL=-2.5;pose.armR=-2.5;
-      if(t>=.45&&!P.ufin){P.ufin=true;const [x,z]=rainTarget();emit('ultfx',{k:'beacon',x,z});aoeHit(x,z,7,128,48,true,true);emit('healburst',{x:P.x,z:P.z,r:11,amt:26});}
+      if(t>=.45&&!P.ufin){P.ufin=true;const [x,z]=rainTarget();emit('ultfx',{k:'beacon',x,z});aoeHit(x,z,11,290,75,true,true);emit('healburst',{x:P.x,z:P.z,r:15,amt:42});}
       break;}
     case 'warlock':{
       if(P.ufin){
@@ -2492,12 +2523,14 @@ function ultFx(d){
   if(d.k==='voidBeam')renderVoidBeam(d);
   else if(d.k==='heavenfall'){ringFx(d.x,d.z,0xffd8a2,9,.62);burst(d.x,1,d.z,55,0xffc56f,11,.24,.7,9);SFX.slam();}
   else if(d.k==='siege'){ringFx(d.x,d.z,0xffc57d,4.2,.43);burst(d.x,1,d.z,24,0xffc57d,6,.17,.55,5);SFX.boom();}
+  else if(d.k==='lanceImpact'){ringFx(d.x,d.z,0x9cf9d9,3.2,.27);burst(d.x,1,d.z,10,0x9cf9d9,5,.16,.3,4);}
+  else if(d.k==='aegisImpact'){ringFx(d.x,d.z,0x80f4cc,7.5,.5);burst(d.x,1,d.z,22,0xadffe1,7,.17,.45,5);SFX.parry();}
   else if(d.k==='sunstrike'){
     ringFx(d.x,d.z,0xffd577,d.r,.46);
     firePillar(d.x,d.z,.75,0xffe09a);
     burst(d.x,.45,d.z,32,0xffdc8e,6,.18,.59,6);SFX.slam();
   }
-  else if(d.k==='beacon'){ringFx(d.x,d.z,0x9dffe0,7,.65);burst(d.x,1,d.z,45,0xa5f2cf,8,.24,.65,6);SFX.boom();}
+  else if(d.k==='beacon'){ringFx(d.x,d.z,0x9dffe0,11,.72);firePillar(d.x,d.z,1.65,0xa5ffd9);burst(d.x,1,d.z,61,0xa5f2cf,11,.24,.72,6);SFX.boom();}
   else if(d.k==='judge'){ringFx(d.x,d.z,0xffd27a,7,.5);burst(d.x,1,d.z,40,0xffd27a,9,.2,.7,4);SFX.slam();}
   else if(d.k==='quake'){ringFx(d.x,d.z,0xc01a10,8,.6);burst(d.x,.3,d.z,50,0x5a5048,12,.3,1,8);spikeLine(d.x,d.z,0,6,0xc01a10);spikeLine(d.x,d.z,Math.PI,6,0xc01a10);spikeLine(d.x,d.z,Math.PI/2,6,0xc01a10);spikeLine(d.x,d.z,-Math.PI/2,6,0xc01a10);}
   else if(d.k==='pillar'){const mat=new THREE.MeshBasicMaterial({color:0xf2e8a0,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
