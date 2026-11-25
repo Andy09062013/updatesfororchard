@@ -404,6 +404,7 @@ const CHARGE=.7;
 
 // ==== DATA ====
 const SENTINEL_DAMAGE={lance:21,aegis:25,pulse:[32,44,53],sunstrike:42,tempest:25,dawnpiercer:[51,102]};
+const NINJA_STAB_DAMAGE=20;
 const CLASSES={
   sword:{ult:'Judgement',name:'Swordsman',hp:110,speed:6.8,desc:'A disciplined warrior with sword and shield. Blocks, parries and delivers crushing strikes.',
     skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
@@ -428,7 +429,7 @@ const CLASSES={
     ctrl:[['light',`Light Lance bursts on impact for ${SENTINEL_DAMAGE.lance} damage in a 3.2-radius area`],['heavy',`Aegis wards allies for 5s and blasts nearby enemies for ${SENTINEL_DAMAGE.aegis} damage`],['q',`Dawn Pulse deals ${SENTINEL_DAMAGE.pulse[0]} damage around you at Lv. 1 and gains damage and reach as you upgrade`],['e',`Sunstrike deals ${SENTINEL_DAMAGE.sunstrike} damage in an 8-radius area at your target`],['f',`Radiant Tempest creates a 9-radius field that strikes three times for ${SENTINEL_DAMAGE.tempest} damage each`]]},
   rogue:{ult:'Thousand Cuts',name:'Ninja',hp:80,speed:7.4,desc:'A swift dagger fighter with piercing shuriken and a 10% chance to dodge each incoming hit.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'shuriken',k:'RMB',n:'Piercing Shuriken',cd:.85},{id:'step',k:'Q',n:'Shadow Step',cd:12},{id:'poison',k:'E',n:'Envenom',cd:18},{id:'smoke',k:'F',n:'Smoke Bomb',cd:25}],
-    ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Throw a shuriken that pierces enemies for 23 damage each'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
+    ctrl:[['light',`Dagger Flurry deals ${NINJA_STAB_DAMAGE} damage per stab`],['heavy','Throw a shuriken that pierces enemies for 23 damage each'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
 };
 const SKELETON={name:'Skeleton',hp:10,speed:6.9,skills:[{k:'LMB',n:'Rusted Swing'}],ctrl:[['light','Sword swing deals 30 damage']]};
 const classData=id=>id==='skeleton'?SKELETON:CLASSES[id];
@@ -2915,7 +2916,7 @@ function updatePlayer(dt){
     case 'stab':{
       const t=P.t,dur=.34,h0=.1,h1=.18,right=P.combo%2===0;
       if(t>.04&&t<h1){vx=Math.sin(P.facing)*3.5;vz=Math.cos(P.facing)*3.5;}
-      if(t>=h0&&t<=h1)checkPlayerHit(2.1,10,3,false);
+      if(t>=h0&&t<=h1)checkPlayerHit(2.1,NINJA_STAB_DAMAGE,3,false);
       const k=ease(t/h1);
       pose.armR=lerp(-.7,-1.7,k);pose.armL=-.5;pose.upperY=(right?1:-1)*lerp(-.35,.35,k);
       pose.legL=.35;pose.legR=-.25;pose.lean=.12;
