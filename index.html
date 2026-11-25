@@ -107,6 +107,9 @@ button.sm:hover{filter:brightness(1.3)}
 .flasks{display:flex;gap:6px;margin-top:6px;align-items:center;font-size:12px;color:#c9b88f;letter-spacing:.1em}
 .flask{width:13px;height:19px;border-radius:3px 3px 6px 6px;background:linear-gradient(180deg,#f2c75a,#b5781c);box-shadow:0 0 8px rgba(242,199,90,.5)}
 .flask.empty{background:#2a241c;box-shadow:none}
+#forgeLabel{margin-bottom:4px;color:#f0d8b2;font-size:11px;text-shadow:0 1px 2px #000}
+#forgeBar{height:8px}
+#forgeFill{width:0%;background:linear-gradient(90deg,#92502a,var(--blade-color,#d8af76))}
 #buffs{margin-top:6px;font-size:12px;color:#9fd8ff;letter-spacing:.1em;min-height:16px}
 #team{position:absolute;left:28px;top:150px;width:220px}
 .tm{margin-bottom:8px;font-size:12px;color:#d8ccb0;text-shadow:0 1px 2px #000}
@@ -331,6 +334,10 @@ body.village-active>canvas:active{cursor:grabbing}
     <div class="bar"><i id="hpChip"></i><i id="hpFill"></i><span id="hpTxt"></span></div>
     <div class="bar mana hidden" id="manaBar"><i id="manaFill"></i><span id="manaTxt"></span></div>
     <div class="bar ultb" id="ultBar"><i id="ultFill"></i><span id="ultTxt"></span></div>
+    <div id="forgeProgress" class="hidden">
+      <div id="forgeLabel"></div>
+      <div class="bar" role="progressbar" aria-label="Blacksmith weapon progress" aria-valuemin="0" aria-valuemax="100" id="forgeBar"><i id="forgeFill"></i></div>
+    </div>
     <div class="flasks" id="flasks"></div>
     <div id="runCoins"></div>
 <div id="buffs"></div>
@@ -456,10 +463,10 @@ const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e
 const MASTERY_THRESHOLDS=[0,60,195];
 const FORGE_BLADES=[
   {name:'Wood',damage:15,time:.54,threshold:0,color:0xa56536},
-  {name:'Iron',damage:25,time:.50,threshold:100,color:0xb7c4d0},
-  {name:'Gold',damage:37,time:.48,threshold:300,color:0xffc747},
-  {name:'Diamond',damage:50,time:.44,threshold:650,color:0x69e9ec},
-  {name:'Doombringer',damage:60,time:.40,threshold:1100,color:0xd65eff}
+  {name:'Iron',damage:25,time:.50,threshold:240,color:0xb7c4d0},
+  {name:'Gold',damage:37,time:.48,threshold:720,color:0xffc747},
+  {name:'Diamond',damage:50,time:.44,threshold:1450,color:0x69e9ec},
+  {name:'Doombringer',damage:60,time:.40,threshold:2450,color:0xd65eff}
 ];
 const UPGRADES={
   jester:[['Q','Blazing Bomb','Fire Bomb hits for 56 damage before igniting the ground.'],['E','Glacial Bomb','Ice Bomb hits for 40 damage and slows the boss for 5 seconds.']],
@@ -1703,6 +1710,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
     const g=grp(0,-.76,0,arm),length=.8+i*.18;
+    g.rotation.z=Math.PI;
     const blade=std(tier.color,{metalness:i===0?0:.49,roughness:i===0?.85:.28,emissive:i>=3?tier.color:0,emissiveIntensity:i>=3?.26:0});
     const grip=std(0x553427),guard=std(i>=2?0xd09e52:0x59616a);
     box(.09,.22,.13,grip,0,-.09,0,g);
@@ -4144,8 +4152,22 @@ function buildSkillBar(){
   const kit=currentLoadout(),sk=kit.skills;
   $('skills').innerHTML=(kit.ult?`<div class="sk ultsk" id="skU"><span class="key">${esc(keyName(BINDS[ultimateBinding(kit)],true))}</span><span class="nm">${kit.ult}</span><div class="cdv"></div><div class="cdt"></div></div>`:'')+sk.map((s,i)=>`<div class="sk" id="sk${i}"><span class="key">${esc(keyName(BINDS[ACTION_KEYS[s.k]],true))}</span><span class="nm">${s.n}</span>${s.cost?`<span class="cost">${s.cost}</span>`:''}<div class="cdv"></div><div class="cdt"></div></div>`).join('');
 }
+function updateForgeProgress(){
+  const isBlacksmith=P.cls==='sword';
+  $('forgeProgress').classList.toggle('hidden',!isBlacksmith);
+  if(!isBlacksmith)return;
+  const tier=P.bladeTier||0;
+  const blade=FORGE_BLADES[tier],next=FORGE_BLADES[tier+1];
+  const progress=next?clamp(stats.dealt/next.threshold,0,1):1;
+  const label=next?`${blade.name} → ${next.name} · ${Math.floor(stats.dealt).toLocaleString()} / ${next.threshold.toLocaleString()} damage`:`${blade.name} · Fully forged`;
+  $('forgeLabel').textContent=label;
+  $('forgeBar').setAttribute('aria-valuenow',Math.floor(progress*100));
+  $('forgeBar').setAttribute('aria-valuetext',label);
+  $('forgeFill').style.width=(progress*100)+'%';
+  $('forgeFill').style.setProperty('--blade-color','#'+(next||blade).color.toString(16).padStart(6,'0'));
+}
 function updateHUD(spec){
-  updateTouchHUD();
+  updateTouchHUD();updateForgeProgress();
   $('hpFill').style.width=(Math.max(0,P.hp)/P.maxHp*100)+'%';$('hpChip').style.width=(P.chip/P.maxHp*100)+'%';$('hpTxt').textContent=Math.ceil(Math.max(0,P.hp))+' / '+P.maxHp;
   if(P.cls==='mage'){$('manaFill').style.width=(P.mana/P.maxMana*100)+'%';$('manaTxt').textContent=Math.floor(P.mana)+' / '+P.maxMana;}
   if(G.room&&G.room.type==='minion'){let rem=0;mins.forEach(m=>rem+=Math.max(0,m.hp));const tot=Math.max(1,G.waveHp||1);
@@ -4157,7 +4179,7 @@ function updateHUD(spec){
   const uv=Math.floor(P.ult||0);$('ultFill').style.width=uv+'%';$('ultTxt').textContent=uv>=100?P.kit.ult+' ready ('+keyName(BINDS[ultimateBinding(P.kit)],true)+')':'Ultimate '+uv+'%';$('ultBar').classList.toggle('ready',uv>=100);
   const us=$('skU');if(us){us.classList.toggle('ready',uv>=100);us.querySelector('.cdv').style.background=uv<100?`conic-gradient(rgba(0,0,0,.72) ${(1-uv/100)*360}deg, transparent 0)`:'none';}
   $('flasks').innerHTML=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level===3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
-  $('buffs').textContent=[P.afk?'AFK · Protected':'',G.mode==='mp'&&!NET.combatHost?'Waiting for an active player':'',P.cls==='sword'?FORGE_BLADES[P.bladeTier||0].name+' · +'+(P.forgePower||0)*2+'% damage':'',P.forgeShield>0?Math.ceil(P.forgeShield)+' shield':'',P.bubbleUntil>gameTime?'Heavenfall · 95% reduction':'',P.soulInvUntil>gameTime?'Soul Sanctuary':'',P.soulPowerUntil>gameTime?'Soul Empowered':'',P.cls==='soul'?`Linked allies · ${soulAllies(localPlayerId()).length}`:activeProtector(localPlayerId())?'Soul Linked':'',P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
+  $('buffs').textContent=[P.afk?'AFK · Protected':'',G.mode==='mp'&&!NET.combatHost?'Waiting for an active player':'',P.cls==='sword'&&P.forgePower?'Empower · +'+P.forgePower*2+'% damage':'',P.forgeShield>0?Math.ceil(P.forgeShield)+' shield':'',P.bubbleUntil>gameTime?'Heavenfall · 95% reduction':'',P.soulInvUntil>gameTime?'Soul Sanctuary':'',P.soulPowerUntil>gameTime?'Soul Empowered':'',P.cls==='soul'?`Linked allies · ${soulAllies(localPlayerId()).length}`:activeProtector(localPlayerId())?'Soul Linked':'',P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
   $('lockTag').innerHTML=(lockTarget?'Locked: '+esc(lockTarget.name):lockOn?'Lock-On: Seeking target':'Lock-On: Off')+'<br>'+G.diff.n+' · '+ARENAS[G.arena].n+(G.campaign?`<br>Campaign · Chamber ${G.ci+1} of ${CAMPAIGN.length}`:'');
   P.kit.skills.forEach((s,i)=>{const el=$('sk'+i);if(!el)return;
     const cd=s.id?P.cd[s.id]||0:0,frac=s.id&&s.cd?cd/s.cd:0;
