@@ -16,15 +16,14 @@ type Room = {
 };
 
 const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin"];
-const BOSSES: Record<string, string> = { varkhul: "keep", sylvara: "frost", ignar: "forge", morvane: "void", thoruun: "storm", vaelis: "void" };
-const ARENAS = ["keep", "frost", "forge", "void", "storm"];
-const DIFFS = ["easy", "normal", "hard", "nightmare"];
+const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm" };
+const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
 const MAX = 5;
 const skinType = (value: unknown) => value === "pixel" ? "pixel" : "classic";
 function roomCapacity(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= MAX ? value : fallback;
 }
-const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe"]);
+const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "stormThrow", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe"]);
 const rooms = new Map<string, Room>();
 type Presence = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel";
   x: number; z: number; facing: number; moving: boolean; seen: number };
@@ -154,11 +153,13 @@ function handle(ws: any, m: any) {
       const s = m.settings || {};
       const capacity = roomCapacity(s.capacity, r.capacity);
       if (capacity < r.players.size) return send(ws, { t: "error", msg: "Party size cannot be smaller than the current party." });
+      if (s.gm === "campaign") return send(ws, { t: "error", msg: "Campaign is temporarily unavailable." });
       r.capacity = capacity;
-      if (Object.hasOwn(BOSSES, s.boss)) r.settings.boss = s.boss;
-      if (ARENAS.includes(s.arena)) r.settings.arena = s.arena;
+      if (Object.hasOwn(BOSSES, s.boss)) {
+        r.settings.boss = s.boss;
+        r.settings.arena = BOSSES[s.boss];
+      }
       if (DIFFS.includes(s.diff)) r.settings.diff = s.diff;
-      if (s.gm === "boss" || s.gm === "campaign") r.settings.gm = s.gm;
       pushLobby(r);
       break;
     }
