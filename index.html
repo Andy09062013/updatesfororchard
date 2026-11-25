@@ -2387,7 +2387,7 @@ function tryActions(mx,mz,ml){
     }
     if(gameTime-buf.x<.32&&ready('dawnpiercer')){
       buf.x=-9;useSkill('dawnpiercer');P.facing=aimAngle();
-      startCast({dur:.65,at:.32,pose:'forward',move:.35,face:false,fn:fireDawnpiercer});return true;
+      startCast({dur:.65,at:.32,pose:'forward',move:.35,fn:fireDawnpiercer});return true;
     }
   }else if(P.cls==='archer'){
     if(gameTime-buf.f<.32&&ready('vault')){buf.f=-9;useSkill('vault');P.facing=aimAngle();P.state='vault';P.t=0;P.iframe=.5;P.fired=false;SFX.roll();return true;}
