@@ -403,7 +403,7 @@ let ARENA=24;
 const CHARGE=.7;
 
 // ==== DATA ====
-const SENTINEL_DAMAGE={lance:41,aegis:49,pulse:[64,88,105],sunstrike:84,tempest:49,dawnpiercer:102,beaconfall:203};
+const SENTINEL_DAMAGE={lance:21,aegis:25,pulse:[32,44,53],sunstrike:42,tempest:25,dawnpiercer:[51,102]};
 const CLASSES={
   sword:{ult:'Judgement',name:'Swordsman',hp:110,speed:6.8,desc:'A disciplined warrior with sword and shield. Blocks, parries and delivers crushing strikes.',
     skills:[{k:'LMB',n:'Slash Combo'},{k:'RMB',n:'Heavy Strike'},{k:'Shift',n:'Block / Parry'},{k:'Space',n:'Roll'}],
@@ -423,16 +423,16 @@ const CLASSES={
   paladin:{name:'Paladin',hp:145,speed:6.15,ult:'Heavenfall',desc:'A shield-bearing tank who protects allies, taunts bosses and crashes down from above.',
     skills:[{k:'LMB',n:'Mace Tap'},{k:'Shift',n:'Raise Shield'},{id:'aura',k:'Q',n:'Guardian Aura',cd:13},{id:'taunt',k:'E',n:'Challenge',cd:14},{id:'thorns',k:'F',n:'Thorns',cd:14}],
     ctrl:[['light','Mace tap deals 8 damage'],['block','Hold shield to take 70% less damage and charge Heavenfall from blocked damage'],['q','Allies nearby take 30% less damage for 5s'],['e','Taunt the boss into targeting you for its next attack'],['f','For 6s, reflect 80% of damage taken from hits back to the attacker']]},
-  sentinel:{name:'Sentinel',hp:120,speed:6.6,ult:'Beaconfall',desc:'A spear-wielding guardian with a defensive barrier and pulses of radiant energy.',
-    skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10},{id:'tempest',k:'F',n:'Radiant Tempest',cd:15},{id:'dawnpiercer',k:'X',n:'Dawnpiercer',cd:12}],
-    ctrl:[['light',`Light Lance bursts on impact for ${SENTINEL_DAMAGE.lance} damage in a 3.2-radius area`],['heavy',`Aegis wards allies for 5s and blasts nearby enemies for ${SENTINEL_DAMAGE.aegis} damage`],['q',`Dawn Pulse deals ${SENTINEL_DAMAGE.pulse[0]} damage around you at Lv. 1 and gains damage and reach as you upgrade`],['e',`Sunstrike deals ${SENTINEL_DAMAGE.sunstrike} damage in an 8-radius area at your target`],['f',`Radiant Tempest creates a 9-radius field that strikes three times for ${SENTINEL_DAMAGE.tempest} damage each`],['x',`Fire a wide piercing beam that deals ${SENTINEL_DAMAGE.dawnpiercer} damage to every enemy in its path`]]},
+  sentinel:{name:'Sentinel',hp:120,speed:6.6,ult:'Dawnpiercer',ultBinding:'x',ultHint:'Hold, then release to fire a piercing beam and heal nearby allies',desc:'A spear-wielding guardian with a defensive barrier and pulses of radiant energy.',
+    skills:[{id:'lance',k:'LMB',n:'Light Lance',cd:.52},{id:'ringguard',k:'RMB',n:'Aegis',cd:8},{id:'pulse',k:'Q',n:'Dawn Pulse',cd:7},{id:'sunstrike',k:'E',n:'Sunstrike',cd:10},{id:'tempest',k:'F',n:'Radiant Tempest',cd:15}],
+    ctrl:[['light',`Light Lance bursts on impact for ${SENTINEL_DAMAGE.lance} damage in a 3.2-radius area`],['heavy',`Aegis wards allies for 5s and blasts nearby enemies for ${SENTINEL_DAMAGE.aegis} damage`],['q',`Dawn Pulse deals ${SENTINEL_DAMAGE.pulse[0]} damage around you at Lv. 1 and gains damage and reach as you upgrade`],['e',`Sunstrike deals ${SENTINEL_DAMAGE.sunstrike} damage in an 8-radius area at your target`],['f',`Radiant Tempest creates a 9-radius field that strikes three times for ${SENTINEL_DAMAGE.tempest} damage each`]]},
   rogue:{ult:'Thousand Cuts',name:'Ninja',hp:70,speed:7.4,desc:'A swift dagger fighter with piercing shuriken and a 10% chance to dodge each incoming hit.',
     skills:[{k:'LMB',n:'Dagger Flurry'},{id:'shuriken',k:'RMB',n:'Piercing Shuriken',cd:.85},{id:'step',k:'Q',n:'Shadow Step',cd:12},{id:'poison',k:'E',n:'Envenom',cd:18},{id:'smoke',k:'F',n:'Smoke Bomb',cd:25}],
     ctrl:[['light','Dagger flurry (rapid chained stabs)'],['heavy','Throw a shuriken that pierces enemies for 23 damage each'],['q','Shadow Step, teleport behind the boss'],['e','Envenom, attacks apply poison for 6 seconds'],['f','Smoke Bomb, the boss loses track of you for a few seconds']]}
 };
 const SKELETON={name:'Skeleton',hp:10,speed:6.9,skills:[{k:'LMB',n:'Rusted Swing'}],ctrl:[['light','Sword swing deals 30 damage']]};
 const classData=id=>id==='skeleton'?SKELETON:CLASSES[id];
-const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e',F:'f',X:'x'};
+const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e',F:'f'};
 const GOLD_COST={2:60,3:135};
 const UPGRADES={
   sword:[['Q','Shield Bash','Strike nearby enemies and stagger the target.',9,'shield'],['Q','Royal Bulwark','Shield Bash hits a wider area and grants 4 seconds of Ward.',9,'shield']],
@@ -499,7 +499,7 @@ function rewardKill(id,amount){
 function lockedAbility(action){return !!(P&&P.seal&&P.seal.until>gameTime&&P.seal.action===action);}
 function sealAbility(duration){
   if(!P||P.dead||P.seal&&P.seal.until>gameTime)return;
-  const skills=currentLoadout().skills.filter(s=>['q','e','f','x','heavy'].includes(ACTION_KEYS[s.k]));
+  const skills=currentLoadout().skills.filter(s=>['q','e','f','heavy'].includes(ACTION_KEYS[s.k]));
   if(!skills.length)return;
   const skill=skills[Math.floor(Math.random()*skills.length)],action=ACTION_KEYS[skill.k];
   P.seal={action,name:skill.n,until:gameTime+duration};
@@ -1605,11 +1605,11 @@ const NET={ws:null,id:null,isHost:true,room:null,online:false};
 const D=d=>Math.round(d*G.diff.dmg);
 
 // ==== INPUT ====
-const keys={},mouse={},buf={light:-9,heavy:-9,roll:-9,heal:-9,q:-9,e:-9,f:-9,x:-9,ult:-9};
+const keys={},mouse={},buf={light:-9,heavy:-9,roll:-9,heal:-9,q:-9,e:-9,f:-9,ult:-9};
 const consume=n=>{if(gameTime-buf[n]<.32){buf[n]=-9;return true;}return false;};
 const ACTIONS=[['up','Move Forward','KeyW'],['down','Move Backward','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
   ['light','Primary Attack','Mouse0'],['heavy','Secondary Attack','Mouse2'],['roll','Roll','Space'],['block','Block / Parry (Swordsman)','ShiftLeft'],
-  ['q','Ability 1','KeyQ'],['e','Ability 2','KeyE'],['f','Ability 3','KeyF'],['x','Ability 4','KeyX'],['ult','Ultimate','KeyG'],['heal','Drink Flask','KeyR'],['lock','Toggle Lock-On','Tab']];
+  ['q','Ability 1','KeyQ'],['e','Ability 2','KeyE'],['f','Ability 3','KeyF'],['x','Sentinel Ultimate','KeyX'],['ult','Ultimate','KeyG'],['heal','Drink Flask','KeyR'],['lock','Toggle Lock-On','Tab']];
 let BINDS={};
 function defaultBinds(){BINDS={};ACTIONS.forEach(a=>BINDS[a[0]]=a[2]);}
 defaultBinds();
@@ -1628,12 +1628,15 @@ function keyName(c,short){
   if(/^Numpad/.test(c))return 'Num '+c.slice(6);
   return c;
 }
-function held(a){if(lockedAbility(a))return false;if(typeof vheld!=='undefined'&&vheld[a])return true;const b=BINDS[a];if(!b)return false;return b.startsWith('Mouse')?!!mouse[+b.slice(5)]:!!keys[b];}
+const ultimateBinding=kit=>kit.ultBinding||'ult';
+function held(a){if(lockedAbility(a))return false;if(typeof vheld!=='undefined'&&vheld[a])return true;const b=BINDS[a==='ult'?ultimateBinding(currentLoadout()):a];if(!b)return false;return b.startsWith('Mouse')?!!mouse[+b.slice(5)]:!!keys[b];}
 function press(code){
   if(code==='ArrowLeft'||code==='ArrowRight'){cycleTarget(code==='ArrowRight'?1:-1);return;}
   for(const a in BINDS)if(BINDS[a]===code&&!lockedAbility(a)){
     if(a==='lock')toggleLock();
-    else if(a in buf)buf[a]=gameTime;
+    else if(a==='ult'||a==='x'){
+      if(a===ultimateBinding(currentLoadout()))buf.ult=gameTime;
+    }else if(a in buf)buf[a]=gameTime;
   }
 }
 let rebinding=null,rebindT=0,chatOpen=false;
@@ -1686,7 +1689,7 @@ function openPause(){paused=true;$('pause').classList.remove('hidden');
   $('pauseNote').textContent=G&&G.mode==='mp'?'The expedition continues while this menu is open':'';
   const mv=['up','left','down','right'].map(a=>keyName(BINDS[a],true)).join(' ');
   const kit=currentLoadout();
-  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Middle Drag','Rotate camera or look around a locked target'],['← / →','Cycle between enemies, bosses and teammates'],['↑ / ↓','Tilt camera'],...ctrlRows(),...(kit.ult?[[keyName(BINDS.ult),'Ultimate: '+kit.ult+' (charges by dealing damage)'+(P?.cls==='mage'?' · revives nearby fallen allies once as skeletons':'')],[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)']]:[]),[keyName(BINDS.lock),'Toggle lock-on'],['/','Open chat (multiplayer)'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
+  const rows=[[mv,'Move (keep moving to sprint)'],['Mouse / Middle Drag','Rotate camera or look around a locked target'],['← / →','Cycle between enemies, bosses and teammates'],['↑ / ↓','Tilt camera'],...ctrlRows(),...(kit.ult?[[keyName(BINDS[ultimateBinding(kit)]),'Ultimate: '+kit.ult+' (charges by dealing damage)'+(kit.ultHint?' · '+kit.ultHint:P?.cls==='mage'?' · revives nearby fallen allies once as skeletons':'')],[keyName(BINDS.roll),'Roll (invulnerable while rolling)'],[keyName(BINDS.heal),'Drink flask (restores 45 health)']]:[]),[keyName(BINDS.lock),'Toggle lock-on'],['/','Open chat (multiplayer)'],['Left Click (when fallen)','Cycle spectated ally'],['Esc','Pause']];
   $('ctrlTable').innerHTML=rows.map(r=>`<div><b>${esc(r[0])}</b><span>${r[1]}</span></div>`).join('');}
 let bindsFrom='menu';
 function openBinds(from){bindsFrom=from;rebinding=null;renderBinds();
@@ -2387,10 +2390,6 @@ function tryActions(mx,mz,ml){
         emit('zone',{z:{kind:'tempest',x,z,r:9,dur:1.85,owner:NET.id||'me'}});
       }});return true;
     }
-    if(gameTime-buf.x<.32&&ready('dawnpiercer')){
-      buf.x=-9;useSkill('dawnpiercer');P.facing=aimAngle();
-      startCast({dur:.65,at:.32,pose:'forward',move:.35,fn:fireDawnpiercer});return true;
-    }
   }else if(P.cls==='archer'){
     if(gameTime-buf.f<.32&&ready('vault')){buf.f=-9;useSkill('vault');P.facing=aimAngle();P.state='vault';P.t=0;P.iframe=.5;P.fired=false;SFX.roll();return true;}
     if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.38,at:.2,pose:'bow',move:.7,fn:()=>{shoot(P.level===3?'crossbolt':'arrow',P.level===3?35:26,6,P.level===3?76:62);SFX.bow();}});return true;}
@@ -2421,15 +2420,25 @@ function aoeHit(x,z,r,dmg,poise,heavy,stun){
   mins.forEach(m=>{if(Math.hypot(m.x-x,m.z-z)-m.r<r){hitMinion(m,dmg,heavy,true);hit=true;if(stun&&NET.isHost&&mins.has(m.id)){emit('cancel',{owner:'min:'+m.id});m.st='move';m.t=Math.max(m.t,1.5);}}});
   return hit;
 }
-function fireDawnpiercer(){
-  const a=P.facing;
-  const area={type:'rect',x:P.x,z:P.z,a,w:5,len:19};
-  emit('ultfx',{k:'dawnpiercer',x:area.x,z:area.z,a,r:area.w/2,len:area.len});
-  if(!B.dead&&!B.air&&BM&&inside(area,B.x,B.z,B.r))hitBoss(SENTINEL_DAMAGE.dawnpiercer,32,true,B.x,B.y+2.8,B.z);
-  mins.forEach(m=>{if(inside(area,m.x,m.z,m.r))hitMinion(m,SENTINEL_DAMAGE.dawnpiercer,true);});
+function fireDawnpiercer(charge){
+  const power=clamp((charge-BEAM_MIN)/(DAWN_MAX-BEAM_MIN),0,1);
+  const [minDamage,maxDamage]=SENTINEL_DAMAGE.dawnpiercer;
+  const dmg=Math.round(lerp(minDamage,maxDamage,power));
+  const area={type:'rect',x:P.x,z:P.z,a:P.facing,w:lerp(4,5,power),len:lerp(16,22,power)};
+  emit('ultfx',{k:'dawnpiercer',x:area.x,z:area.z,a:area.a,r:area.w/2,len:area.len});
+  if(!B.dead&&!B.air&&BM&&inside(area,B.x,B.z,B.r))hitBoss(dmg,32,true,B.x,B.y+2.8,B.z);
+  mins.forEach(m=>{if(inside(area,m.x,m.z,m.r))hitMinion(m,dmg,true);});
+  emit('healburst',{x:P.x,z:P.z,r:15,amt:42});
+  P.ufin=true;P.beamRelease=P.t;
 }
-const ULT_DUR={sword:1.75,mage:1.2,archer:.9,rogue:1.85,berserker:1.6,sentinel:1.05,paladin:1.75};
-const BEAM_MIN=.36,BEAM_CANCEL=3,BEAM_MAX=5;
+const ULT_DUR={sword:1.75,mage:1.2,archer:.9,rogue:1.85,berserker:1.6,paladin:1.75};
+const BEAM_MIN=.36,BEAM_CANCEL=3,BEAM_MAX=5,DAWN_MAX=3;
+function beamChargeProgress(){
+  if(P.state!=='ult'||P.ufin)return -1;
+  if(P.uk==='warlock')return clamp(P.t/BEAM_MAX,0,1);
+  if(P.uk==='sentinel')return clamp(P.t/DAWN_MAX,0,1);
+  return -1;
+}
 function fireVoidBeam(charge){
   const power=clamp(charge/BEAM_MAX,0,1),a=P.facing,dx=Math.sin(a),dz=Math.cos(a);
   const x=P.x+dx*.65,z=P.z+dz*.65,r=.62+1.65*power,len=22+13*power,dmg=Math.round(98+222*power);
@@ -2471,7 +2480,10 @@ function startUlt(){
     [tx,tz]=clampArena(tx,tz,.8);P.ux0=P.x;P.uz0=P.z;P.utx=tx;P.utz=tz;}
   else if(P.cls==='warlock'){
     P.facing=aimAngle();toast('Hold '+keyName(BINDS.ult,true)+' to charge · Release to fire · Roll cancels after 3s',3.3);
-  }else if(P.cls==='sentinel'){P.iframe=.5;}
+  }else if(P.cls==='sentinel'){
+    P.facing=aimAngle();P.iframe=.5;
+    toast('Hold '+keyName(BINDS[ultimateBinding(P.kit)],true)+' to charge · Release to fire',2.5);
+  }
 }
 function updateUlt(dt,pose,mx,mz){
   const t=P.t;P.uvx=P.uvz=0;
@@ -2518,9 +2530,12 @@ function updateUlt(dt,pose,mx,mz){
       else{if(!P.ufin){P.ufin=true;aoeHit(P.x,P.z,7.5,170,90,true,true);emit('ultfx',{k:'quake',x:P.x,z:P.z});shake(1.1);SFX.slam();}pose.armR=-.6;pose.armL=-.6;pose.lean=.6;pose.legL=.8;pose.legR=-.5;}
       break;}
     case 'sentinel':{
-      pose.armL=-2.5;pose.armR=-2.5;
-      if(t>=.45&&!P.ufin){P.ufin=true;const [x,z]=rainTarget();emit('ultfx',{k:'beacon',x,z});aoeHit(x,z,11,SENTINEL_DAMAGE.beaconfall,75,true,true);emit('healburst',{x:P.x,z:P.z,r:15,amt:42});}
-      break;}
+      pose.armR=-1.55;pose.armL=-.8;pose.lean=P.ufin?.2:-.12;
+      if(P.ufin){if(t-P.beamRelease>=.65)P.state='idle';return;}
+      turnTo(aimAngle(),7,dt);
+      if(Math.random()<.46)burst(P.x+Math.sin(P.facing)*.8,1.4,P.z+Math.cos(P.facing)*.8,2,0x9dffe0,1.5,.09+beamChargeProgress()*.14,.34,-2);
+      if(t>=DAWN_MAX||t>=BEAM_MIN&&!held('ult'))fireDawnpiercer(t);
+      return;}
     case 'warlock':{
       if(P.ufin){
         pose.armR=pose.armL=-1.57;pose.lean=.2;
@@ -2566,7 +2581,6 @@ function ultFx(d){
     firePillar(d.x,d.z,.75,0xffe09a);
     burst(d.x,.45,d.z,32,0xffdc8e,6,.18,.59,6);SFX.slam();
   }
-  else if(d.k==='beacon'){ringFx(d.x,d.z,0x9dffe0,11,.72);firePillar(d.x,d.z,1.65,0xa5ffd9);burst(d.x,1,d.z,61,0xa5f2cf,11,.24,.72,6);SFX.boom();}
   else if(d.k==='judge'){ringFx(d.x,d.z,0xffd27a,7,.5);burst(d.x,1,d.z,40,0xffd27a,9,.2,.7,4);SFX.slam();}
   else if(d.k==='quake'){ringFx(d.x,d.z,0xc01a10,8,.6);burst(d.x,.3,d.z,50,0x5a5048,12,.3,1,8);spikeLine(d.x,d.z,0,6,0xc01a10);spikeLine(d.x,d.z,Math.PI,6,0xc01a10);spikeLine(d.x,d.z,Math.PI/2,6,0xc01a10);spikeLine(d.x,d.z,-Math.PI/2,6,0xc01a10);}
   else if(d.k==='pillar'){const mat=new THREE.MeshBasicMaterial({color:0xf2e8a0,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -3273,7 +3287,7 @@ function updateReticle(target){
 // ==== HUD ====
 function buildSkillBar(){
   const kit=currentLoadout(),sk=kit.skills;
-  $('skills').innerHTML=(kit.ult?`<div class="sk ultsk" id="skU"><span class="key">${esc(keyName(BINDS.ult,true))}</span><span class="nm">${kit.ult}</span><div class="cdv"></div><div class="cdt"></div></div>`:'')+sk.map((s,i)=>`<div class="sk" id="sk${i}"><span class="key">${esc(keyName(BINDS[ACTION_KEYS[s.k]],true))}</span><span class="nm">${s.n}</span>${s.cost?`<span class="cost">${s.cost}</span>`:''}<div class="cdv"></div><div class="cdt"></div></div>`).join('');
+  $('skills').innerHTML=(kit.ult?`<div class="sk ultsk" id="skU"><span class="key">${esc(keyName(BINDS[ultimateBinding(kit)],true))}</span><span class="nm">${kit.ult}</span><div class="cdv"></div><div class="cdt"></div></div>`:'')+sk.map((s,i)=>`<div class="sk" id="sk${i}"><span class="key">${esc(keyName(BINDS[ACTION_KEYS[s.k]],true))}</span><span class="nm">${s.n}</span>${s.cost?`<span class="cost">${s.cost}</span>`:''}<div class="cdv"></div><div class="cdt"></div></div>`).join('');
 }
 function updateHUD(spec){
   updateTouchHUD();
@@ -3284,7 +3298,7 @@ function updateHUD(spec){
     $('bFill').style.width=(G.cleared?0:Math.min(100,rem/tot*100))+'%';$('bChip').style.width=$('bFill').style.width;}
   else{$('bFill').style.width=(Math.max(0,B.hp)/B.maxHp*100)+'%';$('bChip').style.width=(B.chip/B.maxHp*100)+'%';}
   let f='';for(let i=0;i<P.maxFlasks;i++)f+=`<div class="flask ${i<P.flasks?'':'empty'}"></div>`;
-  const uv=Math.floor(P.ult||0);$('ultFill').style.width=uv+'%';$('ultTxt').textContent=uv>=100?P.kit.ult+' ready ('+keyName(BINDS.ult,true)+')':'Ultimate '+uv+'%';$('ultBar').classList.toggle('ready',uv>=100);
+  const uv=Math.floor(P.ult||0);$('ultFill').style.width=uv+'%';$('ultTxt').textContent=uv>=100?P.kit.ult+' ready ('+keyName(BINDS[ultimateBinding(P.kit)],true)+')':'Ultimate '+uv+'%';$('ultBar').classList.toggle('ready',uv>=100);
   const us=$('skU');if(us){us.classList.toggle('ready',uv>=100);us.querySelector('.cdv').style.background=uv<100?`conic-gradient(rgba(0,0,0,.72) ${(1-uv/100)*360}deg, transparent 0)`:'none';}
   $('flasks').innerHTML=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level===3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
   $('buffs').textContent=[P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
@@ -3301,9 +3315,8 @@ function updateHUD(spec){
   $('team').innerHTML=teamH;
   const sp=$('specTag');
   if(P.dead&&G.mode==='mp'){sp.classList.remove('hidden');sp.innerHTML=spec?`Spectating ${esc(spec.name)}<small>Left click to switch ally</small>`:'All allies have fallen';}else sp.classList.add('hidden');
-  const cw=$('chargeWrap');let ch=-1;
-  if(P.state==='ult'&&P.uk==='warlock'&&!P.ufin)ch=P.t/BEAM_MAX;
-  else if(P.state==='draw')ch=P.charge/CHARGE;else if(P.state==='cast'&&P.cast.charge&&!P.cast.fired)ch=P.t/P.cast.at;
+  const cw=$('chargeWrap');let ch=beamChargeProgress();
+  if(P.state==='draw')ch=P.charge/CHARGE;else if(P.state==='cast'&&P.cast.charge&&!P.cast.fired)ch=P.t/P.cast.at;
   if(ch>=0){cw.classList.remove('hidden');$('chargeFill').style.width=(clamp(ch,0,1)*100)+'%';}else cw.classList.add('hidden');
   // name tags
   const htg=lockTarget?.kind==='ally'&&!P.dead?lockTarget.id:P.cls==='mage'&&!P.dead?allyTarget().id:null;
@@ -3595,7 +3608,7 @@ function toMenu(){showTouch(false);NET.room=null;try{document.exitPointerLock();
 // ==== TOUCH CONTROLS ====
 let usingTouch=false;
 const TBTN=[{a:'light',d:[.84,.80],s:1.3},{a:'heavy',d:[.95,.66],s:1},{a:'roll',d:[.95,.88],s:.95},{a:'block',d:[.73,.90],s:.9},
-  {a:'q',d:[.72,.72],s:.85},{a:'e',d:[.77,.58],s:.85},{a:'f',d:[.86,.52],s:.85},{a:'x',d:[.68,.48],s:.85},{a:'ult',d:[.95,.43],s:.95},{a:'heal',d:[.63,.90],s:.8},{a:'lock',d:[.95,.31],s:.75},{a:'prevTarget',d:[.79,.31],s:.53},{a:'nextTarget',d:[.87,.31],s:.53}];
+  {a:'q',d:[.72,.72],s:.85},{a:'e',d:[.77,.58],s:.85},{a:'f',d:[.86,.52],s:.85},{a:'ult',d:[.95,.43],s:.95},{a:'heal',d:[.63,.90],s:.8},{a:'lock',d:[.95,.31],s:.75},{a:'prevTarget',d:[.79,.31],s:.53},{a:'nextTarget',d:[.87,.31],s:.53}];
 let TLAY={pos:{},size:100,opac:70,mode:'auto'};
 try{const sv=JSON.parse(localStorage.getItem('hc_touch')||'null');if(sv)TLAY=Object.assign(TLAY,sv);}catch(e){}
 function saveTouch(){try{localStorage.setItem('hc_touch',JSON.stringify(TLAY));}catch(e){}}
@@ -3617,7 +3630,7 @@ const TC={x:0,y:0,joyId:null,jx:0,jy:0,camId:null,cx:0,cy:0},vheld={};let tEditi
 function tLabel(a){
   const C=currentLoadout();
   const skill=C.skills.find(s=>ACTION_KEYS[s.k]===a);if(skill&&a!=='roll'&&a!=='block')return skill.n;
-  if(['light','heavy','q','e','f','x'].includes(a))return null;
+  if(['light','heavy','q','e','f'].includes(a))return null;
   if(a==='block')return C.skills.some(s=>s.k==='Shift')?'Block':null;
   if(!C.ult&&['roll','ult','heal'].includes(a))return null;
   return {roll:'Roll',ult:C.ult,heal:'Flask',lock:'Lock-On',prevTarget:'‹',nextTarget:'›'}[a];
@@ -3695,9 +3708,9 @@ function updateTouchHUD(){
   document.querySelectorAll('#tBtns .tb').forEach(el=>{const a=el.dataset.a,s=tSkill(a),cd=el.querySelector('.tcd'),em=el.querySelector('em');let frac=0,txt='';
     if(s&&s.id&&s.cd){const c=P.cd[s.id]||0;frac=c/s.cd;if(c>.05&&s.cd>=1)txt=c.toFixed(c<10?1:0);el.classList.toggle('nomana',!!(s.cost&&P.mana<s.cost));}
     if(a==='ult'){
-      const u=P.ult||0,charging=P.state==='ult'&&P.uk==='warlock'&&!P.ufin;
-      frac=charging?1-clamp(P.t/BEAM_MAX,0,1):1-u/100;el.classList.toggle('ready',u>=100||charging);
-      txt=charging?Math.floor(P.t/BEAM_MAX*100)+'%':u>=100?'':Math.floor(u)+'%';
+      const u=P.ult||0,charge=beamChargeProgress(),charging=charge>=0;
+      frac=charging?1-charge:1-u/100;el.classList.toggle('ready',u>=100||charging);
+      txt=charging?Math.floor(charge*100)+'%':u>=100?'':Math.floor(u)+'%';
     }
     if(a==='heal')txt=P.flasks+'';
     if(a==='lock')el.classList.toggle('active',lockOn);
@@ -3729,7 +3742,9 @@ function renderClassCards(){
   if(state==='menu'&&PM){
     disposeModel(PM);PM=makePlayer(myClass,charLevel(myClass),skinFor(myClass));
   }
-  $('classInfo').innerHTML=ctrlRows().map(r=>`<b>${esc(r[0])}</b> ${r[1]}`).join(' &nbsp;·&nbsp; ')+` &nbsp;·&nbsp; <b>${esc(keyName(BINDS.roll))}</b> Roll &nbsp;·&nbsp; <b>${esc(keyName(BINDS.heal))}</b> Flask`;
+  const kit=currentLoadout(),rows=ctrlRows();
+  if(kit.ultHint)rows.push([keyName(BINDS[ultimateBinding(kit)]),kit.ult+' · '+kit.ultHint]);
+  $('classInfo').innerHTML=rows.map(r=>`<b>${esc(r[0])}</b> ${r[1]}`).join(' &nbsp;·&nbsp; ')+` &nbsp;·&nbsp; <b>${esc(keyName(BINDS.roll))}</b> Roll &nbsp;·&nbsp; <b>${esc(keyName(BINDS.heal))}</b> Flask`;
 }
 function fillSelects(b,a,d){
   b.innerHTML=Object.entries(BOSSES).map(([k,v])=>`<option value="${k}">${v.n}</option>`).join('');
