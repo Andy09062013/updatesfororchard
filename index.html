@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="hc-build" content="">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Hollow Crown</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@400;600&display=swap" rel="stylesheet">
@@ -4271,6 +4272,29 @@ function loop(now){
   else renderer.render(scene,camera);
 }
 requestAnimationFrame(loop);
+
+// ==== CLIENT UPDATES ====
+const clientVersion=document.querySelector('meta[name="hc-build"]')?.content;
+if(clientVersion){
+  const canRefresh=()=>state==='hub'&&!NET.room&&!document.hidden;
+  let checking=false;
+  async function checkClientVersion(){
+    if(checking||!canRefresh())return;
+    checking=true;
+    try{
+      const response=await fetch('/client-version',{cache:'no-store',signal:AbortSignal.timeout(6000)});
+      if(!response.ok)return;
+      const latest=(await response.text()).trim();
+      if(/^[a-f0-9]{64}$/.test(latest)&&latest!==clientVersion&&canRefresh())location.reload();
+    }catch{
+      // A deployment can briefly leave the version check unavailable.
+    }finally{
+      checking=false;
+    }
+  }
+  setInterval(checkClientVersion,20000);
+  document.addEventListener('visibilitychange',checkClientVersion);
+}
 window.__hc={get P(){return P},get B(){return B},get G(){return G},get NET(){return NET},remotes,startGame,startAction:(n)=>{B.action=null;B.queue=[];startAction(n)},damageBoss:(d)=>damageBoss(d,0,false),get mins(){return mins},killAll:()=>{[...mins.values()].forEach(m=>killMinion(m))},setUlt:()=>{P.ult=100},hitFirst:()=>{const m=[...mins.values()][0];if(m)hitMinion(m,10,false);},get projs(){return projs.length},get LT(){return LT},get state(){return state},get endTimer(){return endTimer},get centerT(){return centerT}};
 })();
 </script>

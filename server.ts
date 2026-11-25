@@ -1,5 +1,8 @@
 // Hollow Crown multiplayer server: serves the game page and runs lobbies + game relay over WebSocket.
-const HTML: string = await Bun.file(new URL("./index.html", import.meta.url)).text();
+const clientSource = await Bun.file(new URL("./index.html", import.meta.url)).text();
+const clientDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(clientSource));
+const clientVersion = Array.from(new Uint8Array(clientDigest), byte => byte.toString(16).padStart(2, "0")).join("");
+const HTML = clientSource.replace('<meta name="hc-build" content="">', `<meta name="hc-build" content="${clientVersion}">`);
 
 type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any };
 type Room = {
@@ -199,6 +202,9 @@ const server = Bun.serve({
       return new Response("WebSocket upgrade failed", { status: 400 });
     }
     if (url.pathname === "/health") return new Response("ok");
+    if (url.pathname === "/client-version") {
+      return new Response(clientVersion, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+    }
     return new Response(HTML, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" } });
   },
   websocket: {
