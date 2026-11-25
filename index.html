@@ -671,11 +671,11 @@ const BOSSES={
     moves:{near:[['reap',3],['cross',2.5],['dashes',1],['soulHarvest',2]],mid:[['dashes',3],['cage',2],['raiseDead',2.2]],far:[['dashes',2.5],['cage',1.5],['rain',1],['raiseDead',2.5]]},
     p2:{near:[['comboD',3],['cage',1.5],['raiseDead',2.4],['soulHarvest',2.5]],mid:[['comboE',2],['cage',2],['rain',1.5]],far:[['rain',2],['cage',2],['dashes',2]]},
     combos:{comboD:['reap','cross'],comboE:['dashes','reap']}},
-  thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:7100,r:1.9,speed:5.15,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.82,model:'storm',coolMul:.48,enrageSpeed:1.25,enrageAt:.65,poiseMul:1.6,
+  thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:5600,r:1.9,speed:5.15,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.9,model:'storm',coolMul:.48,enrageSpeed:1.25,enrageAt:.65,poiseMul:1.6,
     col:0x6ad0ff,dust:0x77786e,fireCol:0x8ad8ff,pillar:0xbfe8ff,spikeCol:0x6ad0ff,shockCol:0x8ad8ff,rainFx:'ice',p2emis:0x0a2a4a,
     enrage:['ZEUS CALLS DOWN THE STORM','Lightning attacks inflict Zapped'],d:'Leaps into the party with shockwaves, charges through the arena, and calls down lightning on several players at once. Enrages at 65% health outside Ultra. Zapped lasts 10 seconds, halves passive recovery, and reduces ability healing by 30%.',
     moves:{near:[['thunderWhip',4],['thunderVault',3.5],['skyJudgment',2]],mid:[['thunderJavelin',3],['thunderVault',4],['skyJudgment',3]],far:[['thunderVault',5],['stormRush',3],['skyJudgment',3]]},
-    p2:{near:[['ionCrossing',3],['stormRush',3]],mid:[['ionCrossing',3],['stormRush',4]],far:[['thunderJavelin',3],['ionCrossing',3]]},
+    p2:{near:[['stormPincer',4],['ionCrossing',2.5],['stormRush',3]],mid:[['stormPincer',4],['ionCrossing',2.5],['stormRush',4]],far:[['stormPincer',3],['thunderJavelin',3],['ionCrossing',3]]},
     p3:[['crownOfStorms',5.5],['thunderRelay',5.5]]},
   vaelis:{n:'Vaelis, the Oathbreaker',arena:'void',hp:3250,r:1.5,speed:3.9,height:5.7,reach:4,slamR:3,sweepR:7,novaR:5.7,dmg:1,model:'oath',float:true,coolMul:1.1,enrageSpeed:1.12,seal:true,
     col:0xf978c3,dust:0x50334b,fireCol:0xf48ac6,pillar:0xf69acd,spikeCol:0xb25388,shockCol:0xf7a4d9,rainFx:'shadow',p2emis:0x480e34,
@@ -3369,7 +3369,7 @@ function chooseAttack(dist){
 const ATK={
   thunderVault(dt,a){
     a.t+=dt;
-    const p=B.pose,launch=.57,air=.92;
+    const p=B.pose,launch=.57,air=.83;
     if(a.t<launch){
       trackTurn(dt,5);p.crouch=-.66*ease(a.t/launch);p.armR=-2.75;p.armL=-2.2;
       return false;
@@ -3381,8 +3381,8 @@ const ATK={
       [a.tx,a.tz]=clampArena(T.x+T.vx*.19+Math.sin(angle)*overshoot,T.z+T.vz*.19+Math.cos(angle)*overshoot,B.r+1);
       B.facing=Math.atan2(a.tx-a.x,a.tz-a.z);
       const delay=air/B.speedMul;
-      stormHazard({type:'circle',x:a.tx,z:a.tz,r:5.2},delay,40,
-        {fx:'javelin',chillTimed:true,shock:{sp:15,max:20,dmg:D(20*G.boss.dmg)}});
+      stormHazard({type:'circle',x:a.tx,z:a.tz,r:5.65},delay,42,
+        {fx:'javelin',chillTimed:true,shock:{sp:18,max:23,dmg:D(23*G.boss.dmg)}});
       if(B.phase>=2){
         const flank=stormTargets().find(q=>q.id!==T.id&&Math.hypot(q.x-a.tx,q.z-a.tz)>7);
         if(flank)stormHazard({type:'circle',x:flank.x,z:flank.z,r:3.2},delay+.47,23,{blockable:false});
@@ -3396,7 +3396,7 @@ const ATK={
   },
   stormRush(dt,a){
     a.t+=dt;
-    const p=B.pose,mark=.32,launch=1.12,dash=.46;
+    const p=B.pose,mark=.32,launch=1.13,dash=.38;
     if(a.t<mark)trackTurn(dt,6);
     if(!a.go&&a.t>=mark){
       a.go=true;a.x=B.x;a.z=B.z;
@@ -3406,9 +3406,9 @@ const ATK={
       const len=Math.hypot(a.tx-B.x,a.tz-B.z);
       B.facing=len>.1?Math.atan2(a.tx-B.x,a.tz-B.z):angle;
       const delay=(launch-mark)/B.speedMul;
-      if(len>=2)stormHazard({type:'rect',x:a.x,z:a.z,a:B.facing,len,w:4.2},delay,32,{fx:'current',chillTimed:true});
-      stormHazard({type:'circle',x:a.tx,z:a.tz,r:4.1},delay+.58,33,
-        {chillWindup:delay,shock:{sp:17,max:17,dmg:D(17*G.boss.dmg)}});
+      if(len>=2)stormHazard({type:'rect',x:a.x,z:a.z,a:B.facing,len,w:4.9},delay,35,{fx:'current',chillTimed:true});
+      stormHazard({type:'circle',x:a.tx,z:a.tz,r:4.8},delay+.48,36,
+        {chillWindup:delay,shock:{sp:20,max:20,dmg:D(21*G.boss.dmg)}});
     }
     if(a.t>=launch){
       const k=clamp((a.t-launch)/dash,0,1);
@@ -3423,13 +3423,13 @@ const ATK={
     if(!a.go&&a.t>=.36){
       a.go=true;
       const [x,z]=clampArena(T.x+T.vx*.16,T.z+T.vz*.16,1.35);
-      const travel=.44,chillWindup=(W-.36)/B.speedMul,delay=chillWindup+travel;
-      stormHazard({type:'circle',x,z,r:4.45},delay,36,{fx:'javelin',parry:true,chillWindup});
+      const travel=.36,chillWindup=(W-.36)/B.speedMul,delay=chillWindup+travel;
+      stormHazard({type:'circle',x,z,r:5},delay,39,{fx:'javelin',parry:true,chillWindup});
       if(B.phase>=2){
         const angle=Math.atan2(x-B.x,z-B.z)+Math.PI/2;
         for(const side of [-1,1]){
           const [sx,sz]=clampArena(x+Math.sin(angle)*side*5,z+Math.cos(angle)*side*5,1);
-          stormHazard({type:'circle',x:sx,z:sz,r:2.6},delay+.59,22,{chillWindup});
+          stormHazard({type:'circle',x:sx,z:sz,r:3.05},delay+.53,25,{chillWindup});
         }
       }
       a.flight={x:B.x,z:B.z,tx:x,tz:z,duration:travel};
@@ -3443,10 +3443,10 @@ const ATK={
     if(a.t<.28)trackTurn(dt,4);
     if(a.t>=.28&&!a.go){
       a.go=true;
-      const swing={type:'arc',x:B.x,z:B.z,a:B.facing-.22,r:12.4,half:.91};
-      const delay=Math.max(.61,(W-.28)/B.speedMul);
-      stormHazard(swing,delay,31,{fx:'whip',parry:true,chillWindup:delay});
-      if(B.phase>=2)stormHazard({...swing,a:B.facing+1.05,r:11.2,half:.79},delay+.65,27,{fx:'whip',parry:true,chillWindup:delay});
+      const swing={type:'arc',x:B.x,z:B.z,a:B.facing-.22,r:13.2,half:1.02};
+      const delay=Math.max(.51,(W-.28)/B.speedMul);
+      stormHazard(swing,delay,35,{fx:'whip',parry:true,chillWindup:delay});
+      if(B.phase>=2)stormHazard({...swing,a:B.facing+1.05,r:12.6,half:.9},delay+.58,31,{fx:'whip',parry:true,chillWindup:delay});
     }
     p.armR=a.t<W?-1.75:-.68;p.armL=-1;p.upperY=a.t<W?.8:-1.05;p.lean=a.t<W?-.24:.36;
     return a.t>=W+1.15*B.speedMul;
@@ -3454,8 +3454,8 @@ const ATK={
   skyJudgment(dt,a){
     a.t+=dt;const p=B.pose;
     a.wave??=0;
-    const waves=B.phase>=2?3:2;
-    if(a.wave<waves&&a.t>=.38+a.wave*.7*B.speedMul){
+    const waves=B.phase>=2?4:2;
+    if(a.wave<waves&&a.t>=.38+a.wave*.62*B.speedMul){
       const wave=a.wave++,spots=[];
       const strike=(x,z,r,delay,damage)=>{
         [x,z]=clampArena(x,z,1.2);
@@ -3464,16 +3464,19 @@ const ATK={
         stormHazard({type:'circle',x,z,r},delay,damage,{blockable:false});
       };
       const players=stormTargets();
-      for(const q of players)strike(q.x+q.vx*.17,q.z+q.vz*.17,3.15,.85,29);
-      const count=(B.phase>=2?6:4)+Math.max(0,players.length-1);
+      for(const q of players){
+        const lead=Math.min(.22,2.2/Math.max(1,Math.hypot(q.vx,q.vz)));
+        strike(q.x+q.vx*lead,q.z+q.vz*lead,3.55,.72,33);
+      }
+      const count=(B.phase>=2?8:5)+Math.max(0,players.length-1);
       const offset=rand(0,TAU)+wave*.35;
       for(let i=0;i<count;i++){
         const angle=offset+i*TAU/count,radius=i%2===0?ARENA*.65:ARENA*.39;
-        strike(Math.sin(angle)*radius,Math.cos(angle)*radius,3,.94+(i%3)*.13,23);
+        strike(Math.sin(angle)*radius,Math.cos(angle)*radius,3.2,.83+(i%3)*.14,25);
       }
     }
     p.armL=-2.98;p.armR=-1.6;p.lean=-.26;
-    return a.t>=.38+(waves-1)*.7*B.speedMul+1.32*B.speedMul;
+    return a.t>=.38+(waves-1)*.62*B.speedMul+1.24*B.speedMul;
   },
   ionCrossing(dt,a){
     a.t+=dt;const p=B.pose,W=.37;
@@ -3483,12 +3486,47 @@ const ATK={
       const base=Math.atan2(T.x-B.x,T.z-B.z);
       for(let i=0;i<3;i++){
         const an=base+(i-1)*Math.PI/3,len=24;
-        stormHazard({type:'rect',x:x-Math.sin(an)*len/2,z:z-Math.cos(an)*len/2,a:an,w:2.7,len},
-          .91+i*.4,30,{fx:'current'});
+        stormHazard({type:'rect',x:x-Math.sin(an)*len/2,z:z-Math.cos(an)*len/2,a:an,w:3.2,len},
+          .77+i*.39,34,{fx:'current'});
       }
     }
     p.armR=-2.2;p.armL=-2.3;p.upperY=.3*Math.sin(a.t*4);
     return a.t>=W+2.18*B.speedMul;
+  },
+  stormPincer(dt,a){
+    a.t+=dt;const p=B.pose;
+    if(a.t<.4)trackTurn(dt,5);
+    if(a.t>=.4&&!a.open){
+      a.open=true;
+      const targets=[];
+      for(const q of stormTargets()){
+        if(targets.length===3)break;
+        if(targets.every(other=>Math.hypot(other.x-q.x,other.z-q.z)>8))targets.push(q);
+      }
+      for(const q of targets){
+        const angle=Math.atan2(q.x-B.x,q.z-B.z);
+        const [x,z]=clampArena(q.x,q.z,1.6);
+        for(const side of [-1,1]){
+          const ox=x+Math.cos(angle)*side*2.65-Math.sin(angle)*9;
+          const oz=z-Math.sin(angle)*side*2.65-Math.cos(angle)*9;
+          stormHazard({type:'rect',x:ox,z:oz,a:angle,len:18,w:3.8},.66,34,{fx:'current'});
+        }
+      }
+    }
+    if(a.t>=.4+.62*B.speedMul&&!a.follow){
+      a.follow=true;
+      const centers=[];
+      for(const q of stormTargets()){
+        if(centers.length===3)break;
+        const speed=Math.hypot(q.vx,q.vz),lead=Math.min(.27,2.65/Math.max(1,speed));
+        const [x,z]=clampArena(q.x+q.vx*lead,q.z+q.vz*lead,1.4);
+        if(centers.some(([sx,sz])=>Math.hypot(sx-x,sz-z)<4))continue;
+        centers.push([x,z]);
+        stormHazard({type:'circle',x,z,r:3.75},.62,37,{blockable:false});
+      }
+    }
+    p.armR=a.follow?-1.2:-2.45;p.armL=a.follow?-1.25:-2.45;p.lean=a.follow?.28:-.24;
+    return a.t>=.4+1.47*B.speedMul;
   },
   crownOfStorms(dt,a){
     a.t+=dt;const p=B.pose,W=.42;
@@ -3512,19 +3550,19 @@ const ATK={
   thunderRelay(dt,a){
     a.t+=dt;const p=B.pose;
     if(a.i===undefined)a.i=0;
-    if(a.i<4&&a.t>=.35+a.i*.71*B.speedMul){
+    if(a.i<5&&a.t>=.35+a.i*.64*B.speedMul){
       const targets=stormTargets(),target=targets[a.i%targets.length]||T;
       const [x,z]=clampArena(target.x+target.vx*.12,target.z+target.vz*.12,1.8);
       const from=a.last||{x:B.x,z:B.z};
-      const r=3.1+a.i*.46,warning=.76+a.i*.075;
-      stormHazard({type:'circle',x,z,r},warning,25+a.i*3,{fx:'javelin'});
+      const r=3.3+a.i*.45,warning=.69+a.i*.07;
+      stormHazard({type:'circle',x,z,r},warning,29+a.i*3,{fx:'javelin'});
       emit('stormThrow',{...from,tx:x,tz:z,duration:warning});
       const other=targets[(a.i+1)%targets.length];
-      if(other&&other!==target&&Math.hypot(other.x-x,other.z-z)>6)stormHazard({type:'circle',x:other.x,z:other.z,r:3.1},warning+.18,25,{blockable:false});
+      if(other&&other!==target&&Math.hypot(other.x-x,other.z-z)>6)stormHazard({type:'circle',x:other.x,z:other.z,r:3.1},warning+.2,28,{blockable:false});
       a.last={x,z};a.i++;
     }
     p.armR=-2.45;p.armL=-1.9;p.upperY=Math.sin(a.t*7)*.34;
-    return a.t>=.35+3.38*B.speedMul;
+    return a.t>=.35+3.64*B.speedMul;
   },
   wardenScissor(dt,a){
     a.t+=dt;const p=B.pose;
