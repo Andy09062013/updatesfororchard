@@ -520,7 +520,8 @@ function applyBossEffect(id){
   const effect=BOSS_EFFECTS[id];if(!effect||P.dead)return;
   const prev=P.effects[id];
   if(!prev||prev.until<=gameTime)floatText(effect.name.toUpperCase(),P.x,2.9,P.z,'label');
-  P.effects[id]={until:gameTime+effect.duration,next:prev&&prev.until>gameTime?prev.next:gameTime+1};
+  const duration=id==='zapped'&&G.bossId==='thoruun'?10:effect.duration;
+  P.effects[id]={until:gameTime+duration,next:prev&&prev.until>gameTime?prev.next:gameTime+1};
 }
 function updateBossEffects(){
   for(const [id,status] of Object.entries(P.effects)){
@@ -648,9 +649,9 @@ const BOSSES={
     moves:{near:[['reap',3],['cross',2.5],['dashes',1],['soulHarvest',2]],mid:[['dashes',3],['cage',2],['raiseDead',2.2]],far:[['dashes',2.5],['cage',1.5],['rain',1],['raiseDead',2.5]]},
     p2:{near:[['comboD',3],['cage',1.5],['raiseDead',2.4],['soulHarvest',2.5]],mid:[['comboE',2],['cage',2],['rain',1.5]],far:[['rain',2],['cage',2],['dashes',2]]},
     combos:{comboD:['reap','cross'],comboE:['dashes','reap']}},
-  thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:3600,r:1.9,speed:3.5,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.05,model:'storm',coolMul:1.1,enrageSpeed:1.12,
+  thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:5600,r:1.9,speed:4.3,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.58,model:'storm',coolMul:.65,enrageSpeed:1.22,enrageAt:.65,poiseMul:1.35,
     col:0x6ad0ff,dust:0x77786e,fireCol:0x8ad8ff,pillar:0xbfe8ff,spikeCol:0x6ad0ff,shockCol:0x8ad8ff,rainFx:'ice',p2emis:0x0a2a4a,
-    enrage:['ZEUS CALLS DOWN THE STORM','Lightning attacks inflict Zapped'],d:'Throws explosive thunderbolts, cracks electric whips, and calls down lightning. Zapped halves passive recovery and reduces ability healing by 30%.',
+    enrage:['ZEUS CALLS DOWN THE STORM','Lightning attacks inflict Zapped'],d:'Throws explosive thunderbolts, cracks electric whips, and calls down lightning. Enrages at 65% health outside Ultra. Zapped lasts 10 seconds, halves passive recovery, and reduces ability healing by 30%.',
     moves:{near:[['thunderWhip',4],['thunderJavelin',2]],mid:[['thunderJavelin',3],['thunderWhip',2],['skyJudgment',2.5]],far:[['thunderJavelin',4],['skyJudgment',3]]},
     p2:{near:[['ionCrossing',3],['skyJudgment',2]],mid:[['ionCrossing',3],['skyJudgment',2]],far:[['ionCrossing',2],['skyJudgment',3]]},
     p3:[['crownOfStorms',4],['thunderRelay',4]]},
@@ -2036,7 +2037,7 @@ function detFx(d){
   if(o.shock)shockwave(s.x,s.z,o.shock.sp,o.shock.max,o.shock.dmg,c.shockCol);
 }
 function stormHazard(shape,delay,damage,extra={}){
-  hostDanger(shape,{color:G.boss.col,delay,dmg:D(damage*G.boss.dmg),srcX:B.x,srcZ:B.z,
+  hostDanger(shape,{color:G.boss.col,delay,dmg:D(damage*G.boss.dmg*(B.phase===3?1.16:1)),srcX:B.x,srcZ:B.z,
     owner:'storm',status:'zapped',fx:'bolt',...extra});
 }
 function lightningThrow(d){
@@ -2351,7 +2352,8 @@ function damageBoss(dmg,poise,heavy,from,stun,reflected=false){
   dmg=bossDamageTaken(dmg,reflected);
   B.hp-=dmg;B.chipT=.8;B.flash=1;
   if(B.hp<=0){B.hp=0;killBoss();return;}
-  if(B.hp<=B.maxHp*.5&&(B.phase===1||(G.diff.ultra&&B.phase===2))){
+  const enrageAt=G.diff.ultra?.5:(G.boss.enrageAt||.5);
+  if(B.hp<=B.maxHp*enrageAt&&(B.phase===1||(G.diff.ultra&&B.phase===2))){
     const phase=G.diff.ultra?3:2;
     for(const owner of ['melee','storm'])emit('cancel',{owner});
     B.queue=[];B.air=false;B.y=0;B.dashId=0;
@@ -3058,32 +3060,32 @@ const ATK={
       a.go=true;
       const [x,z]=clampArena(T.x+T.vx*.16,T.z+T.vz*.16,1.35);
       const travel=.44,delay=(W-.36)/B.speedMul+travel;
-      stormHazard({type:'circle',x,z,r:3.65},delay,36,{fx:'javelin',parry:true});
+      stormHazard({type:'circle',x,z,r:4.45},delay,36,{fx:'javelin',parry:true});
       if(B.phase>=2){
         const angle=Math.atan2(x-B.x,z-B.z)+Math.PI/2;
         for(const side of [-1,1]){
-          const [sx,sz]=clampArena(x+Math.sin(angle)*side*4.5,z+Math.cos(angle)*side*4.5,1);
-          stormHazard({type:'circle',x:sx,z:sz,r:1.9},delay+.63,22);
+          const [sx,sz]=clampArena(x+Math.sin(angle)*side*5,z+Math.cos(angle)*side*5,1);
+          stormHazard({type:'circle',x:sx,z:sz,r:2.6},delay+.59,22);
         }
       }
       a.flight={x:B.x,z:B.z,tx:x,tz:z,duration:travel};
     }
     if(a.flight&&!a.thrown&&a.t>=W){a.thrown=true;emit('stormThrow',a.flight);}
     p.armR=a.t<W?-2.82:-1.05;p.armL=-.58;p.upperY=a.t<W?.66:-.48;p.lean=a.t<W?-.22:.42;
-    return a.t>=W+1.65*B.speedMul;
+    return a.t>=W+1.4*B.speedMul;
   },
   thunderWhip(dt,a){
     a.t+=dt;const p=B.pose,W=1.04;
     if(a.t<.28)trackTurn(dt,4);
     if(a.t>=.28&&!a.go){
       a.go=true;
-      const swing={type:'arc',x:B.x,z:B.z,a:B.facing-.22,r:10.8,half:.78};
-      const delay=(W-.28)/B.speedMul;
+      const swing={type:'arc',x:B.x,z:B.z,a:B.facing-.22,r:12.4,half:.91};
+      const delay=Math.max(.61,(W-.28)/B.speedMul);
       stormHazard(swing,delay,31,{fx:'whip',parry:true});
-      if(B.phase>=2)stormHazard({...swing,a:B.facing+1.05,r:9.5,half:.65},delay+.72,27,{fx:'whip',parry:true});
+      if(B.phase>=2)stormHazard({...swing,a:B.facing+1.05,r:11.2,half:.79},delay+.65,27,{fx:'whip',parry:true});
     }
     p.armR=a.t<W?-1.75:-.68;p.armL=-1;p.upperY=a.t<W?.8:-1.05;p.lean=a.t<W?-.24:.36;
-    return a.t>=W+1.26*B.speedMul;
+    return a.t>=W+1.15*B.speedMul;
   },
   skyJudgment(dt,a){
     a.t+=dt;const p=B.pose,W=.48;
@@ -3091,13 +3093,13 @@ const ATK={
       a.go=true;
       const dir=Math.atan2(T.x-B.x,T.z-B.z);
       const [x,z]=clampArena(T.x,T.z,1.8);
-      for(let i=0;i<(B.phase>=2?4:3);i++){
+      for(let i=0;i<(B.phase>=2?5:3);i++){
         const [sx,sz]=clampArena(x+Math.sin(dir)*i*3.4,z+Math.cos(dir)*i*3.4,1);
-        stormHazard({type:'circle',x:sx,z:sz,r:2.4},.93+i*.43,29,{blockable:false});
+        stormHazard({type:'circle',x:sx,z:sz,r:2.9},.83+i*.37,29,{blockable:false});
       }
     }
     p.armL=-2.98;p.armR=-1.6;p.lean=-.26;
-    return a.t>=W+2.72*B.speedMul;
+    return a.t>=W+2.55*B.speedMul;
   },
   ionCrossing(dt,a){
     a.t+=dt;const p=B.pose,W=.37;
@@ -3106,46 +3108,46 @@ const ATK={
       const [x,z]=clampArena(T.x,T.z,2);
       const base=Math.atan2(T.x-B.x,T.z-B.z);
       for(let i=0;i<3;i++){
-        const an=base+(i-1)*Math.PI/3,len=20;
-        stormHazard({type:'rect',x:x-Math.sin(an)*len/2,z:z-Math.cos(an)*len/2,a:an,w:2,len},
-          1.05+i*.44,30,{fx:'current'});
+        const an=base+(i-1)*Math.PI/3,len=24;
+        stormHazard({type:'rect',x:x-Math.sin(an)*len/2,z:z-Math.cos(an)*len/2,a:an,w:2.7,len},
+          .91+i*.4,30,{fx:'current'});
       }
     }
     p.armR=-2.2;p.armL=-2.3;p.upperY=.3*Math.sin(a.t*4);
-    return a.t>=W+2.52*B.speedMul;
+    return a.t>=W+2.18*B.speedMul;
   },
   crownOfStorms(dt,a){
     a.t+=dt;const p=B.pose,W=.42;
     if(a.t>=W&&!a.go){
       a.go=true;
       const offset=Math.atan2(T.x-B.x,T.z-B.z);
-      for(let i=0;i<6;i++){
-        const angle=offset+i*TAU/6;
+      for(let i=0;i<8;i++){
+        const angle=offset+i*TAU/8;
         const [x,z]=clampArena(B.x+Math.sin(angle)*10,B.z+Math.cos(angle)*10,1.1);
-        stormHazard({type:'circle',x,z,r:2.9},1.12,32,{blockable:false});
+        stormHazard({type:'circle',x,z,r:3.35},1.04,32,{blockable:false});
       }
-      stormHazard({type:'circle',x:B.x,z:B.z,r:6.8},1.92,39);
+      stormHazard({type:'circle',x:B.x,z:B.z,r:7.7},1.77,39);
       for(let i=0;i<3;i++){
         const angle=offset+(i+.5)*TAU/3;
-        stormHazard({type:'rect',x:B.x,z:B.z,a:angle,w:2.4,len:19},2.54,34,{fx:'current'});
+        stormHazard({type:'rect',x:B.x,z:B.z,a:angle,w:2.85,len:22},2.32,34,{fx:'current'});
       }
     }
     p.armR=-2.7;p.armL=-2.8;p.lean=-.3;
-    return a.t>=W+3.23*B.speedMul;
+    return a.t>=W+2.89*B.speedMul;
   },
   thunderRelay(dt,a){
     a.t+=dt;const p=B.pose;
     if(a.i===undefined)a.i=0;
-    if(a.i<3&&a.t>=.35+a.i*.76*B.speedMul){
+    if(a.i<4&&a.t>=.35+a.i*.71*B.speedMul){
       const [x,z]=clampArena(T.x,T.z,1.8);
       const from=a.last||{x:B.x,z:B.z};
-      const r=2.7+a.i*.43;
+      const r=3.1+a.i*.46;
       stormHazard({type:'circle',x,z,r},.68,29+a.i*3,{fx:'javelin'});
       emit('stormThrow',{...from,tx:x,tz:z,duration:.68});
       a.last={x,z};a.i++;
     }
     p.armR=-2.45;p.armL=-1.9;p.upperY=Math.sin(a.t*7)*.34;
-    return a.t>=.35+2.55*B.speedMul;
+    return a.t>=.35+2.99*B.speedMul;
   },
   wardenScissor(dt,a){
     a.t+=dt;const p=B.pose;
@@ -3408,7 +3410,7 @@ const ATK={
 function setBossPhase(phase){
   B.phase=phase;
   B.speedMul=G.diff.spd*(G.boss.enrageSpeed||1.22)*(phase===3?1.08:1);
-  B.maxPoise=phase===3?195:170;B.poise=B.maxPoise;
+  B.maxPoise=Math.round((phase===3?195:170)*(G.boss.poiseMul||1));B.poise=B.maxPoise;
 }
 function updateBoss(dt){
   if(!BM)return;
@@ -3716,7 +3718,7 @@ function setupRoom(def,first){
   if(def.type==='boss'){
     const bc=G.boss,hp=Math.round(bc.hp*G.diff.hp*(1+.65*(G.np-1))*(G.campaign?.85:1));
     BM=makeBossModel(bc.model);
-    B={x:0,z:-ARENA*.25,y:0,facing:0,r:bc.r,hp,maxHp:hp,chip:hp,chipT:0,phase:1,poise:140,maxPoise:140,poiseT:0,action:null,queue:[],cool:2.6,last:'',dead:false,
+    B={x:0,z:-ARENA*.25,y:0,facing:0,r:bc.r,hp,maxHp:hp,chip:hp,chipT:0,phase:1,poise:140*(bc.poiseMul||1),maxPoise:140*(bc.poiseMul||1),poiseT:0,action:null,queue:[],cool:bc.model==='storm'?1.35:2.6,last:'',dead:false,
       speedMul:G.diff.spd,air:false,flash:0,walk:0,pose:BM.pose,tgtId:null,tgtT:0,dashId:0,fade:1,hist:[]};
     if(G.diff.ultra)setBossPhase(2);
     $('bossName').textContent=bc.n;
