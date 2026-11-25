@@ -17,7 +17,7 @@ type Room = {
   players: Map<string, Player>;
 };
 
-const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin", "jester"];
+const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin", "jester", "soul"];
 const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm" };
 const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
 const MAX = 5;
@@ -25,7 +25,7 @@ const skinType = (value: unknown) => value === "pixel" ? "pixel" : "classic";
 function roomCapacity(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= MAX ? value : fallback;
 }
-const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "stormThrow", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe", "bossCredit"]);
+const HOST_EVENTS = new Set(["danger", "cancel", "msg", "shock", "stormThrow", "roarfx", "blink", "eproj", "cleared", "room", "bossDead", "enemyFelled", "oathSeal", "tauntFx", "revive", "wipe", "bossCredit", "soulLinkState"]);
 const rooms = new Map<string, Room>();
 type Presence = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel";
   x: number; z: number; facing: number; moving: boolean; seen: number };
