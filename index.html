@@ -2297,12 +2297,12 @@ function handleEv(e,d,from,local){
     case 'soulGift':applySoulGift(d,from);break;
     case 'soulDamageCredit':
       if(P.cls==='soul'&&d.to===localPlayerId()&&G.links.get(from)===d.to&&Number.isFinite(d.dmg)&&d.dmg>0)
-        gainUlt(Math.min(30,d.dmg*.055));
+        gainUlt(Math.min(8,d.dmg*.02));
       break;
     case 'soulShare':
       if(P.cls==='soul'&&d.to===localPlayerId()&&G.links.get(from)===d.to&&Number.isFinite(d.dmg)&&d.dmg>0){
         const lost=loseHealth(Math.min(500,d.dmg));
-        if(lost>0){P.lastHit=gameTime;gainUlt(lost*.6);}
+        if(lost>0){P.lastHit=gameTime;gainUlt(lost*.25);}
       }
       break;
     case 'paladinBubble':
