@@ -1611,7 +1611,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
-  let glow=null,bowRig=null,frostOrbRef=null;
+  let glow=null,bowRig=null,mageMotion=null;
   const veteran=level>=2,royal=level===3;
   if(skin==='pixel')pixelGear(cls,level,{upper,armL,armR,hipL,hipR});
   else if(cls==='jester'){
@@ -1741,7 +1741,14 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     const cr=new THREE.Mesh(new THREE.OctahedronGeometry(royal?.17:veteran?.14:.11,0),glow);cr.scale.y=1.9;frostOrb.add(cr);
     if(veteran){const orbit=new THREE.Mesh(new THREE.TorusGeometry(royal?.34:.28,.012,5,32),glow);orbit.rotation.x=1.2;frostOrb.add(orbit);}
     for(let i=0;i<(royal?3:veteran?2:0);i++){const a=i/3*TAU;const sp=new THREE.Mesh(new THREE.SphereGeometry(.03,6,6),glow);sp.position.set(Math.sin(a)*.32,Math.cos(a)*.12,Math.cos(a)*.32);frostOrb.add(sp);}
-    frostOrbRef=frostOrb;
+    const flame=grp(0,-.94,.04,armR);
+    const ember=new THREE.MeshBasicMaterial({color:0xffd285});
+    const outer=new THREE.MeshBasicMaterial({color:0xff7133,transparent:true,opacity:.64,depthWrite:false,blending:THREE.AdditiveBlending});
+    const core=ball(.105,ember,0,0,0,1,1,1,flame,10);
+    const aura=new THREE.Mesh(new THREE.IcosahedronGeometry(.19,1),outer);flame.add(aura);
+    const sparks=Array.from({length:4},()=>ball(.027,ember,0,0,0,1,1,1,flame,6));
+    flame.scale.setScalar(.001);flame.visible=false;
+    mageMotion={flame,core,aura,sparks,frostOrb,skirt,tailA,tailB,time:0,heat:0};
     // Small frost mote in the left hand for heals
     ball(.06,glow,0,-.78,.05,1,1,1,armL,8);
   }else if(cls==='warlock'){
@@ -1929,7 +1936,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,frostOrb:frostOrbRef,frostT:Math.random()*9,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
@@ -2606,7 +2613,8 @@ function handleEv(e,d,from,local){
     case 'zone':addZone(d.z);break;
     case 'healCredit':if(d.to===NET.id&&P.cls==='mage'&&remotes.has(from)&&Number.isFinite(d.amount)&&d.amount>0)gainUlt(Math.min(10,d.amount));break;
     case 'healburst':healBurst(d.x,d.z,d.r,d.amt,from,d.credit);break;
-    case 'heal':healBeam(d.x,d.z,d.tx,d.tz);SFX.heal();if(P&&!P.dead&&d.to===(NET.id||'me')){const h=restoreHealth(d.amt);creditMageHealing(from,h);if(h>0)floatText('+'+Math.round(h),P.x,2.7,P.z,'heal');}break;
+    case 'mageCastFx':mageCastFx(d);break;
+    case 'heal':renderMendingRay(d,from);SFX.heal();if(P&&!P.dead&&d.to===(NET.id||'me')){const h=restoreHealth(d.amt);creditMageHealing(from,h);if(h>0)floatText('+'+Math.round(h),P.x,2.7,P.z,'heal');}break;
     case 'renew':healBeam(d.x,d.z,d.tx,d.tz,0xbff0a0);SFX.heal();if(P&&!P.dead&&d.to===(NET.id||'me')){P.hot={rate:d.amt/d.dur,t:d.dur};floatText('RENEW',P.x,2.8,P.z,'label');}break;
     case 'ward':wardBurst(d.x,d.z,d.r,d.dur);break;
     case 'guard':applyGuard(d);break;
@@ -3365,12 +3373,12 @@ function tryActions(mx,mz,ml){
     }
   }else if(P.cls==='mage'){
     if(gameTime-buf.light<.32&&ready('mend')){buf.light=-9;useSkill('mend');const tg=allyTarget();if(!tg.self)P.facing=Math.atan2(tg.x-P.x,tg.z-P.z);
-      startCast({dur:.32,at:.14,pose:'forward',move:.75,face:false,fn:()=>{const t2=allyTarget(tg.id);emit('heal',{to:t2.id,amt:8,x:P.x,z:P.z,tx:t2.x,tz:t2.z});}});return true;}
-    if(gameTime-buf.heavy<.32&&ready('fireball')){buf.heavy=-9;useSkill('fireball');P.facing=aimAngle();startCast({dur:.4,at:.18,pose:'forward',move:.6,fn:()=>{shoot('fire',39,6,30);SFX.fireball();}});return true;}
+      startCast({dur:.32,at:.14,pose:'mageBeam',move:.75,face:false,fn:()=>{const t2=allyTarget(tg.id);emit('heal',{to:t2.id,amt:8,x:P.x,z:P.z,tx:t2.x,tz:t2.z});}});return true;}
+    if(gameTime-buf.heavy<.32&&ready('fireball')){buf.heavy=-9;useSkill('fireball');P.facing=aimAngle();startCast({dur:.4,at:.18,pose:'mageFire',move:.6,fn:()=>{shoot('fire',39,6,30);SFX.fireball();emit('mageCastFx',{kind:'fire',x:P.x,z:P.z,a:P.facing});}});return true;}
     if(gameTime-buf.q<.32&&ready('sanct')){buf.q=-9;useSkill('sanct');SFX.cast();const tg=allyTarget();
-      startCast({dur:.8,at:.5,pose:'raise',move:.2,face:false,healFx:true,fn:()=>{const t2=allyTarget(tg.id);emit('zone',{z:{kind:'heal',x:t2.x,z:t2.z,r:6,dur:6,rate:10,credit:true,owner:NET.id||'me'}});}});return true;}
-    if(gameTime-buf.e<.32&&ready('burst')){buf.e=-9;useSkill('burst');SFX.cast();startCast({dur:.65,at:.4,pose:'raise',move:.3,face:false,healFx:true,fn:()=>{emit('healburst',{x:P.x,z:P.z,r:13,amt:32,credit:true});}});return true;}
-    if(gameTime-buf.f<.32&&ready('ward')){buf.f=-9;useSkill('ward');SFX.cast();startCast({dur:.6,at:.38,pose:'both',move:.3,face:false,fn:()=>{emit('ward',{x:P.x,z:P.z,r:13,dur:[5,7,8][P.level-1]});aoeHit(P.x,P.z,7,P.level>=2?30:18,10,false,true);if(P.level===3)emit('healburst',{x:P.x,z:P.z,r:13,amt:18,credit:true});ringFx(P.x,P.z,0x9fd8ff,6,.4);}});return true;}
+      startCast({dur:.8,at:.5,pose:'mageSanctuary',move:.2,face:false,healFx:true,fn:()=>{const t2=allyTarget(tg.id);emit('mageCastFx',{kind:'sanctuary',x:P.x,z:P.z});emit('zone',{z:{kind:'heal',x:t2.x,z:t2.z,r:6,dur:6,rate:10,credit:true,owner:NET.id||'me'}});}});return true;}
+    if(gameTime-buf.e<.32&&ready('burst')){buf.e=-9;useSkill('burst');SFX.cast();startCast({dur:.65,at:.4,pose:'mageBurst',move:.3,face:false,healFx:true,fn:()=>{emit('mageCastFx',{kind:'burst',x:P.x,z:P.z});emit('healburst',{x:P.x,z:P.z,r:13,amt:32,credit:true});}});return true;}
+    if(gameTime-buf.f<.32&&ready('ward')){buf.f=-9;useSkill('ward');SFX.cast();startCast({dur:.6,at:.38,pose:'mageWard',move:.3,face:false,fn:()=>{emit('mageCastFx',{kind:'ward',x:P.x,z:P.z});emit('ward',{x:P.x,z:P.z,r:13,dur:[5,7,8][P.level-1]});aoeHit(P.x,P.z,7,P.level>=2?30:18,10,false,true);if(P.level===3)emit('healburst',{x:P.x,z:P.z,r:13,amt:18,credit:true});ringFx(P.x,P.z,0x9fd8ff,6,.4);}});return true;}
     buf.light=buf.heavy=buf.q=buf.e=buf.f=-9;
   }else if(P.cls==='berserker'){
     if(consume('light')){P.state='cleave';P.combo=0;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();return true;}
@@ -3546,8 +3554,8 @@ function updateUlt(dt,pose,mx,mz){
       break;
     }
     case 'mage':{
-      pose.armR=-2.9;pose.armL=-2.9;pose.armRz=.3;pose.armLz=-.3;pose.lean=-.15;
-      if(Math.random()<.8)burst(P.x+rand(-.8,.8),.2,P.z+rand(-.8,.8),1,0xf2d870,2,.12,1,-4);
+      mageCastPose(pose,'mageSanctuary',t,.8,1.2);
+      if(Math.random()<.45)burst(P.x+rand(-.8,.8),arenaHeight(P.x,P.z)+.2,P.z+rand(-.8,.8),1,0xbaf8ff,2,.12,1,-4);
       if(t>=.8&&!P.ufin){P.ufin=true;emit('healburst',{x:P.x,z:P.z,r:30,amt:70});emit('ward',{x:P.x,z:P.z,r:30,dur:8});emit('ultfx',{k:'pillar',x:P.x,z:P.z});if(G.mode==='mp')toHost('reviveRequest',{});}
       break;}
     case 'archer':{
@@ -3660,12 +3668,129 @@ function updateTornados(dt){
 }
 function endTornado(){if(localTorn)localTorn.t=Math.min(localTorn.t,.15);}
 
+function mageCastPose(p,spell,t,release,end){
+  const draw=ease(t/release),recover=ease((t-release)/(end-release));
+  const pulse=draw*(1-recover);
+  p.focus=spell==='mageFire'?0:pulse;
+  switch(spell){
+    case 'mageFire': {
+      const wind=ease(draw/.65),throwOut=ease((draw-.65)/.35);
+      p.armR=lerp(lerp(-1.33,-2.12,wind),-1.48,throwOut)+.74*recover;
+      p.armRz=lerp(-.25,.29,wind)-.4*throwOut;
+      p.armL=-.36-.63*pulse;
+      p.upperY=.62*wind-.99*throwOut+.37*recover;
+      p.lean=-.26*wind+.47*throwOut-.21*recover;
+      p.heat=t<release?.77+.55*draw:.05*(1-recover);
+      break;
+    }
+    case 'mageBeam':
+      p.armL=-.44-1.17*pulse;p.armLz=.29*pulse;
+      p.armR=-1.25+.43*pulse;p.armRz=-.34;
+      p.upperY=.36*pulse;p.lean=.13*pulse;
+      break;
+    case 'mageSanctuary':
+      p.armL=-.4-2.55*pulse;p.armR=-1.25-1.63*pulse;
+      p.armLz=-.43*pulse;p.armRz=.43*pulse;p.lean=-.19*pulse;
+      break;
+    case 'mageBurst':
+      p.armL=-.45-1.15*pulse;p.armR=-1.2-.49*pulse;
+      p.armLz=.52*draw-.92*pulse;p.armRz=-.52*draw+.92*pulse;
+      p.lean=-.16*pulse;
+      break;
+    case 'mageWard':
+      p.armL=-.44-1.17*pulse;p.armR=-1.2-.41*pulse;
+      p.armLz=.69*pulse;p.armRz=-.69*pulse;p.upperY=-.22*pulse;
+      break;
+  }
+}
+function mageCastFx(d){
+  const y=arenaHeight(d.x,d.z);
+  if(d.kind==='fire'){
+    const x=d.x+Math.sin(d.a)*.78,z=d.z+Math.cos(d.a)*.78;
+    burst(x,y+1.55,z,16,0xff9346,3.2,.13,.4,-1);
+    return;
+  }
+  const color=d.kind==='ward'?0x9edcff:0x9fffc9;
+  ringFx(d.x,d.z,color,d.kind==='burst'?5:3.5,.48);
+  burst(d.x,y+.5,d.z,22,color,3.3,.11,.65,-2.2);
+}
 function healBeam(x,z,tx,tz,col){
   const dx=tx-x,dz=tz-z,L=Math.hypot(dx,dz);if(L<.5)return;
   const mat=new THREE.MeshBasicMaterial({color:col||0x8af0a0,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false});
   const m=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,L,6,1,true),mat);m.position.set(x+dx/2,1.5,z+dz/2);m.rotation.set(Math.PI/2,0,0);m.rotation.order='YXZ';m.rotation.y=Math.atan2(dx,dz);scene.add(m);
   addFx({dur:.35,update(dt,k){mat.opacity=.85*(1-k);m.scale.x=m.scale.z=1+k*2;},dispose(){scene.remove(m);m.geometry.dispose();mat.dispose();}});
   burst(tx,1.4,tz,10,col||0x8af0a0,2.5,.12,.6,-2);
+}
+function renderMendingRay(d,from){
+  const source=from===(NET.id||'me')||!from?P:remotes.get(from);
+  const target=d.to===(NET.id||'me')?P:remotes.get(d.to);
+  const origin=new THREE.Vector3(),end=new THREE.Vector3(),point=new THREE.Vector3();
+  const left=new THREE.Vector3(),delta=new THREE.Vector3(),direction=new THREE.Vector3(),axis=new THREE.Vector3(0,1,0);
+  const sourceFacing=source?.facing??source?.f??0;
+  const sx=d.x+Math.sin(sourceFacing)*.67-Math.cos(sourceFacing)*.37;
+  const sz=d.z+Math.cos(sourceFacing)*.67+Math.sin(sourceFacing)*.37;
+  origin.set(sx,arenaHeight(d.x,d.z)+1.68,sz);
+  const currentEnd=()=>{
+    const x=target?.x??d.tx,z=target?.z??d.tz;
+    end.set(x,arenaHeight(x,z)+1.37,z);
+  };
+  currentEnd();
+  const group=grp(0,0,0,scene);
+  const glow=new THREE.MeshBasicMaterial({color:0x75f6db,transparent:true,opacity:.22,depthWrite:false,blending:THREE.AdditiveBlending});
+  const light=new THREE.MeshBasicMaterial({color:0xe2ffff,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+  const cylinder=new THREE.CylinderGeometry(1,1,1,10,1,true);
+  const halo=new THREE.Mesh(cylinder,glow),core=new THREE.Mesh(cylinder,light);group.add(halo,core);
+  const strands=Array.from({length:2},(_,i)=>{
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(28*3),3));
+    const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:i?0x87cfff:0xadffd4,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    line.frustumCulled=false;group.add(line);return line;
+  });
+  const rune=new THREE.Mesh(new THREE.TorusGeometry(.44,.022,6,28),light);group.add(rune);
+  const moteGeometry=new THREE.OctahedronGeometry(.08);
+  const motes=Array.from({length:5},()=>{const m=new THREE.Mesh(moteGeometry,light);group.add(m);return m;});
+  addFx({dur:.48,update(dt,k){
+    k=clamp(k,0,1);
+    currentEnd();
+    delta.subVectors(end,origin);
+    const length=delta.length(),fade=ease((1-k)/.55),width=(.8+Math.sin(k*18)*.22)*fade;
+    const reach=ease(k/.28);
+    direction.copy(delta).normalize();
+    point.copy(origin).addScaledVector(delta,reach*.5);
+    for(const mesh of [halo,core]){
+      mesh.position.copy(point);
+      mesh.quaternion.setFromUnitVectors(axis,direction);
+    }
+    core.scale.set(.041*width,length*reach,.041*width);
+    halo.scale.set(.154*width,length*reach,.154*width);
+    light.opacity=.93*fade;glow.opacity=.31*fade;
+    left.set(delta.z,0,-delta.x).normalize();
+    strands.forEach((line,i)=>{
+      const positions=line.geometry.attributes.position;
+      for(let j=0;j<positions.count;j++){
+        const u=j/(positions.count-1)*reach,angle=u*TAU*2.2-k*14+i*Math.PI;
+        const swirl=.16*Math.sin(u*Math.PI)*width;
+        point.copy(origin).addScaledVector(delta,u).addScaledVector(left,Math.cos(angle)*swirl);
+        point.y+=Math.sin(angle)*swirl;
+        positions.setXYZ(j,point.x,point.y,point.z);
+      }
+      positions.needsUpdate=true;line.material.opacity=.76*fade;
+    });
+    rune.position.copy(end);rune.rotation.set(k,sourceFacing,k*4);
+    rune.scale.setScalar((.42+k)*fade);rune.visible=reach>.95;
+    motes.forEach((m,i)=>{
+      const u=clamp(k*2.4-i*.18,0,reach);
+      m.position.copy(origin).addScaledVector(delta,u);
+      m.position.y+=Math.sin(u*Math.PI)*(.1+Math.sin(k*12+i)*.15);
+      m.rotation.set(k*5+i,k*7,0);
+      m.scale.setScalar(fade*(u>0?1.1:.001));
+    });
+  },dispose(){
+    scene.remove(group);cylinder.dispose();moteGeometry.dispose();rune.geometry.dispose();
+    light.dispose();glow.dispose();
+    for(const line of strands){line.geometry.dispose();line.material.dispose();}
+  }});
+  burst(end.x,end.y,end.z,10,0x9dfce0,2,.085,.48,-1.5);
 }
 function shadowStep(){
   const ox=P.x,oz=P.z;let x,z;
@@ -3734,7 +3859,7 @@ function updatePlayer(dt){
   const repeatPrimary=queueHeldPrimary(blockHeld);
   const bA=bossAngle(),faceTarget=lockTarget?Math.atan2(lockTarget.x-P.x,lockTarget.z-P.z):bA,SPD=classData(P.cls).speed*(P.rageT>0?1.3:1)*(activeEffect('frostbite') ? .92 : 1)*(P.soulPowerUntil>gameTime?1.25:1);
   let vx=0,vz=0;const pose=PM.pose;
-  pose.spin=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;pose.yaw=0;pose.jump=0;
+  pose.spin=0;pose.roll=0;pose.heat=0;pose.focus=0;pose.move=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;pose.yaw=0;pose.jump=0;
   const restR={sword:-.55,soul:-.4,mage:-.35,archer:-.25,rogue:-.45,berserker:-.6,warlock:-.35,sentinel:-.48,paladin:-.52,jester:-.46,skeleton:-.44}[P.cls],restL={sword:-.35,soul:-.35,mage:-.25,archer:-.45,rogue:-.45,berserker:-.3,warlock:-.35,sentinel:-.32,paladin:-.4,jester:-.33,skeleton:-.25}[P.cls];
   switch(P.state){
     case 'idle':{
@@ -3744,6 +3869,7 @@ function updatePlayer(dt){
       const spd=Math.hypot(vx,vz),amp=clamp(spd/SPD,0,1.35);
       if(lockTarget&&!sprint)turnTo(faceTarget,16,dt);else if(spd>.5)turnTo(Math.atan2(vx,vz),sprint?11:18,dt);
       P.walk+=dt*spd*1.7;
+      if(P.cls==='mage'){pose.move=amp;pose.gait=P.walk%TAU;}
       pose.legL=Math.sin(P.walk)*.7*amp;pose.legR=-pose.legL;
       pose.armR=restR-Math.sin(P.walk)*.42*amp;pose.armL=restL+Math.sin(P.walk)*.36*amp;
       pose.lean=sprint?.3:spd*.02;pose.upperY=0;
@@ -3828,6 +3954,13 @@ function updatePlayer(dt){
       else if(ml>0)turnTo(Math.atan2(mx,mz),8,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.4;pose.legR=-pose.legL;
       switch(c.pose){
+        case 'mageBeam':
+        case 'mageFire':
+        case 'mageSanctuary':
+        case 'mageBurst':
+        case 'mageWard':
+          mageCastPose(pose,c.pose,t,c.at,c.dur);
+          break;
         case 'bash':pose.armL=-.6-1.15*Math.sin(Math.PI*Math.min(t/c.dur,1));pose.armLz=-.45;pose.upperY=-.56;pose.lean=.24;pose.armR=-.74;break;
         case 'forward':pose.armR=lerp(-.4,-1.6,ease(k));pose.armL=-.3;break;
         case 'forward2':pose.armR=t<c.at?lerp(-.4,-2.6,ease(k)):-1.5;pose.armL=t<c.at?-2.2:-1.2;pose.lean=t<c.at?-.15:.2;break;
@@ -3859,7 +3992,8 @@ function updatePlayer(dt){
       const t=P.t,dur=.55,k=Math.min(1,t/dur);
       const sp=13*Math.pow(1-k,.55)+1.5;vx=P.rx*sp;vz=P.rz*sp;
       const back=Math.abs(wrap(Math.atan2(P.rx,P.rz)-P.facing))>1.6;
-      pose.spin=(back?-1:1)*TAU*ease(k);pose.legL=-.4;pose.legR=-.4;pose.armR=-1;pose.armL=-1;
+      pose.roll=k;
+      pose.spin=(back?-1:1)*TAU*(P.cls==='mage'&&P.skin!=='pixel'?ease((k-.035)/.91):ease(k));pose.legL=-.4;pose.legR=-.4;pose.armR=-1;pose.armL=-1;
       if(Math.random()<.4)burst(P.x,.1,P.z,1,0x3a3530,1.5,.15,.4,2);
       if(t>=dur){P.state='idle';P.rollCd=.27;P.runT=ml>0?.65:0;}
       break;}
@@ -4469,7 +4603,46 @@ function updateBow(model,draw,dt){
   seg(b.s1,b.tipU);seg(b.s2,b.tipL);
   b.nock.visible=d>.04;b.nock.position.y=ny;
 }
+function animateMageRig(model,p,st,dt,s){
+  const rig=model.mageMotion;
+  rig.time+=dt;
+  const t=rig.time,carry=st==='walk'||st==='idle',rolling=st==='roll';
+  const roll=clamp(p.roll??Math.abs(p.spin)/TAU,0,1),tuck=rolling?ease(roll/.23)*ease((1-roll)/.26):0;
+  if(rolling){
+    model.hipL.rotation.x=lerp(model.hipL.rotation.x,-1.45*tuck,s);
+    model.hipR.rotation.x=lerp(model.hipR.rotation.x,-1.16*tuck,s);
+    model.upper.rotation.x=lerp(model.upper.rotation.x,.73*tuck,s);
+    model.armR.rotation.x=lerp(model.armR.rotation.x,-1.54*tuck,s);
+    model.armL.rotation.x=lerp(model.armL.rotation.x,-1.54*tuck,s);
+    model.spin.position.y=.95-.28*tuck;
+    model.spin.scale.set(1-.13*tuck,1-.13*tuck,1-.13*tuck);
+  }
+  rig.skirt.rotation.x=lerp(rig.skirt.rotation.x,rolling?-.22*tuck:clamp(p.lean*.48,-.18,.25),s);
+  rig.tailA.rotation.x=.2+Math.sin(t*8)*(.055+.11*(p.move||0))+.53*tuck;
+  rig.tailB.rotation.x=.18+Math.sin(t*8-.9)*(.055+.11*(p.move||0))+.57*tuck;
+  rig.frostOrb.rotation.y=t*1.7;
+  rig.frostOrb.position.y=-.6+Math.sin(t*2.6)*.06;
+  rig.frostOrb.visible=!rolling;
+  rig.frostOrb.scale.setScalar(1+(st==='cast'||st==='ult'?(p.focus||0)*.48:0));
+  rig.heat=lerp(rig.heat,carry?.77:st==='cast'?(p.heat||0):0,1-Math.exp(-19*dt));
+  rig.flame.visible=rig.heat>.035;
+  rig.flame.scale.setScalar(Math.max(.001,rig.heat));
+  rig.flame.position.y=-.92+Math.sin(t*8)*.038;
+  rig.core.scale.setScalar(.9+.12*Math.sin(t*15));
+  rig.aura.rotation.set(t*2,t*3.7,t*.8);
+  rig.sparks.forEach((spark,i)=>{
+    const angle=t*4.1+i*TAU/rig.sparks.length;
+    spark.position.set(Math.cos(angle)*.23,Math.sin(angle*1.4)*.15,Math.sin(angle)*.23);
+    spark.scale.setScalar(.55+.4*Math.sin(angle*2)**2);
+  });
+}
 function applyPose(model,p,st,dt,px,pz,f,spinY){
+  if(model.mageMotion&&(st==='idle'||st==='walk')){
+    const stride=p.move??(st==='walk'?1:0),step=p.gait??model.mageMotion.time*9;
+    const sway=Math.sin(step)*stride,breath=Math.sin(model.mageMotion.time*3)*.045;
+    p={...p,armR:-1.33+breath-sway*.07,armRz:-.24+sway*.05,armL:-.38+sway*.38,
+      upperY:-.14+sway*.13,jump:(1-Math.cos(step*2))*.026*stride};
+  }
   if(model.skin==='pixel'){
     model.poseTime+=dt;
     if(model.lastPose===st&&model.poseTime<.12)return;
@@ -4505,7 +4678,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   model.spin.rotation.z=lerp(model.spin.rotation.z,walking?p.legL*.06:0,s);
   const sq=1-.16*tuck;model.spin.scale.set(1,sq,1);
   model.spin.position.y=rolling?lerp(.95,.74,tuck):lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
-  if(model.frostOrb){model.frostT+=dt;model.frostOrb.rotation.y=model.frostT*1.7;model.frostOrb.position.y=-.6+Math.sin(model.frostT*2.6)*.05;}
+  if(model.mageMotion)animateMageRig(model,p,st,dt,s);
   if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
 }
 
@@ -4642,7 +4815,7 @@ function updateRemotes(dt){
   updateTornados(dt);
   const s=1-Math.exp(-15*dt);
   remotes.forEach(r=>{if(r.first)return;r.x=lerp(r.x,r.nx,s);r.z=lerp(r.z,r.nz,s);r.f+=wrap(r.nf-r.f)*s;
-    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0};
+    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0};
     setForgeBlade(r.model,r.bladeTier||0);
     applyPose(r.model,p,r.st,dt,r.x,r.z,r.f);
     if(r.zapped&&!r.dead&&gameTime>=(r.sparkAt||0)){r.sparkAt=gameTime+.23;zappedArcs(r.x,r.model.root.position.y,r.z);}
@@ -4653,7 +4826,7 @@ function netTick(dt,force=false){
   if(G.mode!=='mp')return;sendT-=dt;if(!force&&sendT>0)return;sendT=1/15;
   const p=PM.pose,r2=v=>Math.round(v*100)/100;
   nsend({t:'g',d:{k:'p',active:!localAway(),x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,rev:G.revived.has(NET.id),restock:G.restock,inv:P.smoke>0?1:0,zapped:activeEffect('zapped')?1:0,
-    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0].map(r2)}});
+    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0].map(r2)}});
   if(NET.isHost&&(mins.size||G.bossId==='morvane'||(G.room&&G.room.type==='minion'))){nsend({t:'g',d:{k:'m',w:G.wave,wt:G.waveTotal,seq:minId,wh:Math.round(G.waveHp||1),l:[...mins.values()].map(m=>[m.id,MTYPE_IDX.indexOf(m.type),r2(m.x),r2(m.z),r2(m.f),Math.round(m.hp),Math.round(m.maxHp),m.st==='wind'?1:0,r2(Math.max(0,(m.jesterChillUntil||0)-gameTime))])}});}
   if(NET.isHost){
   if(BM){const q=B.pose;
@@ -5346,7 +5519,7 @@ function villageAvatar(cls,level,skin){
 function animateVillager(v,dt){
   v.pace+=v.moving?dt*10:0;
   const swing=v.moving?Math.sin(v.pace)*.62:0;
-  const pose={...VILLAGE_WALK_POSE,armR:-.4-swing*.49,armL:-.32+swing*.49,legL:swing,legR:-swing};
+  const pose={...VILLAGE_WALK_POSE,move:v.moving?1:0,gait:v.pace,armR:-.4-swing*.49,armL:-.32+swing*.49,legL:swing,legR:-swing};
   applyPose(v.model,pose,v.moving?'walk':'idle',dt,v.x,v.z,v.facing);
 }
 function removeVillager(peer){
