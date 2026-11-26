@@ -828,13 +828,13 @@ function useSoulActions(){
         .sort((a,b)=>Math.hypot(a.x-P.x,a.z-P.z)-Math.hypot(b.x-P.x,b.z-P.z))[0];
     if(!combatReady(target)||Math.hypot(target.x-P.x,target.z-P.z)>24){toast('No teammate in link range');return false;}
     if(activeProtector(target.id)){toast('That teammate is already linked');return false;}
-    useSkill('link');startGesture('reach');toHost('soulLinkRequest',{id:target.id});return true;
+    useSkill('link');startGesture('link');toHost('soulLinkRequest',{id:target.id});return true;
   }
   if(consume('heavy')&&ready('unlink')){
-    useSkill('unlink');startGesture('seal');toHost('soulLinkRequest',{id:lockTarget?.kind==='ally'?lockTarget.id:null,remove:true});return true;
+    useSkill('unlink');startGesture('unlink');toHost('soulLinkRequest',{id:lockTarget?.kind==='ally'?lockTarget.id:null,remove:true});return true;
   }
   if(consume('q')&&ready('renewSelf')){
-    useSkill('renewSelf');startGesture('seal');
+    useSkill('renewSelf');startGesture('renewSelf');
     const healed=restoreHealth([38,44,50][P.level-1]);
     ringFx(P.x,P.z,0x8efac4,2.8,.44);SFX.heal();
     if(healed>0)floatText('+'+Math.round(healed),P.x,2.7,P.z,'heal');
@@ -843,7 +843,7 @@ function useSoulActions(){
   if(consume('e')&&ready('soulEmpower')){
     const allies=soulAllies(id);
     if(!allies.length){toast('Link a teammate first');return false;}
-    useSkill('soulEmpower');startGesture('invoke');emit('soulGift',{kind:'power',ids:allies});return true;
+    useSkill('soulEmpower');startGesture('soulEmpower');emit('soulGift',{kind:'power',ids:allies});return true;
   }
   if(consume('f')&&ready('saturate')){
     const missing=soulAllies(id).map(to=>{
@@ -852,7 +852,7 @@ function useSoulActions(){
     });
     const total=missing.reduce((sum,[,n])=>sum+n,0),spent=Math.max(0,P.hp-10);
     if(!total||!spent){toast('Saturate needs an injured linked ally and more than 10 HP');return false;}
-    useSkill('saturate');startGesture('invoke');P.hp-=spent;P.lastHit=gameTime;
+    useSkill('saturate');startGesture('saturate');P.hp-=spent;P.lastHit=gameTime;
     emit('soulGift',{kind:'heal',ids:missing.map(([to])=>to),amounts:missing.map(([,n])=>spent*n/total)});
     return true;
   }
@@ -1960,7 +1960,7 @@ function buildCelestialBody(cls,theme,level,R){
     box(.12,.62,.1,gold,0,-1.45,0,axe);
     root.scale.setScalar(1.1);
   }else if(cls==='paladin'){
-    const shield=grp(0,-.46,.02,armL);
+    const shield=grp(0,-.46,.02,armL);shield.userData.guardShield=true;
     const sh=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.08,24,1,false),plate);sh.rotation.z=Math.PI/2;sh.scale.set(1,1,royal?1.25:1.1);sh.position.set(-.16,0,0);shield.add(sh);
     const rim=new THREE.Mesh(new THREE.TorusGeometry(.42,.03,6,28),gold);rim.rotation.y=Math.PI/2;rim.scale.set(1,1.1,1);rim.position.set(-.2,0,0);shield.add(rim);
     if(classic){box(.04,.5,.08,gold,-.21,0,0,shield);box(.04,.08,.4,gold,-.21,.08,0,shield);if(royal)ball(.06,glowM,-.23,.08,0,1,1,1,shield,8);}
@@ -2461,6 +2461,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     celestial=addCelestialGear(cls,theme,level,{upper});
   }
   if(skin!=='pixel')tailorHero(cls,theme,level,upper,armL,armR);
+  const handProp=skin!=='pixel'?signatureGear(cls,theme,level,upper,armL,armR):null;
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   const knees=[mountLimbJoint(hipL,.46),mountLimbJoint(hipR,.46)];
   const elbows=[mountLimbJoint(armL,.34,.035),mountLimbJoint(armR,.34,.035)];
@@ -2468,7 +2469,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   const drapes=collectDrapes(upper,ninjaRig?.scarf);
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,handProp,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 // Elliptical rings describe fitted garments and embossed metal. Bands share vertices along each fold.
 function fittedShell(parent,material,rows,{pleats=0,fold=0,tip=0,segments=40}={}){
@@ -2568,6 +2569,89 @@ function addClassDetails(cls,{upper,armR,armL},level){
     const wrist=new THREE.Mesh(new THREE.CylinderGeometry(.127,.127,.032,10),trim);
     wrist.position.y=-.588;arm.add(wrist);
   }
+}
+// Character equipment is attached before elbows and knees are split, so it rides the rig.
+function signatureGear(cls,theme,level,upper,armL,armR){
+  let handProp=null;
+  const palette=LIVERY[cls];
+  if(!palette)return;
+  const tint=theme?CELESTIAL_PAL[theme].cloth2:palette[0],accent=theme?CELESTIAL_PAL[theme].gold:palette[1];
+  const trim=std(accent,{metalness:.57,roughness:.32}),shell=std(tint,{metalness:.2,roughness:.61}),dark=std(0x26212b);
+  if(cls==='sword'){
+    const goggles=grp(0,1.31,.235,upper);
+    box(.48,.042,.054,dark,0,0,0,goggles);
+    for(const side of [-1,1]){
+      const bezel=new THREE.Mesh(new THREE.TorusGeometry(.056,.015,7,12),trim);bezel.position.set(side*.09,0,.040);goggles.add(bezel);
+      gearGem(goggles,std(0x3b504e,{roughness:.24,metalness:.37}),side*.09,0,.04,.049,[1,1,.32]);
+    }
+    for(let i=0;i<3;i++)hewnBlock(.051,.15+i*.036,.075,trim,.31+i*.044,.105,.18,upper).rotation.z=-.21;
+  }
+  if(cls==='archer'){
+    for(const side of [-1,1]){
+      const plate=relief(upper,[[-.10,.05],[.10,.07],[.09,-.08],[0,-.17],[-.09,-.05]],shell,.024,side*.25,.46,.30);
+      plate.rotation.y=side*.40;
+      gearGem(plate,trim,0,-.03,.036,.032,[1,1,.6]);
+    }
+    for(let i=0;i<3;i++)gearGem(upper,trim,.15+i*.074,.30-i*.066,.295,.025,[1,1,.48]);
+  }
+  if(cls==='mage'||cls==='warlock'||cls==='soul'){
+    const focus=grp(cls==='mage'?.27:0,cls==='mage'?.11:.45,cls==='mage'?.285:.39,upper);
+    const metal=new THREE.Mesh(new THREE.TorusGeometry(cls==='mage'?.061:.081,.013,6,18),trim);focus.add(metal);
+    gearGem(focus,std(accent,{emissive:accent,emissiveIntensity:cls==='mage'?.18:.36,roughness:.25}),0,0,.017,.054,[.69,1.18,.53]);
+    for(const side of [-1,1]){
+      relief(focus,[[0,.064],[.019,.015],[0,-.04],[-.019,.015]],trim,.007,side*.073,-.075,.006).rotation.z=side*.57;
+    }
+    if(cls==='warlock'){
+      const grimoire=grp(.35,.17,-.14,upper);grimoire.rotation.set(.21,.44,-.31);
+      hewnBlock(.19,.25,.12,dark,0,0,0,grimoire);
+      for(const side of [-1,1])box(.206,.267,.025,shell,0,0,side*.069,grimoire);
+      for(const y of [-.082,.082])box(.22,.022,.15,trim,0,y,0,grimoire);
+    }
+    if(cls==='soul'){
+      for(const arm of [armL,armR])for(const side of [-1,1]){
+        relief(arm,[[0,-.083],[.044,-.015],[0,.107],[-.044,.021]],trim,.016,side*.08,-.58,.125).rotation.z=side*.22;
+      }
+    }
+  }
+  if(cls==='jester'){
+    handProp=grp(.034,-.69,.04,armR);
+    const heldCard=hewnBlock(.115,.167,.018,trim,0,.054,.04,handProp);heldCard.rotation.z=-.19;
+    gearGem(heldCard,dark,0,0,.012,.041,[.74,1.1,.27]);handProp.visible=false;
+    for(let i=0;i<3;i++){
+      const card=relief(upper,[[-.048,-.069],[.048,-.069],[.048,.069],[-.048,.069]],i===1?trim:shell,.013,.24+i*.055,.13+i*.016,.28-i*.024);
+      card.rotation.z=-.55+i*.32;
+      gearGem(card,trim,0,0,.018,.019,[.67,1.13,.35]);
+    }
+  }
+  if(cls==='rogue'){
+    const star=[[-.01,.109],[.032,.035],[.10,.015],[.032,-.027],[.009,-.10],[-.03,-.035],[-.103,-.015],[-.032,.028]];
+    for(let i=0;i<2;i++)relief(armL,star,trim,.010,0,-.43-i*.107,.148).rotation.z=i*.50;
+    handProp=grp(.03,-.69,.078,armR);
+    relief(handProp,star,trim,.016,0,.043,0);
+    gearGem(handProp,dark,0,.044,.019,.035,[1,1,.3]);handProp.visible=false;
+  }
+  if(cls==='berserker'){
+    for(const side of [-1,1])for(let i=0;i<3;i++){
+      const tooth=relief(upper,[[-.04,.055],[.046,.044],[.014,-.069],[-.016,-.095]],trim,.018,side*(.15+.053*i),.66-.085*i,.306);
+      tooth.rotation.z=side*(.23+i*.20);
+    }
+    hewnBlock(.248,.32,.063,shell,0,-.48,.127,armL);
+    gearGem(armL,trim,0,-.45,.177,.061,[.8,1,.42]);
+  }
+  if(cls==='paladin'||cls==='sentinel'){
+    const tabard=grp(0,.09,.295,upper);tabard.rotation.x=-.14;
+    relief(tabard,[[-.165,.09],[.165,.09],[.154,-.47],[0,-.61],[-.154,-.47]],shell,.038,0,0,0);
+    const badge=cls==='paladin'?[[0,.115],[.028,.03],[.095,.017],[.039,-.033],[.063,-.106],[0,-.071],[-.063,-.106],[-.039,-.033],[-.095,.017],[-.028,.03]]:[[0,.118],[.076,.019],[.049,-.075],[0,-.113],[-.049,-.075],[-.076,.019]];
+    relief(tabard,badge,trim,.016,0,-.20,.047);
+    if(level>=2)for(const side of [-1,1])box(.015,.39,.017,trim,side*.131,-.21,.046,tabard);
+    if(cls==='paladin'){
+      const shield=armL.children.find(o=>o.isGroup&&o.userData.guardShield);
+      if(shield)for(let i=0;i<10;i++){
+        const a=i*TAU/10;gearGem(shield,trim,-.213,Math.sin(a)*.372,Math.cos(a)*.399,.020,[.68,1,1]);
+      }
+    }
+  }
+  return handProp;
 }
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
@@ -4094,7 +4178,7 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='jester'){
     if(gameTime-buf.light<.32&&ready('card')){
       buf.light=-9;useSkill('card');P.facing=aimAngle();
-      startCast({dur:.30,at:.12,pose:'forward',move:.7,fn:()=>{shoot('card',JESTER_CARD_DAMAGE,2,58);SFX.whoosh();}});
+      startCast({dur:.30,at:.12,pose:'card',move:.7,fn:()=>{shoot('card',JESTER_CARD_DAMAGE,2,58);SFX.whoosh();}});
       return true;
     }
     for(const [kind,bomb] of Object.entries(JESTER_BOMBS)){
@@ -4108,16 +4192,16 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='paladin'){
     if(consume('light')){startSimpleSwing();return true;}
     if(gameTime-buf.q<.32&&ready('aura')){
-      buf.q=-9;useSkill('aura');startGesture('invoke');const level=P.level,r=level===1?7:10;
+      buf.q=-9;useSkill('aura');startGesture('aura');const level=P.level,r=level===1?7:10;
       emit('guard',{x:P.x,z:P.z,r,dur:[5,7,8][level-1]});
       if(level===3)emit('healburst',{x:P.x,z:P.z,r,amt:12});return true;
     }
     if(gameTime-buf.e<.32&&ready('taunt')){
       buf.e=-9;if(B.dead||Math.hypot(P.x-B.x,P.z-B.z)>26){toast('No boss in taunt range');return false;}
-      useSkill('taunt');startGesture('forge');toHost('taunt',{});return true;
+      useSkill('taunt');startGesture('taunt');toHost('taunt',{});return true;
     }
     if(gameTime-buf.f<.32&&ready('thorns')){
-      buf.f=-9;useSkill('thorns');startGesture('seal');P.thornsUntil=gameTime+6;
+      buf.f=-9;useSkill('thorns');startGesture('thorns');P.thornsUntil=gameTime+6;
       emit('ultfx',{k:'thorns',x:P.x,z:P.z});return true;
     }
   }else if(P.cls==='mage'){
@@ -4134,30 +4218,30 @@ function tryActions(mx,mz,ml){
     if(consume('light')){P.state='cleave';P.combo=0;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();return true;}
     if(consume('heavy')){P.state='crush';P.t=0;P.cr=false;P.hitDone=false;P.tok=(P.tok||0)+1;P.hs=false;aimAtBoss();return true;}
     if(gameTime-buf.q<.32&&ready('whirl')){buf.q=-9;useSkill('whirl');P.state='whirl';P.t=0;P.tick=0;SFX.heavySwing();emit('tornado',{dur:3});return true;}
-    if(gameTime-buf.e<.32&&ready('rage')){buf.e=-9;useSkill('rage');P.rageT=P.level>=2?10:8;if(P.level>=2){const r=P.level===3?6.6:3.8;ringFx(P.x,P.z,0xde424b,r,.48);aoeHit(P.x,P.z,r,P.level===3?43:25,15,true,P.level===3);}SFX.roar();shake(.3);burst(P.x,1.2,P.z,30,0xc01a10,4,.14,.8,-1);floatText('BLOOD RAGE',P.x,2.9,P.z,'label');return true;}
+    if(gameTime-buf.e<.32&&ready('rage')){buf.e=-9;useSkill('rage');startGesture('rage');P.rageT=P.level>=2?10:8;if(P.level>=2){const r=P.level===3?6.6:3.8;ringFx(P.x,P.z,0xde424b,r,.48);aoeHit(P.x,P.z,r,P.level===3?43:25,15,true,P.level===3);}SFX.roar();shake(.3);burst(P.x,1.2,P.z,30,0xc01a10,4,.14,.8,-1);floatText('BLOOD RAGE',P.x,2.9,P.z,'label');return true;}
     if(gameTime-buf.f<.32&&ready('leap')){buf.f=-9;useSkill('leap');let tx,tz;
       if(LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<24){const a=Math.atan2(LT.x-P.x,LT.z-P.z),d=Math.max(0,Math.hypot(LT.x-P.x,LT.z-P.z)-LT.r-1.2);tx=P.x+Math.sin(a)*d;tz=P.z+Math.cos(a)*d;}
       else{const a=aimAngle();tx=P.x+Math.sin(a)*10;tz=P.z+Math.cos(a)*10;}
       [tx,tz]=clampArena(tx,tz,.8);P.state='bleap';P.t=0;P.landed=false;P.lx=P.x;P.lz=P.z;P.ltx=tx;P.ltz=tz;P.iframe=.8;P.facing=Math.atan2(tx-P.x,tz-P.z);SFX.whoosh();return true;}
     buf.q=buf.e=buf.f=-9;
   }else if(P.cls==='warlock'){
-    if(gameTime-buf.light<.32&&ready('bolt')){buf.light=-9;useSkill('bolt');P.facing=aimAngle();startCast({dur:.32,at:.12,pose:'forward',move:.75,fn:()=>{shoot('bolt',20,4,36);SFX.cast();}});return true;}
+    if(gameTime-buf.light<.32&&ready('bolt')){buf.light=-9;useSkill('bolt');P.facing=aimAngle();startCast({dur:.32,at:.12,pose:'bolt',move:.75,fn:()=>{shoot('bolt',20,4,36);SFX.cast();}});return true;}
     if(gameTime-buf.heavy<.32&&ready('curse')){buf.heavy=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>32){toast('No target in range');return false;}useSkill('curse');P.facing=bossAngle();const target={...LT};
-      startCast({dur:.4,at:.2,pose:'both',move:.5,fn:()=>{P.curse={t:6,tick:.5,boss:target.boss,mid:target.id};emit('cursefx',{x:target.x,z:target.z});}});return true;}
-    if(gameTime-buf.q<.32&&ready('rift')){buf.q=-9;useSkill('rift');const tg=rainTarget();startCast({dur:.55,at:.35,pose:'raise',move:.4,face:false,fn:()=>{emit('zone',{z:{kind:'rift',x:tg[0],z:tg[1],r:P.level===1?4.5:5.7,dur:P.level===3?4.8:4,dmg:P.level>=2?13:11,owner:NET.id||'me'}});if(P.level===3)emit('zone',{z:{kind:'heal',x:tg[0],z:tg[1],r:5.7,dur:6,rate:4}});}});return true;}
+      startCast({dur:.4,at:.2,pose:'curse',move:.5,fn:()=>{P.curse={t:6,tick:.5,boss:target.boss,mid:target.id};emit('cursefx',{x:target.x,z:target.z});}});return true;}
+    if(gameTime-buf.q<.32&&ready('rift')){buf.q=-9;useSkill('rift');const tg=rainTarget();startCast({dur:.55,at:.35,pose:'rift',move:.4,face:false,fn:()=>{emit('zone',{z:{kind:'rift',x:tg[0],z:tg[1],r:P.level===1?4.5:5.7,dur:P.level===3?4.8:4,dmg:P.level>=2?13:11,owner:NET.id||'me'}});if(P.level===3)emit('zone',{z:{kind:'heal',x:tg[0],z:tg[1],r:5.7,dur:6,rate:4}});}});return true;}
     if(gameTime-buf.e<.32&&ready('siphon')){buf.e=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>16){toast('No target in range');return false;}useSkill('siphon');P.state='siphon';P.t=0;P.tick=0;return true;}
-    if(gameTime-buf.f<.32&&ready('blink')){buf.f=-9;useSkill('blink');const a=ml>0?Math.atan2(mx,mz):aimAngle();const ox=P.x,oz=P.z;let [x,z]=clampArena(P.x+Math.sin(a)*9,P.z+Math.cos(a)*9,.8);
+    if(gameTime-buf.f<.32&&ready('blink')){buf.f=-9;useSkill('blink');startGesture('blink');const a=ml>0?Math.atan2(mx,mz):aimAngle();const ox=P.x,oz=P.z;let [x,z]=clampArena(P.x+Math.sin(a)*9,P.z+Math.cos(a)*9,.8);
       P.x=x;P.z=z;P.iframe=.3;P.vx=P.vz=0;emit('pstep',{x,z,ox,oz});return true;}
     buf.light=buf.heavy=buf.q=buf.e=buf.f=-9;
   }else if(P.cls==='rogue'){
     if(consume('light')){P.state='stab';P.combo=0;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();SFX.swing();return true;}
     if(gameTime-buf.heavy<.32&&ready('shuriken')){
       buf.heavy=-9;useSkill('shuriken');P.facing=aimAngle();
-      startCast({dur:.32,at:.13,pose:'forward',move:.68,fn:()=>{shoot('shuriken',23,6,47);SFX.whoosh();}});return true;
+      startCast({dur:.32,at:.13,pose:'shuriken',move:.68,fn:()=>{shoot('shuriken',23,6,47);SFX.whoosh();}});return true;
     }
     if(gameTime-buf.q<.32&&ready('step')){buf.q=-9;useSkill('step');
       startCast({dur:.29,at:.12,pose:'ninjaStep',move:.32,fn:shadowStep});return true;}
-    if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');P.poisonT=P.level>=2?8:6;if(P.level===3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
+    if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');startGesture('poison');P.poisonT=P.level>=2?8:6;if(P.level===3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
     if(gameTime-buf.f<.32&&ready('smoke')){buf.f=-9;useSkill('smoke');
       startCast({dur:.32,at:.11,pose:'ninjaSmoke',move:.65,face:false,fn:()=>{
         P.smoke=2.5;emit('smoke',{x:P.x,z:P.z,a:P.facing});
@@ -4166,17 +4250,17 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='sentinel'){
     if(gameTime-buf.light<.32&&ready('lance')){
       buf.light=-9;useSkill('lance');P.facing=aimAngle();
-      startCast({dur:.37,at:.17,pose:'forward',move:.65,fn:()=>{shoot('lance',SENTINEL_DAMAGE.lance,12,51);SFX.cast();}});return true;
+      startCast({dur:.37,at:.17,pose:'lance',move:.65,fn:()=>{shoot('lance',SENTINEL_DAMAGE.lance,12,51);SFX.cast();}});return true;
     }
     if(gameTime-buf.heavy<.32&&ready('ringguard')){
-      buf.heavy=-9;useSkill('ringguard');
+      buf.heavy=-9;useSkill('ringguard');startGesture('aegis');
       emit('ward',{x:P.x,z:P.z,r:7.5,dur:4});
       emit('ultfx',{k:'aegisImpact',x:P.x,z:P.z});
       aoeHit(P.x,P.z,7.5,SENTINEL_DAMAGE.aegis,18,true,false);return true;
     }
     if(gameTime-buf.q<.32&&ready('pulse')){
       buf.q=-9;useSkill('pulse');const level=P.level,r=[7.5,9,10][level-1];
-      startCast({dur:.64,at:.38,pose:'both',move:.35,fn:()=>{
+      startCast({dur:.64,at:.38,pose:'pulse',move:.35,fn:()=>{
         ringFx(P.x,P.z,0x85f5d4,r,.48);SFX.slam();
         aoeHit(P.x,P.z,r,SENTINEL_DAMAGE.pulse[level-1],[23,31,40][level-1],true,level===3);
         if(level===3)emit('healburst',{x:P.x,z:P.z,r:11,amt:16});
@@ -4185,14 +4269,14 @@ function tryActions(mx,mz,ml){
     if(gameTime-buf.e<.32&&ready('sunstrike')){
       buf.e=-9;useSkill('sunstrike');P.facing=aimAngle();
       const [x,z]=sentinelTarget(),r=8;
-      startCast({dur:.82,at:.48,pose:'raise',move:.4,face:false,fn:()=>{
+      startCast({dur:.82,at:.48,pose:'sunstrike',move:.4,face:false,fn:()=>{
         emit('ultfx',{k:'sunstrike',x,z,r});aoeHit(x,z,r,SENTINEL_DAMAGE.sunstrike,34,true,false);
       }});return true;
     }
     if(gameTime-buf.f<.32&&ready('tempest')){
       buf.f=-9;useSkill('tempest');P.facing=aimAngle();
       const [x,z]=sentinelTarget();
-      startCast({dur:.96,at:.55,pose:'raise',move:.3,face:false,fn:()=>{
+      startCast({dur:.96,at:.55,pose:'tempest',move:.3,face:false,fn:()=>{
         emit('zone',{z:{kind:'tempest',x,z,r:9,dur:1.85,owner:NET.id||'me'}});
       }});return true;
     }
@@ -4294,7 +4378,7 @@ function updateUlt(dt,pose,mx,mz){
   const t=P.t;P.uvx=P.uvz=0;
   switch(P.uk){
     case 'soul':{
-      pose.armR=-2.8;pose.armL=-2.8;pose.armRz=.3;pose.armLz=-.3;
+      performMovePose(pose,'soulUlt',t,.46,1);
       if(t>=.46&&!P.ufin){
         P.ufin=true;
         const id=localPlayerId();
@@ -4303,17 +4387,17 @@ function updateUlt(dt,pose,mx,mz){
       break;
     }
     case 'jester':{
-      pose.armR=-2.8;pose.armL=-2.8;pose.armRz=.32;pose.armLz=-.32;pose.lean=-.18;
+      performMovePose(pose,'bombRain',t,.48,1.05);
       if(t>=.48&&!P.ufin){P.ufin=true;startBombRain();}
       break;
     }
     case 'mage':{
-      mageCastPose(pose,'mageSanctuary',t,.8,1.2);
+      performMovePose(pose,'mageRevive',t,.80,1.2);pose.focus=Math.sin(Math.PI*clamp(t/1.2,0,1));
       if(Math.random()<.45)burst(P.x+rand(-.8,.8),arenaHeight(P.x,P.z)+.2,P.z+rand(-.8,.8),1,0xbaf8ff,2,.12,1,-4);
       if(t>=.8&&!P.ufin){P.ufin=true;emit('healburst',{x:P.x,z:P.z,r:30,amt:70});emit('ward',{x:P.x,z:P.z,r:30,dur:8});emit('ultfx',{k:'pillar',x:P.x,z:P.z});if(G.mode==='mp')toHost('reviveRequest',{});}
       break;}
     case 'archer':{
-      const k=ease(Math.min(1,t/.6));pose.armL=-1.57;pose.armR=-1.45;pose.armRz=-1.1*(P.ufin?0:k);pose.upperY=.4;pose.draw=P.ufin?0:k;
+      bowMovePose(pose,'siegeUlt',t,.60,.9,P.level===3);pose.knee+=.11*(1-ease((t-.6)/.30));
       if(!P.ufin&&Math.random()<.7)burst(P.x+Math.sin(P.facing)*.8,1.5,P.z+Math.cos(P.facing)*.8,1,0xffc040,2,.1,.4,0);
       if(t>=.6&&!P.ufin){P.ufin=true;P.facing=aimAngle();shoot('arrowU',0,0,55);SFX.bow();shake(.25);}
       break;}
@@ -4321,7 +4405,12 @@ function updateUlt(dt,pose,mx,mz){
       for(let i=0;i<8;i++){const h=.1+i*.18;if(t>=h&&!(P.uhit&(1<<i))){P.uhit|=1<<i;if(LT.alive){const ox=P.x,oz=P.z,an=Math.random()*TAU;let [x,z]=clampArena(LT.x+Math.sin(an)*(LT.r+1.1),LT.z+Math.cos(an)*(LT.r+1.1),.6);
         P.x=x;P.z=z;P.facing=Math.atan2(LT.x-x,LT.z-z);emit('pstep',{x,z,ox,oz});aoeHit(LT.x,LT.z,LT.r+.6,24,6,false);}}}
       if(t>=1.65&&!P.ufin){P.ufin=true;if(LT.alive){aoeHit(LT.x,LT.z,LT.r+1,60,40,true,true);burst(LT.x,2,LT.z,30,0x8a4aff,7,.15,.6,3);shake(.6);}}
-      const right=Math.floor(t/.18)%2===0;pose.armR=right?-1.7:-.5;pose.armL=right?-.5:-1.7;pose.lean=.3;pose.legL=.5;pose.legR=-.3;
+      const phase=(t-.10+.18)%.18/.18,side=Math.floor((t+.08)/.18)%2?1:-1;
+      const slash=ease(phase/.25)*(1-ease((phase-.41)/.59)),finish=ease((t-1.43)/.22)*(1-ease((t-1.67)/.18));
+      pose.armR=-.57-1.09*slash-1.48*finish;pose.armRz=-.59*side*(1-slash)+.49*side*slash;
+      pose.armL=-.63-.66*slash-.27*finish;pose.armLz=.62;
+      pose.upperY=.66*side*(1-2*slash)-.61*finish;pose.lean=.14+.31*slash+.18*finish;
+      pose.legL=-.51*slash;pose.legR=.36*slash;pose.knee=.23+.31*finish;
       break;}
     case 'paladin':{
       const air=1,k=Math.min(1,t/air);
@@ -4334,16 +4423,25 @@ function updateUlt(dt,pose,mx,mz){
           emit('ultfx',{k:'heavenfall',x:P.x,z:P.z});emit('guard',{x:P.x,z:P.z,r:10,dur:4});
           shake(.8);
         }
-        pose.armR=-.7;pose.armL=-1.1;pose.lean=.55;pose.legL=.6;pose.legR=-.4;
+        const recoil=ease((t-air)/.10)*(1-ease((t-air-.14)/.54));
+        pose.armR=-.61-1.22*recoil;pose.armL=-.79-.61*recoil;pose.lean=.57*recoil;
+        pose.upperY=-.32*recoil;pose.knee=.59*recoil;pose.legL=-.59*recoil;pose.legR=.32*recoil;
       }
       break;}
     case 'berserker':{
       const AIR=.9,k=Math.min(1,t/AIR);
       if(k<1){P.x=lerp(P.ux0,P.utx,k);P.z=lerp(P.uz0,P.utz,k);pose.jump=Math.sin(Math.PI*k)*7;pose.armR=-3;pose.armL=-3;pose.lean=-.3;pose.legL=.7;pose.legR=.7;}
-      else{if(!P.ufin){P.ufin=true;aoeHit(P.x,P.z,7.5,210,90,true,true);emit('ultfx',{k:'quake',x:P.x,z:P.z});shake(1.1);SFX.slam();}pose.armR=-.6;pose.armL=-.6;pose.lean=.6;pose.legL=.8;pose.legR=-.5;}
+      else{if(!P.ufin){P.ufin=true;aoeHit(P.x,P.z,7.5,210,90,true,true);emit('ultfx',{k:'quake',x:P.x,z:P.z});shake(1.1);SFX.slam();}
+        const recoil=1-ease((t-AIR)/.62);
+        pose.armR=-.55-.70*recoil;pose.armL=-.41-.32*recoil;pose.lean=.67*recoil;
+        pose.armRz=-.61*recoil;pose.knee=.72*recoil;pose.legL=-.42*recoil;pose.legR=.65*recoil;}
       break;}
     case 'sentinel':{
-      pose.armR=-1.55;pose.armL=-.8;pose.lean=P.ufin?.2:-.12;
+      const power=ease(t/DAWN_MAX),kick=P.ufin?1-ease((t-P.beamRelease)/.59):0;
+      pose.armR=-1.23-power*.42-kick*.42;pose.armL=-.85-power*.26;
+      pose.upperY=.52-power*.29-kick*.58;pose.lean=-.12-.13*power+.53*kick;
+      pose.legL=-.28-.25*kick;pose.legR=.24;pose.knee=.26+.26*kick;
+      pose.elbowR=-.67+.59*kick;pose.elbowL=-.40;pose.acting=true;
       if(P.ufin){if(t-P.beamRelease>=.65)P.state='idle';return;}
       turnTo(aimAngle(),7,dt);
       if(Math.random()<.46)burst(P.x+Math.sin(P.facing)*.8,1.4,P.z+Math.cos(P.facing)*.8,2,0x9dffe0,1.5,.09+beamChargeProgress()*.14,.34,-2);
@@ -4351,12 +4449,17 @@ function updateUlt(dt,pose,mx,mz){
       return;}
     case 'warlock':{
       if(P.ufin){
-        pose.armR=pose.armL=-1.57;pose.lean=.2;
+        const kick=1-ease((t-P.beamRelease)/.60);
+        pose.armR=-.53-1.08*kick;pose.armL=-.48-1.19*kick;
+        pose.armRz=-.05*kick;pose.armLz=.06*kick;pose.lean=.48*kick;pose.upperY=-.21*kick;
+        pose.legL=-.54*kick;pose.legR=.33*kick;pose.knee=.42*kick;
+        pose.elbowR=-.14*kick;pose.elbowL=-.11*kick;pose.acting=true;
         if(t-P.beamRelease>=.65)P.state='idle';return;
       }
       const power=clamp(t/BEAM_MAX,0,1);
       turnTo(aimAngle(),7,dt);pose.armR=-1.27;pose.armL=-1.32;pose.armRz=.35;pose.armLz=-.35;
-      pose.lean=-.13;pose.legL=.3;pose.legR=-.25;
+      pose.lean=-.13-.22*power;pose.upperY=.25+.47*power;pose.legL=-.29;pose.legR=.37;
+      pose.knee=.26+.28*power;pose.elbowR=-.76-power*.32;pose.elbowL=-.81-power*.28;pose.acting=true;
       if(Math.random()<.46)burst(P.x+Math.sin(P.facing)*.67,1.4,P.z+Math.cos(P.facing)*.67,2,0xc381ff,1.5,.09+power*.14,.34,-2);
       if(t<BEAM_CANCEL)buf.roll=-9;
       if(t>=BEAM_CANCEL&&P.rollCd<=0&&consume('roll')){cancelVoidBeam();startRoll(mx,mz,Math.hypot(mx,mz));return;}
@@ -4630,25 +4733,76 @@ function queueHeldPrimary(blockHeld){
   buf.light=gameTime;
   return true;
 }
-const PLAYER_GESTURES={
-  reach:{duration:.31,armR:-1.61,armL:-.67,lean:.14,yaw:-.19},
-  seal:{duration:.36,armR:-1.07,armL:-1.38,lean:.13,yaw:.19},
-  invoke:{duration:.55,armR:-2.17,armL:-2.17,lean:-.14,yaw:0},
-  forge:{duration:.48,armR:-1.91,armL:-.67,lean:.12,yaw:.24}
+// Angles for the windup and release, ordered by shoulder, twist, lean, stance and elbow.
+const ACT_CHANNELS=['armR','armL','armRz','armLz','upperY','lean','legL','legR','knee','elbowR','elbowL'];
+const MOVE_POSES={
+  card:[[.19,-.53,-.54,.10,.52,-.13,.17,-.24,.22,-1.15,-.19],[-1.82,-.71,.37,-.18,-.57,.25,-.33,.18,.16,-.07,-.40]],
+  shuriken:[[-1.03,-.89,.78,.13,.68,-.17,.17,-.24,.29,-1.09,-.35],[-1.66,-.51,.47,.22,-.61,.37,-.45,.23,.25,-.05,-.21]],
+  bolt:[[-.21,-.78,-.54,.25,.61,-.17,.19,-.27,.28,-1.14,-.23],[-1.46,-.91,-.09,.32,-.39,.23,-.27,.14,.18,-.17,-.53]],
+  curse:[[-.95,-1.55,-.29,.50,-.36,-.16,-.11,.23,.17,-.62,-.94],[-.57,-1.80,-.62,.19,.21,.16,-.22,.17,.27,-.35,-.06]],
+  rift:[[-1.27,-1.32,.53,-.53,.14,-.29,.22,-.31,.24,-1.12,-1.1],[-.71,-.76,-.94,.91,-.37,.46,-.45,.26,.55,-.07,-.22]],
+  lance:[[-.47,-1.34,-.38,.23,.63,-.11,.24,-.24,.25,-.91,-.43],[-1.68,-.74,-.03,.37,-.40,.32,-.47,.24,.34,-.06,-.57]],
+  pulse:[[-1.35,-1.48,.42,-.42,.08,-.18,-.15,.18,.38,-.80,-.72],[-.86,-.93,-1.09,1.05,-.12,.34,-.37,.27,.56,-.12,-.17]],
+  sunstrike:[[-2.91,-1.08,-.28,.45,.48,-.27,.19,-.21,.17,-.56,-.54],[-1.60,-.68,-.11,.66,-.48,.39,-.39,.29,.29,-.06,-.36]],
+  tempest:[[-1.48,-2.72,.38,.38,-.72,-.22,-.25,.24,.32,-.84,-.46],[-2.73,-1.80,-.69,.77,.58,.24,-.42,.23,.45,-.16,-.09]],
+  mageRevive:[[-1.20,-1.48,.38,-.36,-.14,.35,-.33,.27,.49,-1.10,-.93],[-2.32,-2.66,-.69,.65,.22,-.32,-.24,.16,.20,-.19,-.12]],
+  soulUlt:[[-1.16,-1.19,.47,-.47,-.19,.26,-.37,.30,.34,-.97,-.94],[-1.81,-1.82,-1.10,1.10,.16,-.24,-.20,.09,.20,-.28,-.28]],
+  bombRain:[[-1.02,-1.13,.27,-.31,.26,.40,-.32,.18,.48,-1.03,-.96],[-2.59,-2.75,-.58,.62,-.27,-.28,-.26,.08,.18,-.11,-.08]],
+  siphon:[[-1.07,-1.65,.35,.42,-.22,.13,-.25,.14,.31,-.78,-.14],[-1.41,-1.56,-.10,.20,.34,-.17,-.36,.30,.27,-.59,-.25]],
+  forge:[[.11,-1.11,-.63,.23,.75,-.25,.18,-.29,.27,-.91,-.65],[-1.95,-.42,.12,.44,-.54,.37,-.40,.28,.43,-.12,-.44]],
+  link:[[-.54,-.94,.31,.40,.41,-.08,.18,-.17,.13,-.99,-.26],[-1.75,-.61,-.04,.52,-.18,.18,-.27,.14,.19,-.11,-.44]],
+  unlink:[[-1.56,-.72,.52,.43,-.40,.03,-.13,.14,.17,-.58,-.36],[-.64,-1.21,-.98,.79,.33,-.12,.15,-.24,.21,-.14,-.27]],
+  renewSelf:[[-1.32,-.68,.40,-.68,.25,.21,-.25,.17,.25,-.85,-.70],[-1.17,-1.56,.38,-.37,-.13,.15,-.21,.24,.22,-1.01,-1.03]],
+  soulEmpower:[[-.87,-1.68,.48,-.04,.45,.08,-.24,.22,.26,-.89,-.58],[-2.29,-1.72,-.62,.83,-.40,-.15,-.29,.19,.21,-.12,-.37]],
+  saturate:[[-1.22,-1.22,.59,-.54,.12,.28,-.28,.22,.37,-.90,-.89],[-.63,-.62,-.81,.82,-.13,.59,-.42,.33,.59,-.30,-.32]],
+  aura:[[-1.03,-1.15,-.31,.59,.31,.12,-.28,.18,.31,-.74,-.81],[-2.12,-1.76,-.66,.45,-.19,-.20,-.34,.20,.18,-.20,-.44]],
+  taunt:[[-.37,-1.29,-.77,-.19,.55,-.08,.22,-.27,.25,-.89,-.39],[-1.97,-1.10,-.05,.46,-.34,.24,-.43,.30,.23,-.12,-.33]],
+  thorns:[[-1.01,-1.33,.31,-.45,-.36,.17,-.22,.19,.32,-.91,-.71],[-.53,-1.76,-.54,.22,.42,.40,-.38,.24,.46,-.41,-.18]],
+  rage:[[-1.03,-1.05,.58,-.61,.35,.36,-.37,.32,.61,-1.04,-.92],[-2.42,-2.13,-.77,.99,-.30,-.33,-.28,.24,.35,-.37,-.42]],
+  blink:[[-1.04,-1.21,-.65,.62,-.34,.50,-.49,.39,.55,-.79,-.73],[-.34,-1.62,-1.05,.34,.68,-.10,.22,-.46,.37,-.30,-.42]],
+  poison:[[-.86,-1.28,.35,.49,.43,.23,-.22,.25,.31,-.54,-.91],[-1.30,-.74,.52,.22,-.46,.30,-.40,.32,.33,-.49,-.53]],
+  aegis:[[-1.69,-1.15,-.26,.32,.67,-.10,.16,-.27,.30,-.68,-.55],[-.69,-1.63,-.53,-.03,-.30,.43,-.40,.28,.51,-.11,-.31]]
 };
-function startGesture(name){P.gesture={profile:PLAYER_GESTURES[name],elapsed:0};}
+function performMovePose(p,name,t,release,end,overlay=false){
+  const [wind,hit]=MOVE_POSES[name];
+  const prepare=ease(t/(release*.68)),drive=ease((t-release*.68)/(release*.32));
+  const recover=ease((t-release)/(end-release));
+  for(let i=0;i<ACT_CHANNELS.length;i++){
+    const key=ACT_CHANNELS[i],base=overlay?(p[key]||0):i<2?-.40:0;
+    const action=lerp(lerp(base,wind[i],prepare),hit[i],drive);
+    p[key]=lerp(action,base,recover);
+  }
+  p.acting=true;
+}
+function bowMovePose(p,move,t,release,end,crossbow){
+  const high=move==='sky',heavy=move!=='bow',reload=move==='chargedRelease';
+  const pull=reload?1:ease(t/release),shot=ease((t-release+.018)/.065);
+  const recoil=shot*(1-ease((t-release-.04)/.14)),recover=ease((t-release)/(end-release));
+  const raise=ease(t/.083)*(1-recover);
+  p.armL=lerp(-.43,high?-2.71:-1.57,raise)-recoil*(heavy?.26:.12);
+  p.armR=lerp(-.36,high?-2.36:-1.48,raise)+recoil*(crossbow?-.22:.30);
+  p.armLz=high?.13*raise:.08*raise;
+  p.armRz=-pull*(1-shot)*(crossbow?.65:heavy?1.19:1.03)+recoil*.33;
+  p.upperY=(heavy?.55:.33)*raise-recoil*.15;
+  p.lean=(high?-.30:-.06)*raise-recoil*(heavy?.18:.08);
+  p.legL=-.28*raise;p.legR=.22*raise;p.knee=.21*raise+recoil*.15;
+  p.elbowL=-.18*raise;p.elbowR=-.60*pull*(1-shot)-.24*recoil;
+  p.draw=pull*(1-shot);p.acting=true;
+}
+
+const GESTURE_TIME={link:.33,unlink:.38,renewSelf:.52,soulEmpower:.59,saturate:.66,forge:.48,
+  aura:.53,taunt:.39,thorns:.45,rage:.58,blink:.30,poison:.39,aegis:.42};
+function startGesture(name){P.gesture={name,elapsed:0};}
 function updatePlayerGesture(pose,dt){
   const gesture=P.gesture;
   if(!gesture)return;
   if(P.state!=='idle'&&P.state!=='block'){P.gesture=null;return;}
-  const {profile}=gesture,k=gesture.elapsed/profile.duration;
-  const blend=ease(k/.32)*(1-ease((k-.46)/.54));
-  pose.armR=lerp(pose.armR,profile.armR,blend);
-  pose.armL=P.state==='block'?pose.armL:lerp(pose.armL,profile.armL,blend);
-  pose.upperY+=profile.yaw*blend;
-  pose.lean+=profile.lean*blend;
+  const {name,elapsed}=gesture,duration=GESTURE_TIME[name];
+  const shieldArm=pose.armL,shieldSpread=pose.armLz;
+  performMovePose(pose,name,elapsed,duration*(name==='blink'?.14:.32),duration,true);
+  if(P.state==='block'){pose.armL=shieldArm;pose.armLz=shieldSpread;pose.elbowL=-.42;}
   gesture.elapsed+=dt;
-  if(gesture.elapsed>=profile.duration)P.gesture=null;
+  if(gesture.elapsed>=duration)P.gesture=null;
 }
 function updatePlayer(dt){
   P.iframe=Math.max(0,P.iframe-dt);P.hurtInv=Math.max(0,P.hurtInv-dt);P.t+=dt;P.ward=Math.max(0,P.ward-dt);P.guard=Math.max(0,(P.guard||0)-dt);P.rollCd-=dt;
@@ -4673,7 +4827,7 @@ function updatePlayer(dt){
   const repeatPrimary=queueHeldPrimary(blockHeld);
   const bA=bossAngle(),faceTarget=lockTarget?Math.atan2(lockTarget.x-P.x,lockTarget.z-P.z):bA,SPD=classData(P.cls).speed*(P.rageT>0?1.3:1)*(activeEffect('frostbite') ? .92 : 1)*(P.soulPowerUntil>gameTime?1.25:1);
   let vx=0,vz=0;const pose=PM.pose;
-  pose.bombStage=0;pose.bombColor=0;pose.headPitch=0;
+  pose.bombStage=0;pose.bombColor=0;pose.headPitch=0;pose.handProp=false;pose.acting=false;pose.elbowL=pose.elbowR=0;
   pose.strafe=0;pose.bank=0;pose.backstep=0;pose.knee=0;
   pose.spin=0;pose.roll=0;pose.heat=0;pose.focus=0;pose.move=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;pose.yaw=0;pose.jump=0;
   const restR={sword:-.55,soul:-.4,mage:-.35,archer:-.25,rogue:-.45,berserker:-.6,warlock:-.35,sentinel:-.48,paladin:-.52,jester:-.46,skeleton:-.44}[P.cls],restL={sword:-.35,soul:-.35,mage:-.25,archer:-.45,rogue:-.45,berserker:-.3,warlock:-.35,sentinel:-.32,paladin:-.4,jester:-.33,skeleton:-.25}[P.cls];
@@ -4791,7 +4945,11 @@ function updatePlayer(dt){
       if(c.face)turnTo(aimAngle(),10,dt);
       else if(ml>0)turnTo(Math.atan2(mx,mz),8,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.4;pose.legR=-pose.legL;
-      switch(c.pose){
+      if(MOVE_POSES[c.pose]){
+        performMovePose(pose,c.pose,t,c.at,c.dur);
+        pose.handProp=t>c.at*.20&&t<c.at&&(c.pose==='card'||c.pose==='shuriken');
+      }
+      else switch(c.pose){
         case 'ninjaStep':{
           const tuck=ease(k)*(1-ease((t-c.at)/(c.dur-c.at)));
           pose.lean=.69*tuck;pose.armR=-.55+.9*tuck;pose.armL=-.6-.48*tuck;
@@ -4811,14 +4969,9 @@ function updatePlayer(dt){
         case 'mageWard':
           mageCastPose(pose,c.pose,t,c.at,c.dur);
           break;
-        case 'bash':pose.armL=-.6-1.15*Math.sin(Math.PI*Math.min(t/c.dur,1));pose.armLz=-.45;pose.upperY=-.56;pose.lean=.24;pose.armR=-.74;break;
-        case 'forward':pose.armR=lerp(-.4,-1.6,ease(k));pose.armL=-.3;break;
-        case 'forward2':pose.armR=t<c.at?lerp(-.4,-2.6,ease(k)):-1.5;pose.armL=t<c.at?-2.2:-1.2;pose.lean=t<c.at?-.15:.2;break;
-        case 'raise':pose.armR=lerp(-.4,-2.9,ease(k));pose.armL=lerp(-.3,-2.9,ease(k));pose.armRz=.3;pose.armLz=-.3;pose.lean=-.1;break;
-        case 'both':pose.armR=-1.6;pose.armL=-1.6;pose.armRz=-.6*ease(k);pose.armLz=.6*ease(k);break;
-        case 'bow':{const dr=c.fired?0:ease(k);pose.armL=-1.57;pose.armR=-1.5+.15*dr;pose.armRz=-1.0*dr;pose.upperY=.35;pose.draw=dr;if(c.fired&&t-c.at<.12){pose.armRz=.25;pose.armR=-1.2;}break;}
-        case 'bowC':{const dr=c.fired?0:ease(k);pose.armL=-1.57;pose.armR=-1.45+.1*dr;pose.armRz=-1.1*dr;pose.upperY=.4;pose.lean=-.05;pose.draw=dr;if(c.fired){pose.armRz=.3;pose.armR=-1.15;}break;}
-        case 'sky':{const dr=c.fired?0:ease(k);pose.armL=-2.55;pose.armR=-2.45;pose.armRz=-.9*dr;pose.upperY=.3;pose.lean=-.35;pose.draw=dr;break;}
+        case 'bow':case 'bowC':case 'sky':case 'chargedRelease':
+          bowMovePose(pose,c.pose,t,c.at||.001,c.dur,P.level===3);
+          break;
       }
       if(c.healFx&&Math.random()<.6)burst(P.x+rand(-.6,.6),.3,P.z+rand(-.6,.6),1,0xf2d870,1,.1,.8,-3);
       if(c.charge&&!c.fired&&Math.random()<.4)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
@@ -4831,11 +4984,12 @@ function updatePlayer(dt){
       vx=mx*SPD*.6;vz=mz*SPD*.6;turnTo(aimAngle(),14,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.35;pose.legR=-pose.legL;
       pose.armL=-1.57;pose.armR=-1.45+.1*ease(k);pose.armRz=-1.1*ease(k);pose.upperY=.4;pose.draw=.15+.85*ease(k);
+      pose.elbowR=-.35-.49*ease(k);pose.elbowL=-.16;pose.knee=.20+.16*k;pose.acting=true;
       if(k>=1&&Math.random()<.5)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
       if(!held('heavy')){
         const full=k>=1,dmg=full?75:Math.round(24+33*k);shoot(P.level===3?'crossbolt':full?'arrowC':'arrow',dmg+(P.level===3?10:0),full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
-        P.cd.charged=.55;startCast({dur:.22,at:0,pose:'bow',move:.7,fired:true,fn:()=>{}});P.cast.fired=true;
+        P.cd.charged=.55;startCast({dur:.22,at:0,pose:'chargedRelease',move:.7,fired:true,fn:()=>{}});P.cast.fired=true;
       }
       break;}
     case 'roll':{
@@ -4867,7 +5021,7 @@ function updatePlayer(dt){
       if(t>=dur)P.state='idle';break;}
     case 'siphon':{
       const t=P.t;vx=mx*SPD*.35;vz=mz*SPD*.35;if(LT.alive)turnTo(bossAngle(),10,dt);
-      pose.armL=-1.6;pose.armR=-1.6;pose.armLz=.3;pose.armRz=-.3;pose.lean=-.05;
+      performMovePose(pose,'siphon',Math.min(t,.28)+Math.sin(t*22)*.023,.28,1.75);
       P.tick=Math.max(-dt,P.tick-dt);if(P.tick<=.000001&&LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<16){P.tick+=.3;healBeam(LT.x,LT.z,P.x,P.z,0xb06aff);
         if(LT.boss)hitBoss(7,1,false,LT.x,2.5,LT.z,true);else{const m=mins.get(LT.id);if(m)hitMinion(m,7,false,true);}
         restoreHealth(3);}
@@ -5613,7 +5767,17 @@ function jesterThrowPose(p,t,release,end,kind){
   p.armRz=-.32-.32*wind+.23*snap+.09*recover;
   p.upperY=-.64*wind+1.02*snap-.38*recover;
   p.lean=-.17*wind+.55*snap-.38*recover;
-  p.headPitch=.33*snap*(1-recover);
+  const hold=1-recover,weight=wind*hold;
+  if(kind==='fire'){
+    p.knee=.39*weight;p.legL=-.42*snap*hold;p.legR=.31*weight;p.lean+=.14*snap*hold;
+  }else if(kind==='ice'){
+    p.armR-=.47*weight;p.armLz+=.16*weight;p.upperY-=.22*weight;
+    p.knee=.28*weight;p.legR=.26*weight;
+  }else{
+    p.armRz-=.54*weight;p.upperY+=.29*snap*hold;p.legL=-.21*weight;p.legR=.38*weight;
+  }
+  p.elbowL=-1.07*wind*(1-snap)-.11*hold;p.elbowR=-.43*hold;p.acting=true;
+  p.headPitch=(kind==='fire'?.43:kind==='ice'?.28:.36)*snap*hold;
   p.bombStage=t<release?1+wind:3;
   p.bombColor=JESTER_BOMBS[kind].color;
 }
@@ -5716,8 +5880,8 @@ function updatePlayerJoints(model,p,st,s,tuck,walking,speed,phase){
     }
   }
   const props=model.cls==='archer'||model.cls==='jester';
-  const rightBend=st==='heal'?-.14:walking?(props?-.11:-.09-.28*run):-.08;
-  const leftBend=st==='block'?-.34:st==='heal'?-.62:walking?(props?-.07:-.13-.26*run):-.09;
+  const rightBend=p.acting?p.elbowR:st==='heal'?-.14:walking?(props?-.11:-.09-.28*run):-.08;
+  const leftBend=p.acting?p.elbowL:st==='block'?-.34:st==='heal'?-.62:walking?(props?-.07:-.13-.26*run):-.09;
   model.elbows[0].rotation.x=lerp(model.elbows[0].rotation.x,leftBend-.7*tuck,s);
   model.elbows[1].rotation.x=lerp(model.elbows[1].rotation.x,rightBend-.74*tuck,s);
 }
@@ -5744,12 +5908,12 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   const walking=st==='idle'||st==='walk'||st==='block';
   const sourceGait=p.gait||0;
   if(model.skin!=='pixel')p=locomotionPose(model,p,walking,dt,px,pz,f);
-  if(p.stepWeight&&walking&&st!=='block'&&!model.ninjaRig&&!model.mageMotion&&!model.jesterRig){
+  if(!p.acting&&p.stepWeight&&walking&&st!=='block'&&!model.ninjaRig&&!model.mageMotion&&!model.jesterRig){
     const sway=(Math.sin(p.gait-.38)-Math.sin(sourceGait-.38))*(p.stepWeight||0);
     p={...p,armR:p.armR-sway*.31,armL:p.armL+sway*.31,upperY:p.upperY+Math.sin(p.gait)*(p.stepWeight||0)*.14};
   }
-  if(model.ninjaRig&&(st==='idle'||st==='walk'))p=ninjaMovePose(p,st);
-  if(model.jesterRig&&(st==='idle'||st==='walk')){
+  if(!p.acting&&model.ninjaRig&&(st==='idle'||st==='walk'))p=ninjaMovePose(p,st);
+  if(!p.acting&&model.jesterRig&&(st==='idle'||st==='walk')){
     const sway=p.legL*.055;
     p={...p,armR:-1.12+sway,armL:-1.12-sway,armRz:-.32,armLz:.32};
   }
@@ -5796,7 +5960,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
     model.armR.rotation.x=lerp(model.armR.rotation.x,-1.9*tuck+p.armR*(1-tuck),1-Math.exp(-30*dt));
     model.armL.rotation.x=lerp(model.armL.rotation.x,-1.9*tuck+p.armL*(1-tuck),1-Math.exp(-30*dt));
   }else if(walking){
-    model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY+twist,s);
+    model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY+(p.acting?0:twist),s);
   }
   const spin=rolling||vaulting?p.spin:st==='dead'?-1.45:0;
   model.spin.rotation.x=wrap(model.spin.rotation.x+wrap(spin-model.spin.rotation.x)*(rolling||vaulting?1-Math.exp(-67*dt):st==='dead'?s*.4:s));
@@ -5808,6 +5972,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(rolling)keepRollAboveFloor(model,tuck);
   if(model.mageMotion)animateMageRig(model,p,st,dt,s);
   if(model.jesterRig)animateJesterRig(model,p,st,s);
+  if(model.handProp)model.handProp.visible=st==='cast'&&!!p.handProp;
   if(model.ninjaRig){
     model.ninjaRig.head.rotation.x=lerp(model.ninjaRig.head.rotation.x,-p.lean*.76,s);
     model.ninjaRig.scarf.rotation.x=lerp(model.ninjaRig.scarf.rotation.x,.12+(p.move||0)*.29,s);
@@ -5968,7 +6133,7 @@ function updateRemotes(dt){
   updateTornados(dt);
   const s=1-Math.exp(-15*dt);
   remotes.forEach(r=>{if(r.first)return;r.x=lerp(r.x,r.nx,s);r.z=lerp(r.z,r.nz,s);r.f+=wrap(r.nf-r.f)*s;
-    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0,bombStage:a[17]||0,bombColor:a[18]||0,headPitch:a[19]||0,strafe:a[20]||0,bank:a[21]||0,backstep:a[22]||0,knee:a[23]||0};
+    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0,bombStage:a[17]||0,bombColor:a[18]||0,headPitch:a[19]||0,strafe:a[20]||0,bank:a[21]||0,backstep:a[22]||0,knee:a[23]||0,acting:!!a[24],elbowR:a[25]||0,elbowL:a[26]||0,handProp:!!a[27]};
     setForgeBlade(r.model,r.bladeTier||0);
     applyPose(r.model,p,r.st,dt,r.x,r.z,r.f);
     if(r.zapped&&!r.dead&&gameTime>=(r.sparkAt||0)){r.sparkAt=gameTime+.23;zappedArcs(r.x,r.model.root.position.y,r.z);}
@@ -5979,7 +6144,7 @@ function netTick(dt,force=false){
   if(G.mode!=='mp')return;sendT-=dt;if(!force&&sendT>0)return;sendT=1/15;
   const p=PM.pose,r2=v=>Math.round(v*100)/100;
   nsend({t:'g',d:{k:'p',active:!localAway(),x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,rev:G.revived.has(NET.id),restock:G.restock,inv:P.smoke>0?1:0,zapped:activeEffect('zapped')?1:0,
-    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0,p.bombStage||0,p.bombColor||0,p.headPitch||0,p.strafe||0,p.bank||0,p.backstep||0,p.knee||0].map(r2)}});
+    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0,p.bombStage||0,p.bombColor||0,p.headPitch||0,p.strafe||0,p.bank||0,p.backstep||0,p.knee||0,p.acting?1:0,p.elbowR||0,p.elbowL||0,p.handProp?1:0].map(r2)}});
   if(NET.isHost&&(mins.size||G.bossId==='morvane'||(G.room&&G.room.type==='minion'))){nsend({t:'g',d:{k:'m',w:G.wave,wt:G.waveTotal,seq:minId,wh:Math.round(G.waveHp||1),l:[...mins.values()].map(m=>[m.id,MTYPE_IDX.indexOf(m.type),r2(m.x),r2(m.z),r2(m.f),Math.round(m.hp),Math.round(m.maxHp),m.st==='wind'?1:0,r2(Math.max(0,(m.jesterChillUntil||0)-gameTime))])}});}
   if(NET.isHost){
   if(BM){const q=B.pose;
