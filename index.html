@@ -1738,9 +1738,10 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
       ball(.11,leather,0,-.66,.02,1,1.1,1,arm,12);
       if(royal){const rune=box(.04,.2,.02,glow,0,-.32,.19,arm);rune.rotation.x=-.2;}
     }
-    // Floating ice crystal beside the right hand
-    const frostOrb=grp(.2,-.6,.32,armR);
-    const cr=new THREE.Mesh(new THREE.OctahedronGeometry(royal?.17:veteran?.14:.11,0),glow);cr.scale.y=1.9;frostOrb.add(cr);
+    // Keep the crystal upright as the hand moves beneath it.
+    const frostOrb=grp(0,0,0,upper);
+    const cr=new THREE.Mesh(new THREE.OctahedronGeometry(royal?.21:veteran?.19:.17,0),glow);
+    cr.scale.y=1.55;frostOrb.add(cr);
     if(veteran){const orbit=new THREE.Mesh(new THREE.TorusGeometry(royal?.34:.28,.012,5,32),glow);orbit.rotation.x=1.2;frostOrb.add(orbit);}
     for(let i=0;i<(royal?3:veteran?2:0);i++){const a=i/3*TAU;const sp=new THREE.Mesh(new THREE.SphereGeometry(.03,6,6),glow);sp.position.set(Math.sin(a)*.32,Math.cos(a)*.12,Math.cos(a)*.32);frostOrb.add(sp);}
     const flame=grp(0,-.94,.04,armR);
@@ -3677,7 +3678,7 @@ function mageCastPose(p,spell,t,release,end){
   switch(spell){
     case 'mageFire': {
       const wind=ease(draw/.65),throwOut=ease((draw-.65)/.35);
-      p.armR=lerp(lerp(-.4,-2.12,wind),-1.48,throwOut)+.74*recover;
+      p.armR=lerp(lerp(-1.89,-2.12,wind),-1.48,throwOut)+.74*recover;
       p.armRz=lerp(-.25,.29,wind)-.4*throwOut;
       p.armL=-.36-.63*pulse;
       p.upperY=.62*wind-.99*throwOut+.37*recover;
@@ -4622,9 +4623,12 @@ function animateMageRig(model,p,st,dt,s){
   rig.skirt.rotation.x=lerp(rig.skirt.rotation.x,rolling?-.22*tuck:clamp(p.lean*.48,-.18,.25),s);
   rig.tailA.rotation.x=.2+Math.sin(t*8)*(.055+.11*(p.move||0))+.53*tuck;
   rig.tailB.rotation.x=.18+Math.sin(t*8-.9)*(.055+.11*(p.move||0))+.57*tuck;
-  rig.frostOrb.rotation.y=t*1.7;
-  rig.frostOrb.position.y=-.6+Math.sin(t*2.6)*.06;
-  rig.frostOrb.visible=!rolling;
+  const carrying=st==='idle'||st==='walk';
+  rig.frostOrb.rotation.y=t*.38;
+  rig.frostOrb.position.set(0,-.69,.02).applyEuler(model.armR.rotation).add(model.armR.position);
+  rig.frostOrb.position.y+=.32+Math.sin(t*2.7)*.045;
+  rig.frostOrb.visible=!rolling&&st!=='dead'&&!(st==='cast'&&p.heat>0);
+  if(carrying)rig.frostOrb.position.z+=.04;
   rig.frostOrb.scale.setScalar(1+(st==='cast'||st==='ult'?(p.focus||0)*.48:0));
   const castHeat=st==='cast'?(p.heat||0):0;
   rig.heat=castHeat>0?lerp(rig.heat,castHeat,1-Math.exp(-19*dt)):0;
@@ -4643,7 +4647,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(model.mageMotion&&(st==='idle'||st==='walk')){
     const stride=p.move??(st==='walk'?1:0),step=p.gait??model.mageMotion.time*9;
     const sway=Math.sin(step)*stride,breath=Math.sin(model.mageMotion.time*3)*.045;
-    p={...p,armR:-.4+breath-sway*.42,armRz:-.08+sway*.05,armL:-.38+sway*.38,
+    p={...p,armR:-1.89+breath-sway*.065,armRz:.37+sway*.045,armL:-.38+sway*.38,
       upperY:-.14+sway*.13,jump:(1-Math.cos(step*2))*.026*stride};
   }
   if(model.skin==='pixel'){
