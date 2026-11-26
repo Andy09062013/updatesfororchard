@@ -1289,6 +1289,81 @@ function arenaHeight(x,z){
   const radius=Math.hypot(x,z);
   return COLOSSEUM_STEPS.find(step=>radius>=step.inner&&radius<step.outer)?.height||0;
 }
+function arenaStandards(g,R,storm){
+  const map=canvasTex(256,512,(c,w,h)=>{
+    const gradient=c.createLinearGradient(0,0,w,h);
+    gradient.addColorStop(0,storm?'#374e79':'#812e37');gradient.addColorStop(.57,storm?'#1e3457':'#461f32');gradient.addColorStop(1,storm?'#142544':'#251d2b');
+    c.fillStyle=gradient;c.fillRect(0,0,w,h);
+    const ink=storm?'#dbc189':'#c39b70';
+    for(let i=0;i<h;i+=4){c.fillStyle=i%8?'#ffffff0a':'#00000015';c.fillRect(0,i,w,1);}
+    c.strokeStyle=ink;c.lineWidth=4;c.strokeRect(10,10,236,492);c.lineWidth=1;c.strokeRect(18,18,220,476);
+    c.translate(128,211);
+    for(let i=0;i<32;i++){
+      c.save();c.rotate(i*Math.PI/16);c.fillStyle=ink;c.fillRect(-1,-78,2,i%4?5:12);c.restore();
+    }
+    for(const side of [-1,1]){
+      c.save();c.scale(side,1);c.lineWidth=3;c.beginPath();c.moveTo(2,98);c.quadraticCurveTo(92,75,78,-17);c.stroke();
+      for(let j=0;j<9;j++){const a=(j+1)*.15;c.save();c.translate(78*Math.cos(a),-12+99*Math.sin(a));c.rotate(.3+a);
+        c.fillStyle=ink;c.beginPath();c.ellipse(0,-7,4,12,-.37,0,TAU);c.fill();c.restore();}
+      c.restore();
+    }
+    const mark=storm?[[-8,-58],[36,-58],[7,-8],[32,-8],[-20,64],[-6,12],[-32,12]]:
+      [[-49,-30],[-23,-10],[-23,-45],[0,-14],[23,-45],[23,-10],[49,-30],[32,30],[0,44],[-32,30]];
+    c.fillStyle=ink;c.beginPath();mark.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fill();
+    c.beginPath();c.moveTo(-33,117);c.lineTo(0,146);c.lineTo(33,117);c.stroke();
+  },1,1);
+  const mat=std(0xffffff,{map,side:THREE.DoubleSide,roughness:.89});
+  const pole=std(0x947452,{metalness:.46,roughness:.48});
+  const geo=new THREE.PlaneGeometry(2.65,5.8,12,18),p=geo.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const x=p.getX(i),v=(2.9-p.getY(i))/5.8;
+    p.setXYZ(i,x,p.getY(i)-v**4*(.65-.45*Math.abs(x)),.13*Math.cos(x*6)*(.35+v)+.2*v*v);
+  }
+  geo.computeVertexNormals();
+  for(let i=0;i<8;i++){
+    const a=(i+(storm?0:.5))*TAU/8,r=storm?R+2.15:R+1.5;
+    const frame=grp(Math.sin(a)*r,storm?5.2:10.3,Math.cos(a)*r,g);frame.rotation.y=a+Math.PI;
+    frame.add(new THREE.Mesh(geo,mat));box(3.15,.12,.16,pole,0,2.92,0,frame);
+  }
+}
+function villageShingles(){
+  return canvasTex(256,256,(c,w,h)=>{
+    c.fillStyle='#575666';c.fillRect(0,0,w,h);
+    for(let row=-1;row<9;row++)for(let col=-1;col<9;col++){
+      const x=col*32+(row%2?16:0),y=row*32,shade=143+((col*17+row*23+128)%6)*9;
+      c.fillStyle='rgb('+shade+','+shade+','+(shade+5)+')';
+      c.beginPath();c.moveTo(x+1,y);c.lineTo(x+31,y);c.lineTo(x+30,y+27);c.quadraticCurveTo(x+18,y+35,x+3,y+29);c.closePath();c.fill();
+      c.strokeStyle='#ffffff39';c.beginPath();c.moveTo(x+3,y+26);c.quadraticCurveTo(x+16,y+32,x+28,y+26);c.stroke();
+    }
+  },1,1);
+}
+function olympianMedallion(g){
+  const t=canvasTex(768,768,(c,w)=>{
+    c.translate(w/2,w/2);
+    c.fillStyle='#887d6e';c.beginPath();c.arc(0,0,380,0,TAU);c.fill();
+    for(let row=0;row<33;row++){
+      const r=7+row*11,n=Math.max(9,Math.round(r*.49));
+      for(let i=0;i<n;i++){
+        const a=(i+(row%2)*.5)/n*TAU,b=a+TAU/n;
+        const border=row===31||row===28||row===23||row===22;
+        const tone=((i*31+row*11)%15)-7;
+        const base=border?[161,131,81]:row>23?[87,92,95]:[143,135,118];
+        c.fillStyle='rgb('+base.map(v=>v+tone).join(',')+')';
+        c.beginPath();c.arc(0,0,r+9.5,a+.001,b-.001);c.arc(0,0,r,b-.001,a+.001,true);c.closePath();c.fill();
+      }
+    }
+    c.strokeStyle='#d1b580';c.lineWidth=4;
+    for(let i=0;i<36;i++){
+      c.save();c.rotate(i*TAU/36);c.beginPath();c.moveTo(-24,-330);c.lineTo(18,-330);c.lineTo(18,-304);c.lineTo(-10,-304);c.lineTo(-10,-320);c.lineTo(7,-320);c.stroke();c.restore();
+    }
+    for(let i=0;i<8;i++){
+      c.save();c.rotate(i*TAU/8);c.fillStyle=i%2?'#8f836a':'#756c5e';
+      c.beginPath();c.moveTo(0,-244);c.lineTo(24,-73);c.lineTo(0,-25);c.lineTo(-24,-73);c.closePath();c.fill();c.restore();
+    }
+  },1,1);
+  const m=new THREE.Mesh(new THREE.CircleGeometry(5.89,96).rotateX(-Math.PI/2),std(0xffffff,{map:t,roughness:.78,metalness:.09,polygonOffset:true,polygonOffsetFactor:-1}));
+  m.receiveShadow=true;m.position.y=1.208;g.add(m);
+}
 function buildColosseum(g,R,floorMaterial){
   const marble=new THREE.MeshStandardMaterial({color:0x9b9080,roughness:.72});
   const cap=new THREE.MeshStandardMaterial({color:0xc0b497,roughness:.69});
@@ -1339,11 +1414,10 @@ function buildColosseum(g,R,floorMaterial){
     for(let n=0;n<5;n++)if((i+n)%4!==2)column(city,n*1.8-3.6,0,(i+n)%5===0?2.7:8.1);
     if(i%3!==1){
       box(8.65,.6,2.8,cap,0,10.15,0,city);
-      const pediment=new THREE.Mesh(new THREE.CylinderGeometry(4.4,4.4,2.6,3),ruin);
-      pediment.rotation.x=Math.PI/2;pediment.scale.x=1.17;pediment.scale.z=.46;
-      pediment.position.set(0,10.99,0);city.add(pediment);
+      relief(city,[[-4.55,0],[4.55,0],[0,1.85]],ruin,1.35,0,10.45,-.7);
     }
   }
+  olympianMedallion(g);
   const mosaic=new THREE.Mesh(new THREE.RingGeometry(4.45,4.64,64).rotateX(-Math.PI/2),bronze);
   mosaic.position.y=1.218;g.add(mosaic);
   for(let i=0;i<20;i++){
@@ -1389,6 +1463,7 @@ function buildArena(id){
   }else{
     const ceil=new THREE.Mesh(new THREE.CircleGeometry(wallR+1,48).rotateX(Math.PI/2),new THREE.MeshStandardMaterial({color:0x08070a,roughness:1}));ceil.position.y=18;g.add(ceil);
   }
+  if(id==='keep'||th.storm)arenaStandards(g,R,!!th.storm);
   buildInlay(g,R,th);
   for(const rr of [R*.42,R*.17]){const m=new THREE.MeshBasicMaterial({color:th.rune,transparent:true,opacity:.5});runeMats.push(m);
     const ring=new THREE.Mesh(new THREE.RingGeometry(rr-.07,rr,128).rotateX(-Math.PI/2),m);ring.position.y=.02;g.add(ring);}
@@ -2240,7 +2315,11 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
         wrap.rotation.z=(i%2?.31:-.31);
       }
     }
-    hewnBlock(.74,.86,.44,cloth,0,.46,0,upper);
+    const weave=std(0xffffff,{vertexColors:true,roughness:.9,side:THREE.DoubleSide});
+    weave.userData.keepColor=true;
+    const tint=theme?CELESTIAL_PAL[theme].cloth2:0x293247,selvedge=theme?CELESTIAL_PAL[theme].gold:0x813d4e;
+    fittedShell(upper,weave,[[.90,.31,.22,tint],[.77,.395,.26,tint],[.46,.35,.25,tint],[.15,.30,.22,tint],[.09,.34,.26,selvedge],[-.18,.415,.31,tint],[-.22,.41,.31,selvedge]],{pleats:8,fold:.038,tip:.085});
+
     hewnBlock(.75,.13,.49,stitch,0,.10,0,upper);
     const seam=box(.043,.69,.035,trim,.14,.46,.25,upper);seam.rotation.z=-.27;
     box(.15,.105,.054,dark,-.07,.10,.263,upper);
@@ -2253,7 +2332,10 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     const hood=new THREE.Mesh(new THREE.SphereGeometry(.268,16,11),dark);
     hood.scale.set(.92,1.16,.91);hood.position.set(0,.24,-.018);head.add(hood);
     hewnBlock(.345,.12,.114,skin,0,.257,.184,head);
-    hewnBlock(.355,.17,.12,cloth,0,.119,.17,head);
+    const mask=relief(head,[[-.18,.09],[-.07,.07],[0,.12],[.07,.07],[.18,.09],[.16,-.045],[0,-.11],[-.16,-.045]],cloth,.045,0,.115,.18);
+    for(let row=0;row<2;row++)for(const side of [-1,1]){
+      const pleat=box(.118,.014,.012,stitch,side*.074,-.006-row*.035,.048,mask);pleat.rotation.z=side*.15;
+    }
     hewnBlock(.46,.13,.40,stitch,0,-.016,-.017,head);
     const eyes=std(0xe6d8bb);
     for(const side of [-1,1]){
@@ -2378,6 +2460,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     if(!CELESTIAL_BODY.includes(cls))themeMaterials(root,theme);
     celestial=addCelestialGear(cls,theme,level,{upper});
   }
+  if(skin!=='pixel')tailorHero(cls,theme,level,upper,armL,armR);
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   const knees=[mountLimbJoint(hipL,.46),mountLimbJoint(hipR,.46)];
   const elbows=[mountLimbJoint(armL,.34,.035),mountLimbJoint(armR,.34,.035)];
@@ -2386,6 +2469,76 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const drapes=collectDrapes(upper,ninjaRig?.scarf);
   world.add(root);
   return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+}
+// Elliptical rings describe fitted garments and embossed metal. Bands share vertices along each fold.
+function fittedShell(parent,material,rows,{pleats=0,fold=0,tip=0,segments=40}={}){
+  const positions=[],indices=[],colors=[];
+  rows.forEach(([y,rx,rz,tint],j)=>{
+    const c=new THREE.Color(tint);
+    for(let i=0;i<segments;i++){
+      const a=i/segments*TAU,flute=pleats?Math.cos(a*pleats):0;
+      const depth=1+fold*flute*j/(rows.length-1);
+      positions.push(Math.sin(a)*rx*depth,y-tip*(j/(rows.length-1))**2*Math.abs(Math.cos(a))**6,Math.cos(a)*rz*depth);
+      colors.push(c.r,c.g,c.b);
+      if(j){
+        const lo=j*segments+i,hi=lo-segments,next=j*segments+(i+1)%segments;
+        indices.push(hi,lo,next-segments,next-segments,lo,next);
+      }
+    }
+  });
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
+  g.setIndex(indices);g.computeVertexNormals();
+  const mesh=new THREE.Mesh(g,material);mesh.castShadow=mesh.receiveShadow=true;parent.add(mesh);return mesh;
+}
+function relief(parent,points,mat,depth,x,y,z){
+  const path=new THREE.Shape();points.forEach(([px,py],i)=>i?path.lineTo(px,py):path.moveTo(px,py));path.closePath();
+  const m=new THREE.Mesh(new THREE.ExtrudeGeometry(path,{depth,bevelEnabled:true,bevelThickness:depth*.22,bevelSize:depth*.24,bevelSegments:2}),mat);
+  m.position.set(x,y,z);parent.add(m);return m;
+}
+const LIVERY={
+  sword:[0x713f2d,0xb77745,'apron'],archer:[0x39654e,0xbb9c63,'ranger'],mage:[0x354b86,0xb3cef1,'mantle'],
+  jester:[0x9c2651,0xf0bc58,'ruff'],rogue:[0x273449,0xa75351,'ranger'],soul:[0x296550,0x8fdcb0,'mantle'],
+  warlock:[0x47274e,0xc086b1,'mantle'],berserker:[0x684336,0xc4ac82,'hide'],
+  paladin:[0x667e90,0xdbc185,'plate'],sentinel:[0x3f726f,0xc0cba8,'plate']
+};
+function tailorHero(cls,theme,level,upper,armL,armR){
+  if(!LIVERY[cls])return;
+  const [base,edge,cut]=LIVERY[cls],dye=theme?CELESTIAL_PAL[theme].cloth2:base,trim=theme?CELESTIAL_PAL[theme].gold:edge;
+  const plated=cut==='plate',cloth=std(0xffffff,{vertexColors:true,side:THREE.DoubleSide,roughness:plated?.38:.85,metalness:plated?.42:.04});
+  const metal=std(trim,{metalness:.47,roughness:.34});
+  if(cut==='apron'){
+    const apron=relief(upper,[[-.22,.34],[.22,.34],[.32,-.30],[.24,-.50],[-.24,-.50],[-.32,-.30]],std(dye,{roughness:.9}),.022,0,.36,.301);
+    for(const s of [-1,1])gearGem(apron,metal,.17*s,.27,.033,.032,[1,1,.45]);
+    const tool=grp(-.09,.52,-.38,upper);tool.rotation.z=-.58;
+    hewnBlock(.085,.90,.10,std(0x664128),0,0,0,tool);
+    hewnBlock(.43,.18,.18,metal,0,.40,0,tool);
+  }else{
+    const r=cut==='ruff'?.50:plated?.49:cut==='hide'?.43:.48;
+    const shell=fittedShell(upper,cloth,[[.96,.23,.23,trim],[.92,.275,.255,dye],[.86,r*.84,.32,dye],
+      [.78,r,.355,dye],[.70,r*.98,.36,dye],[.68,r*.97,.363,trim],[.65,r*.96,.36,trim]],
+      {pleats:cut==='ruff'?12:plated?4:8,fold:cut==='ruff'?.16:.055,tip:cut==='ranger'?.14:.055});
+    if(cut==='hide'||cut==='ranger')shell.rotation.z=cls==='rogue'?-.16:.16;
+    if(cut==='ruff')shell.rotation.y=.15;
+    if(plated||cut==='hide'){
+      for(const [i,arm] of [armL,armR].entries()){
+        if(cut==='hide'&&i===1)continue;
+        const cap=fittedShell(arm,cloth,[[.13,.09,.12,trim],[.08,.19,.19,dye],[-.02,.235,.24,dye],[-.12,.213,.22,trim],[-.15,.205,.21,trim]],{pleats:6,fold:.048,tip:.045});
+        cap.rotation.z=(i?1:-1)*.16;
+      }
+    }
+    if(cut==='mantle'||plated){
+      const tab=grp(0,.63,.35,upper);tab.rotation.x=.075;
+      relief(tab,[[-.115,0],[.115,0],[.11,-.34],[0,-.48],[-.11,-.34]],std(dye),.018,0,0,0);
+      const symbol=cls==='mage'?[[0,.095],[.055,0],[0,-.13],[-.055,0]]:
+        cls==='soul'?[[0,.08],[.068,.05],[.073,-.015],[0,-.105],[-.073,-.015],[-.068,.05]]:
+        [[0,.095],[.027,.025],[.083,0],[.027,-.025],[0,-.12],[-.027,-.025],[-.083,0],[-.027,.025]];
+      relief(tab,symbol,metal,.012,0,-.19,.027);
+    }
+  }
+  if(level>=2)for(const arm of [armL,armR]){
+    fittedShell(arm,cloth,[[-.39,.136,.147,trim],[-.415,.14,.15,dye],[-.51,.148,.156,dye],[-.53,.146,.154,trim]],{tip:level===3?.09:.035,segments:20});
+  }
 }
 function addClassDetails(cls,{upper,armR,armL},level){
   const colors={sword:0xb47743,soul:0x5fad8c,warlock:0x775191,berserker:0x875944,
@@ -2518,6 +2671,15 @@ function makeBossModel(type){
     }
     for(const side of [-1,1])hewnBlock(1.37,.83,.2,bands,0,-2.63,side*.94,maul);
     for(let i=0;i<3;i++)gearGem(maul,glow,(i-1)*.27,-2.63,1.06,.085,[.8,1,.45]);
+    const hammered=std(0xffffff,{vertexColors:true,metalness:.52,roughness:.43,side:THREE.DoubleSide});
+    fittedShell(upper,hammered,[[3.48,.47,.49,0xa78a69],[3.30,.65,.64,0x565665],[3.12,.68,.69,0x827369],[3.07,.61,.66,0x392e36]],{pleats:8,fold:.06,tip:.08});
+    relief(upper,[[-.14,.18],[.14,.18],[.09,-.21],[0,-.38],[-.09,-.21]],bands,.10,0,2.91,.61);
+    for(const side of [-1,1]){
+      const cheek=relief(upper,[[-.22,.22],[.19,.18],[.18,-.16],[0,-.37],[-.19,-.25]],iron,.12,side*.37,2.70,.56);
+      cheek.rotation.y=side*.40;
+      const plate=fittedShell(side<0?armL:armR,hammered,[[.61,.23,.31,0xad9672],[.49,.61,.63,0x726474],[.27,.78,.78,0x514858],[.17,.81,.79,0xae8963],[.10,.76,.76,0x423e4c]],{pleats:8,fold:.065,tip:.14});
+      plate.rotation.z=side*.21;
+    }
     maul.userData.bossWeapon=true;
     knees=[mountLimbJoint(hipL,1.13),mountLimbJoint(hipR,1.13)];
     elbows=[mountLimbJoint(armL,1.04),mountLimbJoint(armR,1.04)];
@@ -2631,6 +2793,13 @@ function makeBossModel(type){
         const a=sign*(.43+i*.32),leaf=oval(Math.sin(a)*.71,3.58+i*.024,Math.cos(a)*.51,.11,.24,.065,gold,upper);
         leaf.rotation.z=-sign*.78;
       }
+    }
+    const silk=std(0xffffff,{vertexColors:true,roughness:.84,side:THREE.DoubleSide});
+    fittedShell(upper,silk,[[.50,1.01,.81,0xedd39a],[.38,1.08,.83,0xc8aa68],[.31,1.1,.85,0xf1eee5],[-.62,1.55,1.54,0xc4c6cb],[-.94,1.62,1.62,0xf4ecdc],[-1.01,1.63,1.63,0xb69856],[-1.07,1.62,1.62,0xe7d8b8]],{pleats:16,fold:.046,tip:.07,segments:96});
+    for(let i=-3;i<=3;i++){
+      const length=.49-.052*Math.abs(i),lock=new THREE.Mesh(new THREE.LatheGeometry(
+        [[.012,-length],[.097,-length*.65],[.146,-length*.28],[.124,.04],[.04,.16]].map(([x,y])=>new THREE.Vector2(x,y)),10),hair);
+      lock.position.set(i*.135,2.63+Math.abs(i)*.038,.78-Math.abs(i)*.052);lock.rotation.z=-i*.10;upper.add(lock);
     }
     oval(0,2.9,.72,.115,.19,.15,skin,upper);
     oval(0,2.46,.49,.38,.4,.28,hair,upper);
@@ -6359,6 +6528,7 @@ function buildVillage(){
   },28,28);
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(160,160),std(0xffffff,{map:groundMap}));
   ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;villageScene.add(ground);
+  const slateMap=villageShingles();
   const plasterStone=std(0xa7a39b),timber=std(0x574137),floor=std(0x8e6e50),stone=std(0x797f83);
   const pathMat=std(0xffffff,{map:canvasTex(128,128,(c,w,h)=>{
     c.fillStyle='#817763';c.fillRect(0,0,w,h);
@@ -6414,7 +6584,7 @@ function buildVillage(){
       continue;
     }
     const house=site.kind==='house',w=house?6:4.6,d=house?4.6:3.65,front=d/2,wallHeight=house?3.08:2.82;
-    const plaster=std(site.wall),roof=std(site.roof),edge=std(site.roof,{roughness:.65});
+    const plaster=std(site.wall),roof=std(site.roof,{map:slateMap,roughness:.8}),edge=std(site.roof,{roughness:.65});
     box(w,.1,d,floor,0,.003,0,h);
     box(w,wallHeight,.23,plaster,0,wallHeight/2,-front,h);
     villageSpace(h,0,-front,w,.23);
@@ -6441,6 +6611,9 @@ function buildVillage(){
     const span=w/2+.32,tilt=Math.atan2(rise,span),slant=Math.hypot(span,rise);
     for(const side of [-1,1]){
       const roofPart=box(slant+.14,.16,d+.6,roof,side*span/2,wallHeight+rise/2+.08,0,h);
+      // The broad face of the box maps roof pitch along U; turn the courses across the slope.
+      const uv=roofPart.geometry.attributes.uv;
+      for(let k=0;k<uv.count;k++){const u=uv.getX(k),v=uv.getY(k);uv.setXY(k,v*d/3,side*u*slant/3);}
       roofPart.rotation.z=-side*tilt;
       for(let row=0;row<5;row++){
         const tile=box(.055,.08,d+.63,edge,(row-2)*slant/5,.11,0,roofPart);tile.castShadow=false;
