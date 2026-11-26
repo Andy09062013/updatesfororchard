@@ -1,6 +1,5 @@
 // Hollow Crown multiplayer server: serves the game page and runs lobbies + game relay over WebSocket.
 const clientSource = await Bun.file(new URL("./index.html", import.meta.url)).text();
-const modelCache = new Map<string, Uint8Array>();
 const clientDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(clientSource));
 const clientVersion = Array.from(new Uint8Array(clientDigest), byte => byte.toString(16).padStart(2, "0")).join("");
 const HTML = clientSource.replace('<meta name="hc-build" content="">', `<meta name="hc-build" content="${clientVersion}">`);
@@ -315,27 +314,12 @@ setInterval(() => {
 let nextId = 1;
 const server = Bun.serve({
   port: Number(Bun.env.PORT || 3000),
-  async fetch(req, srv) {
+  fetch(req, srv) {
     const url = new URL(req.url);
     if (url.pathname === "/ws") {
       const id = (nextId++).toString(36) + Math.random().toString(36).slice(2, 7);
       if (srv.upgrade(req, { data: { id, room: null } })) return;
       return new Response("WebSocket upgrade failed", { status: 400 });
-    }
-    if (url.pathname.startsWith("/models/")) {
-      const name = url.pathname.slice(8);
-      if (!/^(tex\/[A-Za-z0-9_-]+\.jpg|[a-z0-9_-]+\.(glb|gltf|bin))$/.test(name)) return new Response("Not found", { status: 404 });
-      const file = Bun.file(new URL("./models/" + name, import.meta.url));
-      if (!(await file.exists())) return new Response("Not found", { status: 404 });
-      const ext = name.split(".").pop();
-      const type = ext === "jpg" ? "image/jpeg" : ext === "gltf" ? "model/gltf+json" : ext === "bin" ? "application/octet-stream" : "model/gltf-binary";
-      const headers: Record<string, string> = { "Content-Type": type, "Cache-Control": "public, max-age=86400" };
-      if (ext !== "jpg" && (req.headers.get("accept-encoding") || "").includes("gzip")) {
-        let packed = modelCache.get(name);
-        if (!packed) { packed = Bun.gzipSync(new Uint8Array(await file.arrayBuffer())); modelCache.set(name, packed); }
-        return new Response(packed, { headers: { ...headers, "Content-Encoding": "gzip" } });
-      }
-      return new Response(file, { headers });
     }
     if (url.pathname === "/health") return new Response("ok");
     if (url.pathname === "/client-version") {
