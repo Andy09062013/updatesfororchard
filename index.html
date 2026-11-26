@@ -64,7 +64,7 @@ input.code{text-transform:uppercase;letter-spacing:.3em;width:130px;text-align:c
 .card p{font-size:12.5px;line-height:1.5;color:#b5a991;min-height:56px}
 .card .tag{display:inline-block;margin-top:10px;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;padding:4px 10px;border-radius:3px;background:#3c2b18;color:#e6c27a}
 .card.sel{border-color:#d9a74a;box-shadow:0 0 0 1px #d9a74a,0 0 30px rgba(217,167,74,.25)}
-.classInfo{max-width:760px;text-align:center;font-size:12.5px;line-height:1.8;color:#9c907a;padding:0 16px;min-height:44px}
+.classInfo{max-width:900px;width:min(900px,94vw);text-align:center;font-size:12.5px;line-height:1.8;color:#9c907a;padding:0 16px;min-height:44px;box-sizing:border-box}
 .classInfo b{color:#cdb88f}
 button.big{font-family:Cinzel,serif;font-size:16px;letter-spacing:.14em;padding:12px 30px;background:linear-gradient(180deg,#7a2a18,#4a140b);color:#f3dcb4;border:1px solid #c0703a;border-radius:4px;cursor:pointer;transition:.15s}
 button.big:hover{filter:brightness(1.25);transform:translateY(-1px)}
@@ -220,7 +220,32 @@ button.big.alt{background:linear-gradient(180deg,#2d3643,#161c26);border-color:#
 .boss .bar{border-color:#c3a169}
 #vignette{box-shadow:none;background:radial-gradient(ellipse at 50% 43%,transparent 48%,#06091166 100%)}
 button:focus-visible,.card:focus-visible{outline:2px solid #ffe1a8;outline-offset:3px}
-#upgradePanel{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:9px 14px;width:min(820px,94vw);padding:9px 14px;border:1px solid #716047;background:#101823ed;color:#d7c8ad}
+#upgradePanel{display:flex;flex-direction:column;gap:8px;width:min(860px,94vw);padding:12px 16px;border:1px solid #716047;background:#101823ed;color:#d7c8ad;box-sizing:border-box}
+#upgradePanel .mh{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px}
+#upgradePanel .mh b{font-family:Cinzel,serif;color:#f2ca7d;letter-spacing:.04em}
+#upgradePanel .mbar{height:7px;background:#241c14;border:1px solid #4a3d2e;border-radius:4px;overflow:hidden}
+#upgradePanel .mbar i{display:block;height:100%;background:linear-gradient(90deg,#b8862e,#f2ca7d)}
+#upgradePanel .mranks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+#upgradePanel .mr{border:1px solid #3a3024;border-radius:5px;padding:8px 10px;background:rgba(10,8,6,.45);font-size:12px;line-height:1.45}
+#upgradePanel .mr p{margin:3px 0 0}
+#upgradePanel .mr .mrg{color:#a99878;font-style:italic}
+#upgradePanel .mr.done{border-color:#6b5a3a}
+#upgradePanel .mr.next{border-color:#d9a74a;box-shadow:0 0 0 1px #d9a74a33}
+#upgradePanel .mr.locked{opacity:.6}
+#upgradePanel .mrh{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9c907a;margin-bottom:2px}
+#upgradePanel .mr.done .mrs{color:#8fd19e}
+#upgradePanel .mr.next .mrs{color:#f2ca7d}
+#upgradePanel .mhow{font-size:11.5px;color:#9c907a}
+.classInfo .mvTitle{font-family:Cinzel,serif;color:#e3cfa6;font-size:14px;letter-spacing:.05em;margin-bottom:8px;text-align:center}
+.classInfo .mvGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:6px 14px;text-align:left}
+.classInfo .mv{display:flex;gap:10px;align-items:flex-start;padding:6px 8px;border:1px solid #33291f;border-radius:5px;background:rgba(10,8,6,.4)}
+.classInfo .mv.ult{border-color:#7a5a2a}
+.classInfo .mv.basic{opacity:.8}
+.classInfo .mk{flex:0 0 auto;min-width:44px;text-align:center;font:600 11px Inter,sans-serif;color:#f2c75a;border:1px solid #6b5636;border-radius:4px;padding:3px 5px;background:#1d150e}
+.classInfo .mt{flex:1;font-size:12.5px;line-height:1.45}
+.classInfo .mt b{color:#eadcc0}
+.classInfo .mcd{margin-left:8px;font-size:11px;color:#9c907a}
+.classInfo .mt p{margin:2px 0 0;color:#c9bb9f}
 .roleBadge{display:block;font-size:11px;color:#afe1bf;margin:4px 0}
 #coinBalance,#runCoins{color:#f2ca7d;font-weight:600}
 #upgradeLook{font-size:12px;color:#d8bd8d;line-height:1.5}
@@ -513,7 +538,7 @@ const UPGRADE_GEAR={
   jester:['Gold bells and a longer split collar','Royal purple motley, an emerald hat and gilded cards'],
   sword:['Reinforced apron','Gilded apron'],
   soul:['Jade collar','Bright emerald robes'],
-  mage:['An ice-blue mantle and a ringed staff','White robes, a tall collar and a sunburst staff'],
+  mage:['A silver-edged hat with a star jewel, frost-trimmed scarf, strapped boots and a ringed ice crystal','A crown of ice shards, a glacial cape, glowing cuff runes and a larger orbiting crystal'],
   archer:['A feathered cowl, a green cape and brass bow fittings','A steel crossbow and a heavier ranger mantle'],
   warlock:['A bone mask and violet crystal gauntlets','A split horn crown, crimson cloak and larger crystals'],
   berserker:['Crimson war paint and an iron-banded axe','Spiked shoulders, a bone crest and a double-edged axe'],
@@ -521,6 +546,106 @@ const UPGRADE_GEAR={
   paladin:['An ivory tabard and a back-mounted banner','Gold plate, a sunburst shield and a gilded mace'],
   sentinel:['Copper-framed armor and an emerald spear','A mint crystal crest, brighter plates and a trident']
 };
+
+// ==== MOVE GUIDE: [action, move name, plain description] ====
+const MOVE_GUIDE={
+  sword:[
+    ['light','Forge Strike','Swing your sword. Landing hits forges a better blade during the fight: Wood 15, Iron 21, Gold 27, Diamond 32, Doombringer 36 damage per hit.'],
+    ['q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks up to +30%.'],
+    ['passive','Last Stand','Once per fight, a hit that would kill you leaves you at 1 HP with a 30 HP shield instead.']],
+  soul:[
+    ['light','Soul Link','Link to a teammate within 24 units. You take 50% of the damage they receive, and their damage charges your ultimate.'],
+    ['heavy','Unlink','Remove the link from the selected teammate, or clear every link.'],
+    ['q','Mend Soul','Restore 38 HP to yourself.'],
+    ['e','Empower','For 7 seconds, linked allies move 25% faster, deal 20% more damage and take 20% less damage.'],
+    ['f','Saturate','Spend your own HP down to 10 and share that healing among your linked allies.']],
+  mage:[
+    ['light','Mending Ray','Heal the targeted ally (or yourself) for 8 HP.'],
+    ['heavy','Fireball','Throw a fireball that deals 39 damage.'],
+    ['q','Sanctuary','Place a healing circle on the targeted ally: 10 HP per second to everyone inside for 6 seconds.'],
+    ['e','Healing Burst','Instantly heal every ally within 13 units for 32 HP.'],
+    ['f','Arcane Ward','Allies within 13 units take 45% less damage for 5 seconds. Enemies within 7 units take 18 damage and are stunned.']],
+  archer:[
+    ['light','Shot','Fire a quick arrow for 20 damage.'],
+    ['heavy','Charged Shot','Hold to draw the bow. A full draw (0.7s) deals 75 damage; releasing early deals 24 to 57.'],
+    ['q','Triple Shot','Fire three heavy arrows in a narrow spread, 29 damage each.'],
+    ['e','Arrow Rain','Arrows fall on the target area (5.5 radius) for 3 seconds, 12 damage every 0.25s.'],
+    ['f','Vault Shot','Backflip away (invulnerable while airborne) and fire a 42 damage arrow.']],
+  warlock:[
+    ['light','Shadow Bolt','Fire a bolt of shadow for 20 damage.'],
+    ['heavy','Curse of Agony','Curse the locked target: 7 damage every 0.5s for 6 seconds (84 total).'],
+    ['q','Void Rift','Open a rift (4.5 radius) at the target for 4 seconds: 11 damage every 0.4s to enemies inside.'],
+    ['e','Siphon Life','Channel on a target within 16 units: 7 damage and 3 HP restored to you every 0.3s.'],
+    ['f','Shadow Blink','Teleport 9 units in your movement direction, briefly invulnerable.']],
+  berserker:[
+    ['light','Cleave','Wide alternating axe swings, 30 damage each.'],
+    ['heavy','Crushing Blow','Slow overhead strike for 84 damage that breaks the boss\'s poise.'],
+    ['q','Whirlwind','Spin like a tornado for 3 seconds: 13 damage every 0.2s and 40% less damage taken. You can move while spinning.'],
+    ['e','Blood Rage','For 8 seconds: +28% damage, +30% speed, 35% less damage taken, and hits heal you for 15% of the damage.'],
+    ['f','Leap Slam','Jump onto the target and slam for 55 damage. Invulnerable in the air.']],
+  paladin:[
+    ['light','Mace Tap','Strike with your mace for 19 damage.'],
+    ['block','Raise Shield','Hold to take 70% less damage. Damage you block charges Heavenfall.'],
+    ['q','Guardian Aura','Allies within 7 units take 30% less damage for 5 seconds.'],
+    ['e','Challenge','Taunt the boss so its next attack targets you (26 unit range).'],
+    ['f','Thorns','For 6 seconds, reflect 80% of the damage you take back at the attacker.']],
+  sentinel:[
+    ['light','Light Lance','Throw a lance that bursts on impact for 21 damage in a 3.2 radius.'],
+    ['heavy','Aegis','Allies within 7.5 units take 45% less damage for 4 seconds; nearby enemies take 25 damage.'],
+    ['q','Dawn Pulse','Release a pulse around you: 32 damage in a 7.5 radius.'],
+    ['e','Sunstrike','Call down light on the target area: 42 damage in an 8 radius.'],
+    ['f','Radiant Tempest','Create a 9-radius storm at the target that strikes three times for 25 damage each.']],
+  jester:[
+    ['light','Card Throw','Flick a card for 13 damage. Very fast.'],
+    ['q','Fire Bomb','Lob a bomb for 47 damage that leaves a burning patch for 4 seconds.'],
+    ['e','Ice Bomb','Lob a bomb for 32 damage that slows enemy movement, attacks and hazards for 4 seconds.'],
+    ['f','Confusion Bomb','Stun the boss for up to 2.4 seconds. Deals no damage.']],
+  rogue:[
+    ['light','Dagger Flurry','Rapid dagger stabs, 15 damage each.'],
+    ['heavy','Piercing Shuriken','Throw a shuriken that passes through enemies, 23 damage to each.'],
+    ['q','Shadow Step','Teleport behind your target, briefly invulnerable.'],
+    ['e','Envenom','For 6 seconds your hits deal +3 damage and poison the target (4 damage every 0.5s for 3 seconds).'],
+    ['f','Smoke Bomb','The boss loses track of you for 2.5 seconds.'],
+    ['passive','Evasion','10% chance to dodge any incoming hit completely.']]
+};
+const ULT_GUIDE={
+  mage:'Heal every ally within 30 units for 70 HP, ward them for 8 seconds and revive fallen allies at 50 max HP (once per expedition).',
+  archer:'Fire an explosive arrow: a 76 damage blast followed by six 28 damage explosions around it.',
+  rogue:'Teleport around the target for 8 strikes of 24 damage, then finish with a 60 damage stun. Invulnerable throughout.',
+  berserker:'Leap onto the target and shatter the ground: 210 damage in a 7.5 radius and a stun. Invulnerable in the air.',
+  paladin:'Crash down from the sky for 185 damage in an 8.5 radius and stun. Landing grants a bubble with 95% damage reduction for 7 seconds.',
+  warlock:'Hold to charge, release to fire a widening void beam. A full charge deals up to 450 damage.',
+  sentinel:'Hold, then release to fire a piercing beam (51 to 140 damage) that also heals nearby allies.',
+  jester:'Drop three waves of fire, ice and confusion bombs across the arena.',
+  soul:'Charged by the damage your linked allies deal. You become invulnerable and restore 20 HP per second for 7 seconds.'
+};
+// Mastery ranks: [key, new move name, full description at this rank, short summary of the change]
+const MASTERY_GUIDE={
+  sword:[['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks up to +30%.','New gear only. Abilities are unchanged.'],
+         ['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks up to +30%.','New gear only. Abilities are unchanged.']],
+  soul:[['Q','Mend Soul','Restore 44 HP to yourself.','Mend Soul heals 44 HP (was 38).'],
+        ['Q','Mend Soul','Restore 50 HP to yourself.','Mend Soul heals 50 HP (was 44).']],
+  mage:[['F','Radiant Ward','Allies within 13 units take 45% less damage for 7 seconds. Enemies within 7 units take 30 damage and are stunned.','Arcane Ward lasts 7s (was 5s) and deals 30 damage (was 18).'],
+        ['F','Dawn Aegis','Allies within 13 units take 45% less damage for 8 seconds and are healed for 18 HP. Enemies within 7 units take 30 damage and are stunned.','Ward lasts 8s and also heals allies for 18 HP.']],
+  archer:[['Q','Hunter\'s Volley','Fire five arrows in a wide spread, 22 damage each.','Triple Shot becomes a 5-arrow volley (22 each).'],
+          ['Q','Siege Bolt','Fire one heavy crossbow bolt for 106 damage that bursts on impact (4.2 radius).','Triple Shot becomes a 106 damage exploding bolt. Your bow becomes a crossbow: basic shots deal 26 (was 20).']],
+  warlock:[['Q','Grave Rift','Open a wider rift (5.7 radius) for 4 seconds: 13 damage every 0.4s.','Void Rift is larger and deals 13 per tick (was 11).'],
+           ['Q','Soul Well','Open a wide rift for 4.8 seconds (13 damage every 0.4s) and leave a healing well that restores 4 HP per second for 6 seconds.','Rift lasts longer and heals allies standing in it.']],
+  berserker:[['E','Crimson Rage','Blood Rage lasts 10 seconds and deals 25 damage to enemies within 3.8 units when activated.','Blood Rage lasts 10s (was 8s) and hits nearby enemies.'],
+             ['E','Blood Quake','Blood Rage lasts 10 seconds and sends out a shockwave: 43 damage within 6.6 units and a stun.','The activation shockwave is bigger, stronger and stuns.']],
+  rogue:[['E','Venom Coat','For 8 seconds your hits deal +4 damage and poison the target.','Envenom lasts 8s (was 6s) and adds +4 per hit (was +3).'],
+         ['E','Night Venom','For 8 seconds your hits deal +6 damage and poison the target. Activating it releases toxic mist: 35 damage within 5 units.','+6 per hit and a 35 damage mist burst on activation.']],
+  paladin:[['Q','Guardian Banner','Allies within 10 units take 30% less damage for 7 seconds.','Guardian Aura covers 10 units (was 7) and lasts 7s (was 5s).'],
+           ['Q','Aegis of Dawn','Allies within 10 units take 30% less damage for 8 seconds and are healed for 12 HP.','Aura lasts 8s and also heals allies for 12 HP.']],
+  sentinel:[['Q','Resonant Pulse','Release a pulse around you: 44 damage in a 9 radius.','Dawn Pulse deals 44 damage (was 32) in a 9 radius.'],
+            ['Q','Radiant Pulse','Release a pulse: 53 damage in a 10 radius, stuns enemies and heals nearby allies for 16 HP.','Pulse deals 53, stuns, and heals allies.']],
+  jester:[['Q','Blazing Bomb','Lob a bomb for 56 damage that leaves a burning patch for 4 seconds.','Fire Bomb deals 56 damage (was 47).'],
+          ['E','Glacial Bomb','Lob a bomb for 40 damage that slows enemy movement, attacks and hazards for 5 seconds.','Ice Bomb deals 40 damage (was 32) and slows for 5s (was 4s).']]
+};
+for(const id in MOVE_GUIDE)if(CLASSES[id])CLASSES[id].ctrl=MOVE_GUIDE[id];
+for(const id in ULT_GUIDE)if(CLASSES[id])CLASSES[id].ultHint=ULT_GUIDE[id];
+for(const id in MASTERY_GUIDE)if(UPGRADES[id])UPGRADES[id]=MASTERY_GUIDE[id].map(r=>[r[0],r[1],r[2],r[3]]);
+SKELETON.ctrl=[['light','Rusted Swing','Swing your sword for 30 damage.']];
 const profileKey='hc_progression_v1';
 function readProfile(){
   try{
@@ -543,20 +668,36 @@ function charLevel(id){
 }
 function saveProfile(){try{localStorage.setItem(profileKey,JSON.stringify(profile));}catch(e){}}
 function loadout(cls,level){
-  const base=CLASSES[cls],upgrade=UPGRADES[cls][level-2];
-  if(!upgrade)return base;
-  const [key,n,desc]=upgrade,action=ACTION_KEYS[key];
-  const skills=base.skills.map(s=>s.k===key?{...s,n}:s);
-  const ctrl=base.ctrl.filter(r=>r[0]!==action).concat([[action,n+' · '+desc]]);
+  const base=CLASSES[cls];
+  if(level<2||!UPGRADES[cls])return base;
+  let skills=base.skills,ctrl=base.ctrl;
+  for(const upgrade of UPGRADES[cls].slice(0,level-1)){
+    const [key,n,desc]=upgrade,action=ACTION_KEYS[key];
+    skills=skills.map(s=>s.k===key?{...s,n}:s);
+    ctrl=ctrl.map(r=>r[0]===action?[action,n,desc]:r);
+  }
   return {...base,skills,ctrl};
 }
 const currentLoadout=()=>state==='play'&&P?P.kit:loadout(myClass,charLevel(myClass));
 function renderUpgrade(){
   const level=charLevel(myClass),points=profile.mastery[myClass]||0,threshold=MASTERY_THRESHOLDS[level];
+  renderMasteryTrack(level,points);return;
   $('coinBalance').textContent=threshold?`${points} / ${threshold} mastery points`:`${points} mastery points · Rank 3`;
   const entry=UPGRADES[myClass][Math.min(level-1,1)];
   $('upgradeInfo').textContent=threshold?`Rank ${level+1} · ${entry[1]} · ${entry[2]}`:`Unlocked · ${entry[1]}`;
   $('upgradeLook').textContent=threshold?`Gear · ${UPGRADE_GEAR[myClass][level-1]}`:'';
+}
+function renderMasteryTrack(level,points){
+  const ranks=UPGRADES[myClass]||[],gear=UPGRADE_GEAR[myClass]||[];
+  const next=MASTERY_THRESHOLDS[level],prev=MASTERY_THRESHOLDS[level-1]||0;
+  const pct=next?Math.min(100,Math.round((points-prev)/(next-prev)*100)):100;
+  const step=(rank,title,body,look)=>{const state=level>=rank?'done':rank===level+1?'next':'locked';
+    const need=MASTERY_THRESHOLDS[rank-1];
+    return `<div class="mr ${state}"><div class="mrh"><span class="mrn">Rank ${rank}</span><span class="mrs">${state==='done'?'Unlocked':need+' points'}</span></div><b>${esc(title)}</b><p>${esc(body)}</p>${look?`<p class="mrg">Gear: ${esc(look)}</p>`:''}</div>`;};
+  $('upgradePanel').innerHTML=`<div class="mh"><b>${esc(CLASSES[myClass].name)} Mastery ${level}</b><span>${next?`${points} / ${next} points to Rank ${level+1}`:`${points} points · Max rank`}</span></div>
+    <div class="mbar"><i style="width:${pct}%"></i></div>
+    <div class="mranks">${step(1,'Base kit','Every move as listed below.','')}${ranks.map((r,i)=>step(i+2,r[1]+' ('+r[0]+')',r[3]||r[2],gear[i])).join('')}</div>
+    <div class="mhow">Earn mastery by playing this class: 3 points every 20 seconds in battle, 4 to 10 per minion, 50 per boss defeated.</div>`;
 }
 function gainMastery(amount){
   if(!G||P.afk)return;
@@ -1470,7 +1611,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
-  let glow=null,bowRig=null;
+  let glow=null,bowRig=null,frostOrbRef=null;
   const veteran=level>=2,royal=level===3;
   if(skin==='pixel')pixelGear(cls,level,{upper,armL,armR,hipL,hipR});
   else if(cls==='jester'){
@@ -1531,24 +1672,78 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     gearGem(upper,mint,0,.69,.28,.13,[.85,1.1,.55]);
     if(veteran)box(.68,.11,.47,mint,0,.88,0,upper);
   }else if(cls==='mage'){
-    const robe=std(royal?0xd3d1c6:veteran?0x385c80:0x4a2a7a,{roughness:.85}),trim=std(0xd9b04a,{metalness:.7,roughness:.3}),skin=std(0xd8b898),wood=std(0x5a3a22);
-    glow=new THREE.MeshBasicMaterial({color:royal?0xffda81:0x9fe0ff});
-    box(.25,.95,.3,robe,0,-.47,0,hipL);box(.25,.95,.3,robe,0,-.47,0,hipR);
-    const skirt=new THREE.Mesh(new THREE.CylinderGeometry(.42,.62,1.0,10),robe);skirt.position.y=.5;skirt.castShadow=true;inner.add(skirt);
-    hewnBlock(.74,.9,.44,robe,0,.46,0,upper);box(.2,.92,.46,trim,0,.46,.01,upper);box(.78,.1,.48,trim,0,.04,0,upper);
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.24,14,12),skin);head.position.y=1.18;head.castShadow=true;upper.add(head);
-    const hood=new THREE.Mesh(new THREE.ConeGeometry(.34,.75,10),robe);hood.position.set(0,1.42,-.04);hood.rotation.x=-.15;hood.castShadow=true;upper.add(hood);
-    box(.2,.68,.2,robe,0,-.34,0,armR);box(.2,.68,.2,robe,0,-.34,0,armL);
-    const staff=grp(0,-.72,0,armR);const sh=new THREE.Mesh(new THREE.CylinderGeometry(.04,.05,2.1,6),wood);sh.position.y=-.3;sh.castShadow=true;staff.add(sh);
-    gearGem(staff,glow,0,-1.42,0,veteran?.19:.16);
-    if(veteran){
-      staffHead(staff,trim,royal);
-      bossCape(royal?.98:.86,royal?1.45:1.08,std(royal?0xdad7ca:0x527f9e,{side:THREE.DoubleSide}),upper,.32,-.29);
-      for(const side of [-1,1]){
-        hewnBlock(.31,royal?.32:.19,.39,trim,side*.32,.89,-.04,upper).rotation.z=side*.32;
-      }
+    // Frostbound Mage: midnight robe, wide witch hat, shadowed face with glowing eyes, scarf and a floating ice crystal.
+    const cloth=std(royal?0x141c3a:0x151a33,{roughness:.9}),panel=std(royal?0x3e4f86:0x2e3760,{roughness:.84});
+    const frost=std(0xc4d1eb,{metalness:.25,roughness:.42}),leather=std(0x3b2b29,{roughness:.72}),gun=std(0x617085,{metalness:.7,roughness:.3});
+    const voidMat=std(0x0b1124,{roughness:.95});
+    glow=new THREE.MeshBasicMaterial({color:royal?0xbdf0ff:0x9fe1ff});
+    const eyeMat=new THREE.MeshBasicMaterial({color:royal?0xffffff:0xdaf2ff});
+    const ball=(r,mat,x,y,z,sx=1,sy=1,sz=1,parent=upper,seg=16)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,seg,Math.max(8,seg*.6|0)),mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;parent.add(m);return m;};
+    const tube=(rt,rb,h,mat,x,y,z,parent=upper,seg=16)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;};
+    const ring=(r,t,mat,x,y,z,parent=upper,arc=TAU)=>{const m=new THREE.Mesh(new THREE.TorusGeometry(r,t,6,28,arc),mat);m.position.set(x,y,z);m.rotation.x=Math.PI/2;parent.add(m);return m;};
+    // Boots
+    for(const leg of [hipL,hipR]){
+      tube(.14,.15,.5,leather,0,-.6,0,leg,12);
+      ball(.13,leather,0,-.86,.09,1,.72,1.7,leg,14);
+      box(.25,.2,.05,panel,0,-.58,.135,leg);
+      if(veteran)for(const y of [-.5,-.72])box(.32,.035,.32,gun,0,y,0,leg);
     }
-    const ho=new THREE.Mesh(new THREE.SphereGeometry(.09,8,8),glow);ho.position.y=-.75;armL.add(ho);
+    // Long layered robe (static on the hips, does not twist with the torso)
+    const skirt=tube(.33,.46,.66,cloth,0,.78,0,inner,18);skirt.scale.z=.74;
+    for(const side of [-1,1]){
+      const pn=box(.17,.62,.03,panel,side*.11,.79,.335,inner);pn.rotation.x=-.16;pn.rotation.z=side*.06;
+      if(veteran){const pp=box(.025,.6,.03,frost,side*.03,.79,.35,inner);pp.rotation.x=-.16;}
+    }
+    // Torso
+    const torso=tube(.25,.31,.86,cloth,0,.42,0,upper,18);torso.scale.z=.74;
+    box(.2,.7,.03,panel,0,.38,.23,upper);
+    // Belt, buckle and pouches
+    const belt=ring(.31,.045,leather,0,.17,0);belt.scale.y=.76;
+    box(.16,.14,.05,gun,0,.17,.245,upper);box(.07,.06,.03,frost,0,.17,.275,upper);
+    for(const side of [-1,1])ball(.09,leather,side*.27,.08,.14,1,1.2,1);
+    // Dagger at the hip
+    const dagger=grp(-.36,.1,.08,upper);dagger.rotation.z=.18;
+    tube(.03,.03,.2,leather,0,.1,0,dagger,8);box(.18,.035,.05,gun,0,0,0,dagger);
+    const blade=new THREE.Mesh(new THREE.ConeGeometry(.035,.3,6),frost);blade.position.y=-.17;blade.rotation.x=Math.PI;dagger.add(blade);
+    // Shoulder mantle and scarf
+    ball(.36,panel,0,.86,0,1,.36,.74);
+    ball(.25,veteran?frost:panel,0,.98,.01,1,.55,.88);
+    const fold=ring(.2,.05,panel,0,.96,.06);fold.scale.set(1,.9,1);
+    const tailA=box(.13,.62,.03,veteran?frost:panel,-.13,.62,-.22,upper);tailA.rotation.x=.2;tailA.rotation.z=.12;
+    const tailB=box(.13,.56,.03,panel,.12,.66,-.22,upper);tailB.rotation.x=.18;tailB.rotation.z=-.1;
+    // Shadowed face and glowing eyes
+    ball(.22,voidMat,0,1.2,0,1,1.12,.92);
+    for(const side of [-1,1]){const e=ball(.032,eyeMat,side*.085,1.22,.19,1,1.8,.6,upper,8);e.rotation.z=-side*.18;}
+    // Wide-brimmed hat with a bent tip
+    ball(.56,panel,0,1.4,0,1,.07,.8,upper,28);
+    tube(.15,.3,.46,cloth,0,1.64,-.01,upper,22);
+    ball(.16,cloth,.07,1.9,-.01,1,1.05,.95);
+    const tip=new THREE.Mesh(new THREE.ConeGeometry(.12,.34,14),cloth);tip.position.set(.21,1.98,-.02);tip.rotation.z=-1.05;tip.castShadow=true;upper.add(tip);
+    if(veteran){
+      const edge=ring(.555,.016,frost,0,1.41,0,upper,Math.PI);edge.rotation.z=0;edge.scale.set(1,.8,1);edge.rotation.y=0;
+      ring(.29,.022,frost,0,1.44,0);
+      ball(.05,glow,0,1.6,.25,1,1,.4,upper,10);
+    }
+    if(royal){
+      for(let i=0;i<7;i++){const a=i/7*TAU;const sp=new THREE.Mesh(new THREE.ConeGeometry(.05,.24,6),glow);sp.position.set(Math.sin(a)*.27,1.53,Math.cos(a)*.27*.95);sp.rotation.z=-Math.sin(a)*.32;sp.rotation.x=Math.cos(a)*.32;upper.add(sp);}
+      bossCape(.78,1.15,std(0x1f2b55,{side:THREE.DoubleSide}),upper,.85,-.26);
+    }
+    // Arms: wide sleeves, frost cuffs and gloves
+    for(const arm of [armL,armR]){
+      ball(.18,cloth,0,-.02,0,1,1,1.05,arm,12);
+      tube(.12,.21,.46,panel,0,-.3,0,arm,14);
+      tube(.2,.2,.08,frost,0,-.56,0,arm,14);
+      ball(.11,leather,0,-.66,.02,1,1.1,1,arm,12);
+      if(royal){const rune=box(.04,.2,.02,glow,0,-.32,.19,arm);rune.rotation.x=-.2;}
+    }
+    // Floating ice crystal beside the right hand
+    const frostOrb=grp(.2,-.6,.32,armR);
+    const cr=new THREE.Mesh(new THREE.OctahedronGeometry(royal?.17:veteran?.14:.11,0),glow);cr.scale.y=1.9;frostOrb.add(cr);
+    if(veteran){const orbit=new THREE.Mesh(new THREE.TorusGeometry(royal?.34:.28,.012,5,32),glow);orbit.rotation.x=1.2;frostOrb.add(orbit);}
+    for(let i=0;i<(royal?3:veteran?2:0);i++){const a=i/3*TAU;const sp=new THREE.Mesh(new THREE.SphereGeometry(.03,6,6),glow);sp.position.set(Math.sin(a)*.32,Math.cos(a)*.12,Math.cos(a)*.32);frostOrb.add(sp);}
+    frostOrbRef=frostOrb;
+    // Small frost mote in the left hand for heals
+    ball(.06,glow,0,-.78,.05,1,1,1,armL,8);
   }else if(cls==='warlock'){
     const robe=std(royal?0x3d1526:0x1a0e22,{roughness:.85}),trim=std(royal?0xc03f64:0x6a1a2a,{roughness:.6}),skin=std(0xb8a8b0),horn=std(0x2a2026,{roughness:.5}),glowW=new THREE.MeshBasicMaterial({color:0xb06aff});
     glow=glowW;
@@ -1734,7 +1929,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,frostOrb:frostOrbRef,frostT:Math.random()*9,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
@@ -2072,7 +2267,7 @@ document.addEventListener('pointerlockchange',()=>{
   if(document.pointerLockElement===canvas)hadLock=true;
   else if(hadLock&&cameraPrefs.shiftLock&&state==='play'&&!paused&&!chatOpen&&!localAway())openPause();
 });
-function ctrlRows(){return currentLoadout().ctrl.map(r=>[r[0]==='passive'?'Passive':keyName(BINDS[r[0]]),r[1]]);}
+function ctrlRows(){return currentLoadout().ctrl.map(r=>[r[0]==='passive'?'Passive':keyName(BINDS[r[0]]),r.length>2?r[1]+': '+r[2]:r[1]]);}
 function openPause(){closeOnlineRoster();paused=true;clearCombatInput();$('pause').classList.remove('hidden');
   $('pauseNote').textContent=G&&G.mode==='mp'?'The expedition continues while this menu is open':'';
   const mv=['up','left','down','right'].map(a=>keyName(BINDS[a],true)).join(' ');
@@ -3550,8 +3745,8 @@ function updatePlayer(dt){
       if(lockTarget&&!sprint)turnTo(faceTarget,16,dt);else if(spd>.5)turnTo(Math.atan2(vx,vz),sprint?11:18,dt);
       P.walk+=dt*spd*1.7;
       pose.legL=Math.sin(P.walk)*.7*amp;pose.legR=-pose.legL;
-      pose.armR=restR+Math.sin(P.walk)*.25*amp;pose.armL=restL-Math.sin(P.walk)*.15*amp;
-      pose.lean=sprint?.28:spd*.012;pose.upperY=0;
+      pose.armR=restR-Math.sin(P.walk)*.42*amp;pose.armL=restL+Math.sin(P.walk)*.36*amp;
+      pose.lean=sprint?.3:spd*.02;pose.upperY=0;
       if(sprint&&Math.random()<.15)burst(P.x,.1,P.z,1,0x3a3530,1.2,.12,.35,2);
       if(blockHeld){P.state='block';P.t=0;break;}
       tryActions(mx,mz,ml);break;}
@@ -3664,7 +3859,7 @@ function updatePlayer(dt){
       const t=P.t,dur=.55,k=Math.min(1,t/dur);
       const sp=13*Math.pow(1-k,.55)+1.5;vx=P.rx*sp;vz=P.rz*sp;
       const back=Math.abs(wrap(Math.atan2(P.rx,P.rz)-P.facing))>1.6;
-      pose.spin=(back?-1:1)*TAU*ease(k);pose.legL=.8;pose.legR=.8;pose.armR=-1;pose.armL=-1;
+      pose.spin=(back?-1:1)*TAU*ease(k);pose.legL=-.4;pose.legR=-.4;pose.armR=-1;pose.armL=-1;
       if(Math.random()<.4)burst(P.x,.1,P.z,1,0x3a3530,1.5,.15,.4,2);
       if(t>=dur){P.state='idle';P.rollCd=.27;P.runT=ml>0?.65:0;}
       break;}
@@ -4291,9 +4486,26 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   model.armR.rotation.x=lerp(model.armR.rotation.x,p.armR,s);model.armR.rotation.z=lerp(model.armR.rotation.z,p.armRz,s);
   model.armL.rotation.x=lerp(model.armL.rotation.x,p.armL,s);model.armL.rotation.z=lerp(model.armL.rotation.z,p.armLz||0,s);
   model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY,s);model.upper.rotation.x=lerp(model.upper.rotation.x,p.lean,s);
-  model.hipL.rotation.x=lerp(model.hipL.rotation.x,p.legL,s);model.hipR.rotation.x=lerp(model.hipR.rotation.x,p.legR,s);
-  if(st==='roll')model.spin.rotation.x=p.spin;else model.spin.rotation.x=lerp(model.spin.rotation.x,st==='dead'?-1.45:0,st==='dead'?s*.25:1);
-  model.spin.position.y=st==='roll'?.55:lerp(model.spin.position.y,st==='dead'?.25:.95,s);
+  const rolling=st==='roll',walking=(st==='idle'||st==='walk'||st==='block')&&!rolling;
+  // Roll: tuck into a ball (knees to chest, head down, arms wrapped) and tumble around the hips.
+  const rk=rolling?clamp(Math.abs(p.spin)/TAU,0,1):0,tuck=rolling?ease(clamp(rk/.16,0,1))*ease(clamp((1-rk)/.2,0,1)):0;
+  const legT=rolling?lerp(p.legL,-1.55,tuck):p.legL,legT2=rolling?lerp(p.legR,-1.4,tuck):p.legR;
+  // Walk: torso counter-twist, hip sway and a small bob that dips at full stride.
+  const stride=walking?clamp(Math.abs(p.legL)/.7,0,1.2):0;
+  const twist=walking?p.legL*.2:0;
+  model.hipL.rotation.x=lerp(model.hipL.rotation.x,legT,rolling?1-Math.exp(-30*dt):s);model.hipR.rotation.x=lerp(model.hipR.rotation.x,legT2,rolling?1-Math.exp(-30*dt):s);
+  if(rolling){
+    model.upper.rotation.x=lerp(model.upper.rotation.x,.95*tuck,1-Math.exp(-30*dt));
+    model.armR.rotation.x=lerp(model.armR.rotation.x,-1.9*tuck+p.armR*(1-tuck),1-Math.exp(-30*dt));
+    model.armL.rotation.x=lerp(model.armL.rotation.x,-1.9*tuck+p.armL*(1-tuck),1-Math.exp(-30*dt));
+  }else if(walking){
+    model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY+twist,s);
+  }
+  if(rolling)model.spin.rotation.x=p.spin;else model.spin.rotation.x=lerp(model.spin.rotation.x,st==='dead'?-1.45:0,st==='dead'?s*.25:1);
+  model.spin.rotation.z=lerp(model.spin.rotation.z,walking?p.legL*.06:0,s);
+  const sq=1-.16*tuck;model.spin.scale.set(1,sq,1);
+  model.spin.position.y=rolling?lerp(.95,.74,tuck):lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
+  if(model.frostOrb){model.frostT+=dt;model.frostOrb.rotation.y=model.frostT*1.7;model.frostOrb.position.y=-.6+Math.sin(model.frostT*2.6)*.05;}
   if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
 }
 
@@ -4862,10 +5074,13 @@ function renderClassCards(){
   if(state==='menu'&&PM){
     disposeModel(PM);PM=makePlayer(myClass,charLevel(myClass),skinFor());
   }
-  const kit=currentLoadout(),rows=ctrlRows();
-  const primary=rows.find(row=>row[0]===keyName(BINDS.light));if(primary)primary[1]+=' (hold to repeat)';
-  if(kit.ultHint)rows.push([keyName(BINDS[ultimateBinding(kit)]),kit.ult+' · '+kit.ultHint]);
-  $('classInfo').innerHTML=rows.map(r=>`<b>${esc(r[0])}</b> ${r[1]}`).join(' &nbsp;·&nbsp; ')+` &nbsp;·&nbsp; <b>${esc(keyName(BINDS.roll))}</b> Roll &nbsp;·&nbsp; <b>${esc(keyName(BINDS.heal))}</b> Flask`;
+  const kit=currentLoadout();
+  const cdText=action=>{const sk=kit.skills.find(x=>ACTION_KEYS[x.k]===action&&x.cd);if(!sk)return '';return [sk.cd>=1?sk.cd+'s cooldown':'',sk.cost?sk.cost+' mana':''].filter(Boolean).join(' · ');};
+  const rowsHtml=kit.ctrl.map(r=>{const key=r[0]==='passive'?'Passive':keyName(BINDS[r[0]],true);const name=r.length>2?r[1]:'';const desc=r.length>2?r[2]:r[1];const meta=cdText(r[0]);
+    return `<div class="mv"><span class="mk">${esc(key)}</span><div class="mt"><b>${esc(name)}</b>${meta?`<span class="mcd">${esc(meta)}</span>`:''}<p>${esc(desc)}${r[0]==='light'?' Hold to keep attacking.':''}</p></div></div>`;}).join('');
+  const ultHtml=kit.ult?`<div class="mv ult"><span class="mk">${esc(keyName(BINDS[ultimateBinding(kit)],true))}</span><div class="mt"><b>${esc(kit.ult)}</b><span class="mcd">Ultimate · charges as you deal damage</span><p>${esc(kit.ultHint||'')}</p></div></div>`:'';
+  const basics=`<div class="mv basic"><span class="mk">${esc(keyName(BINDS.roll,true))}</span><div class="mt"><b>Roll</b><p>Dodge in your movement direction. You are invulnerable for the first part of the roll.</p></div></div><div class="mv basic"><span class="mk">${esc(keyName(BINDS.heal,true))}</span><div class="mt"><b>Flask</b><p>Drink a flask to restore 45 HP. Limited uses per fight.</p></div></div>`;
+  $('classInfo').innerHTML=`<div class="mvTitle">${esc(CLASSES[myClass].name)} moves at Mastery ${charLevel(myClass)}</div><div class="mvGrid">${rowsHtml}${ultHtml}${basics}</div>`;
 }
 function fillSelects(b,a,d){
   b.innerHTML=EXPEDITION_BOSSES.map(id=>`<option value="${id}">${BOSSES[id].n}</option>`).join('');
