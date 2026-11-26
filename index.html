@@ -3990,6 +3990,7 @@ function updatePlayer(dt){
   const bA=bossAngle(),faceTarget=lockTarget?Math.atan2(lockTarget.x-P.x,lockTarget.z-P.z):bA,SPD=classData(P.cls).speed*(P.rageT>0?1.3:1)*(activeEffect('frostbite') ? .92 : 1)*(P.soulPowerUntil>gameTime?1.25:1);
   let vx=0,vz=0;const pose=PM.pose;
   pose.bombStage=0;pose.bombColor=0;pose.headPitch=0;
+  pose.strafe=0;
   pose.spin=0;pose.roll=0;pose.heat=0;pose.focus=0;pose.move=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;pose.yaw=0;pose.jump=0;
   const restR={sword:-.55,soul:-.4,mage:-.35,archer:-.25,rogue:-.45,berserker:-.6,warlock:-.35,sentinel:-.48,paladin:-.52,jester:-.46,skeleton:-.44}[P.cls],restL={sword:-.35,soul:-.35,mage:-.25,archer:-.45,rogue:-.45,berserker:-.3,warlock:-.35,sentinel:-.32,paladin:-.4,jester:-.33,skeleton:-.25}[P.cls];
   switch(P.state){
@@ -4000,7 +4001,14 @@ function updatePlayer(dt){
       const spd=Math.hypot(vx,vz),amp=clamp(spd/SPD,0,1.35);
       if(lockTarget&&!sprint)turnTo(faceTarget,16,dt);else if(spd>.5)turnTo(Math.atan2(vx,vz),sprint?11:18,dt);
       P.walk+=dt*spd*1.7;
-      if(P.cls==='mage'||P.cls==='rogue'){pose.move=amp;pose.gait=P.walk%TAU;}
+      if(P.cls==='mage'){pose.move=amp;pose.gait=P.walk%TAU;}
+      if(P.cls==='rogue'){
+        const forward=vx*Math.sin(P.facing)+vz*Math.cos(P.facing);
+        const sideways=vx*Math.cos(P.facing)-vz*Math.sin(P.facing);
+        P.ninjaGait=(P.ninjaGait||0)+dt*spd*2.1*(forward<-.3*spd?-1:1);
+        pose.move=amp;pose.gait=P.ninjaGait%TAU;
+        pose.strafe=spd>.25?sideways/spd:0;
+      }
       pose.legL=Math.sin(P.walk)*.7*amp;pose.legR=-pose.legL;
       pose.armR=restR-Math.sin(P.walk)*.42*amp;pose.armL=restL+Math.sin(P.walk)*.36*amp;
       pose.lean=sprint?.3:spd*.02;pose.upperY=0;
@@ -4854,11 +4862,17 @@ function animateJesterRig(model,p,st,s){
   rig.prop.position.set(0,.58,.76).lerp(rig.palm,clamp(stage-1,0,1));
 }
 function ninjaMovePose(p,st){
-  const strength=clamp(p.move??(st==='walk'?1:0),0,1.3);
-  const phase=p.gait??0,stride=Math.sin(phase)*strength;
-  return {...p,armR:-.82-stride*.48,armL:-.94+stride*.57,
-    armRz:-.24,armLz:.24,legL:stride*.94,legR:-stride*.94,lean:.10+strength*.28,
-    upperY:stride*.18,jump:Math.sin(phase)**2*strength*.057};
+  const speed=clamp(p.move??(st==='walk'?1:0),0,1.35);
+  const run=ease((speed-1.02)/.28);
+  const phase=p.gait??0,side=clamp(p.strafe||0,-1,1);
+  const swing=Math.sin(phase)*Math.min(1,speed);
+  const stride=swing*lerp(.39,.66,run)*(1-.53*Math.abs(side));
+  return {...p,armR:lerp(-.35,-.63,run)-swing*lerp(.16,.34,run),
+    armL:lerp(-.32,-.67,run)+swing*lerp(.23,.40,run),
+    armRz:lerp(-.08,-.15,run),armLz:lerp(.08,.15,run),
+    legL:stride,legR:-stride,legSpread:side*swing*.26,
+    lean:.035+speed*.04+run*.20,upperY:swing*.095,
+    jump:Math.sin(phase)**2*Math.min(speed,1)*lerp(.012,.028,run)};
 }
 function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(model.ninjaRig&&(st==='idle'||st==='walk'))p=ninjaMovePose(p,st);
@@ -4910,8 +4924,10 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(model.mageMotion)animateMageRig(model,p,st,dt,s);
   if(model.jesterRig)animateJesterRig(model,p,st,s);
   if(model.ninjaRig){
-    model.ninjaRig.head.rotation.x=lerp(model.ninjaRig.head.rotation.x,-p.lean*.63,s);
-    model.ninjaRig.scarf.rotation.x=lerp(model.ninjaRig.scarf.rotation.x,.12+(p.move||0)*.66,s);
+    model.ninjaRig.head.rotation.x=lerp(model.ninjaRig.head.rotation.x,-p.lean*.76,s);
+    model.hipL.rotation.z=lerp(model.hipL.rotation.z,p.legSpread||0,s);
+    model.hipR.rotation.z=lerp(model.hipR.rotation.z,-(p.legSpread||0),s);
+    model.ninjaRig.scarf.rotation.x=lerp(model.ninjaRig.scarf.rotation.x,.12+(p.move||0)*.29,s);
     model.ninjaRig.scarf.rotation.z=Math.sin(p.gait||0)*.13*(p.move||0);
   }
   if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
@@ -5050,7 +5066,7 @@ function updateRemotes(dt){
   updateTornados(dt);
   const s=1-Math.exp(-15*dt);
   remotes.forEach(r=>{if(r.first)return;r.x=lerp(r.x,r.nx,s);r.z=lerp(r.z,r.nz,s);r.f+=wrap(r.nf-r.f)*s;
-    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0,bombStage:a[17]||0,bombColor:a[18]||0,headPitch:a[19]||0};
+    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0,bombStage:a[17]||0,bombColor:a[18]||0,headPitch:a[19]||0,strafe:a[20]||0};
     setForgeBlade(r.model,r.bladeTier||0);
     applyPose(r.model,p,r.st,dt,r.x,r.z,r.f);
     if(r.zapped&&!r.dead&&gameTime>=(r.sparkAt||0)){r.sparkAt=gameTime+.23;zappedArcs(r.x,r.model.root.position.y,r.z);}
@@ -5061,7 +5077,7 @@ function netTick(dt,force=false){
   if(G.mode!=='mp')return;sendT-=dt;if(!force&&sendT>0)return;sendT=1/15;
   const p=PM.pose,r2=v=>Math.round(v*100)/100;
   nsend({t:'g',d:{k:'p',active:!localAway(),x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,rev:G.revived.has(NET.id),restock:G.restock,inv:P.smoke>0?1:0,zapped:activeEffect('zapped')?1:0,
-    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0,p.bombStage||0,p.bombColor||0,p.headPitch||0].map(r2)}});
+    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0,p.bombStage||0,p.bombColor||0,p.headPitch||0,p.strafe||0].map(r2)}});
   if(NET.isHost&&(mins.size||G.bossId==='morvane'||(G.room&&G.room.type==='minion'))){nsend({t:'g',d:{k:'m',w:G.wave,wt:G.waveTotal,seq:minId,wh:Math.round(G.waveHp||1),l:[...mins.values()].map(m=>[m.id,MTYPE_IDX.indexOf(m.type),r2(m.x),r2(m.z),r2(m.f),Math.round(m.hp),Math.round(m.maxHp),m.st==='wind'?1:0,r2(Math.max(0,(m.jesterChillUntil||0)-gameTime))])}});}
   if(NET.isHost){
   if(BM){const q=B.pose;
@@ -5755,6 +5771,14 @@ function animateVillager(v,dt){
   v.pace+=v.moving?dt*10:0;
   const swing=v.moving?Math.sin(v.pace)*.62:0;
   const pose={...VILLAGE_WALK_POSE,move:v.moving?1:0,gait:v.pace,armR:-.4-swing*.49,armL:-.32+swing*.49,legL:swing,legR:-swing};
+  if(v.model.ninjaRig){
+    const distance=v.ninjaX===undefined?0:Math.hypot(v.x-v.ninjaX,v.z-v.ninjaZ);
+    v.ninjaX=v.x;v.ninjaZ=v.z;
+    const speed=dt>0&&distance<1.5?Math.min(1.35,distance/(dt*5.2)):0;
+    v.ninjaSpeed=lerp(v.ninjaSpeed||0,speed,1-Math.exp(-19*dt));
+    v.ninjaGait=(v.ninjaGait||0)+(distance<1.5?distance*2.1:0);
+    pose.move=v.ninjaSpeed;pose.gait=v.ninjaGait%TAU;
+  }
   applyPose(v.model,pose,v.moving?'walk':'idle',dt,v.x,v.z,v.facing);
 }
 function removeVillager(peer){
