@@ -291,6 +291,14 @@ body.village-active>canvas:active{cursor:grabbing}
 .classic-art{border-radius:22px 22px 11px 11px}
 #skinPixel[hidden]{display:none}
 .celestial-art{border-radius:50%;background:linear-gradient(90deg,#f6efd9 0 50%,#7a1020 50% 100%)!important;box-shadow:inset 0 0 0 3px #e2c26a,0 0 18px rgba(255,214,120,.35)}
+.newsPanel{max-height:min(68vh,640px);overflow-y:auto;width:min(760px,94vw);text-align:left;box-sizing:border-box}
+.newsPanel .nItem{border-bottom:1px solid #3a3024;padding:12px 4px}
+.newsPanel .nItem:last-child{border-bottom:0}
+.newsPanel .nHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.newsPanel .nHead b{font-family:Cinzel,serif;color:#f2ca7d;font-size:15px;letter-spacing:.03em}
+.newsPanel .nHead span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9c907a}
+.newsPanel .nTag{display:inline-block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#1d150e;background:#d9a74a;border-radius:3px;padding:1px 6px;margin-left:8px;vertical-align:2px}
+.newsPanel ul{margin:6px 0 0 18px;padding:0;color:#d7c8ad;font-size:13px;line-height:1.55}
 .skin-note{font-size:11px;line-height:1.35;color:#a99878;max-width:220px}
 .pixel-art{clip-path:polygon(22% 0,79% 0,79% 12%,100% 12%,100% 83%,82% 83%,82% 100%,18% 100%,18% 83%,0 83%,0 12%,22% 12%)}
 .ft.oof{font:bold italic clamp(33px,5vw,59px)/1 system-ui,sans-serif;color:#ffe26c;-webkit-text-stroke:1px #321d43;text-shadow:3px 4px #65285e,-2px -2px #361f42;letter-spacing:.05em;z-index:10}
@@ -318,6 +326,12 @@ body.village-active>canvas:active{cursor:grabbing}
 
   </div>
   <button class="big alt" id="skinBack">Back to Village</button>
+</section>
+
+<section id="news" class="screen hidden">
+  <h2>Notice Board</h2>
+  <div class="panel wide newsPanel" id="newsList"></div>
+  <button class="big alt" id="newsBack">Back to Village</button>
 </section>
 
 <div id="menu" class="screen hidden">
@@ -969,6 +983,8 @@ function revivePlayer(d){
   ringFx(d.x,d.z,0xc1f1a7,4,.62);
 }
 
+// Zeus keeps his full stats on Hard and above; on Easy and Normal he is slower, hits softer and enrages later.
+const ZEUS_FAIR={hp:3900,speed:4.2,dmg:.78,coolMul:1.05,enrageSpeed:1.08,enrageAt:.5,poiseMul:1.15,fair:true};
 const DIFFS={
   easy:{n:'Easy',hp:.7,dmg:.6,spd:.9,flasks:5,d:'Reduced boss health and damage. Five flasks.'},
   normal:{n:'Normal',hp:1,dmg:1,spd:1,flasks:3,d:'The intended challenge. Three flasks.'},
@@ -1636,7 +1652,7 @@ function themeMaterials(root,theme){
     if(!o.isMesh||!o.material||Array.isArray(o.material))return;
     if(done.has(o.material)){const src=o.material;o.material=done.get(src);o.userData.srcMat=src;return;}
     const src=o.material,m=src.clone();done.set(src,m);o.material=m;o.userData.srcMat=src;
-    if(!m.color)return;
+    if(!m.color||src.userData.keepColor)return;
     m.color.getHSL(hsl);const {h,s:sat,l}=hsl;
     if(m.isMeshBasicMaterial){m.color.setHex(theme==='angel'?(l>.8?0xffffff:0xfff1b8):(l>.8?0xffb070:0xff5a1a));return;}
     const isSkin=h>.02&&h<.13&&sat>.2&&sat<.75&&l>.45&&l<.88;
@@ -1661,9 +1677,9 @@ function themeMaterials(root,theme){
 // Halo + feathered wings, or horns + bat wings + spaded tail. Works on every model.
 function addCelestialGear(cls,theme,level,R){
   const {upper}=R,veteran=level>=2,royal=level===3,out={theme,t:Math.random()*9,wings:[],halo:null,tail:null};
-  const top={mage:2.14,jester:1.92,archer:1.56,rogue:1.52,paladin:1.6,sentinel:1.58,berserker:1.5}[cls]??1.48;
-  const hornY={mage:1.5,jester:1.44,archer:1.36,rogue:1.36,paladin:1.42,sentinel:1.42}[cls]??1.34;
-  const hornX={mage:.27,jester:.2}[cls]??.17;
+  const top={mage:2.14,jester:1.92,archer:1.56,rogue:1.52,paladin:1.72,sentinel:1.62,berserker:1.52,soul:1.5,warlock:1.58}[cls]??1.5;
+  const hornY={mage:1.5,jester:1.44,archer:1.36,rogue:1.36,paladin:1.36,sentinel:1.36,berserker:1.36,warlock:1.36}[cls]??1.34;
+  const hornX={mage:.27,jester:.2,paladin:.21,berserker:.22}[cls]??.18;
   const link=(a,b,r1,r2,mat,parent,seg=7)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A);const m=new THREE.Mesh(new THREE.CylinderGeometry(r2,r1,d.length(),seg),mat);m.position.copy(A).lerp(B,.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());parent.add(m);return m;};
   const span=royal?1.32:veteran?1.15:1;
   if(theme==='angel'){
@@ -1762,19 +1778,59 @@ function buildCelestialBody(cls,theme,level,R){
     else if(cls==='sword'&&side>0)ball(.19,plate,side*.47,.88,0,1.1,.7,1,upper,12);
   }
   if(!robe&&!heavy)ball(.34,cloth2,0,.9,-.02,1,.3,.7,upper,14);
-  // Head
-  const face=ball(.21,skinM,0,1.17,.03,1,1.1,.98,upper,16);
-  for(const side of [-1,1]){
-    ball(.035,eyeM,side*.075,1.2,.205,1,.8,.5,upper,8);
-    box(.07,.018,.02,hair,side*.075,1.25,.2,upper);
+  // Head: every class wears a mask or helm instead of a plain face
+  const helmM=classic?plate:angel?gold:std(0x1c1416,{metalness:.6,roughness:.35});
+  const maskM=classic?(cls==='soul'?std(0xe8e4da,{roughness:.35}):plate):angel?std(0xf6f0de,{metalness:.25,roughness:.32}):std(0x2a0c0e,{roughness:.4});
+  const voidM=std(0x07060a,{roughness:1}),slitM=std(0x050404,{roughness:1}),fangM=std(0xf1ead8,{roughness:.4});
+  const fangs=(y,z,w=.07)=>{if(theme!=='devil')return;for(const side of [-1,1]){const f=new THREE.Mesh(new THREE.ConeGeometry(.018,.07,5),fangM);f.position.set(side*w,y,z);f.rotation.x=Math.PI;upper.add(f);}};
+  if(cls==='sword'){
+    ball(.235,helmM,0,1.18,0,1,1.06,1,upper,18);
+    box(.36,.15,.05,slitM,0,1.18,.21,upper);box(.28,.032,.02,glowM,0,1.19,.236,upper);
+    for(const side of [-1,1]){ball(.025,gold,side*.15,1.18,.215,1,1,1,upper,6);const v=box(.05,.07,.02,glowM,side*.12,1.07,.21,upper);v.rotation.z=side*.3;
+      tube(.055,.055,.04,gold,side*.08,1.32,.18,upper,10).rotation.x=Math.PI/2;ball(.045,glowM,side*.08,1.32,.205,1,1,.3,upper,8);}
+    box(.22,.02,.02,leather,0,1.32,.18,upper);
+    const guard=tube(.25,.28,.18,leather,0,1.0,-.02,upper,14);guard.scale.z=.9;
+    fangs(1.07,.21,.05);
+  }else if(cls==='soul'){
+    const hood=new THREE.Mesh(new THREE.SphereGeometry(.28,16,12,Math.PI/2+.8,TAU-1.6,0,2.05),cloth2);hood.material.side=THREE.DoubleSide;hood.position.set(0,1.2,-.02);upper.add(hood);
+    ball(.2,voidM,0,1.17,0,1,1.1,.95,upper,12);
+    const mask=ball(.2,maskM,0,1.18,.08,.9,1.18,.55,upper,16);
+    for(const side of [-1,1]){ball(.045,slitM,side*.075,1.21,.185,1,.7,.4,upper,8);ball(.02,glowM,side*.075,1.21,.2,1,1,.5,upper,6);box(.015,.11,.01,glowM,side*.075,1.11,.19,upper);}
+    box(.08,.012,.01,glowM,0,1.06,.18,upper);ball(.03,glowM,0,1.33,.15,1,1,.4,upper,6);
+    fangs(1.04,.17,.04);
+  }else if(cls==='warlock'){
+    ball(.21,voidM,0,1.17,.02,1,1.1,.95,upper,14);
+    for(const side of [-1,1]){const e=ball(.03,glowM,side*.075,1.2,.19,1.4,.7,.5,upper,8);e.rotation.z=-side*.25;}
+    box(.1,.012,.01,glowM,0,1.07,.2,upper);
+    const hood=new THREE.Mesh(new THREE.SphereGeometry(.29,16,12,Math.PI/2+.9,TAU-1.8,0,2.05),cloth2);hood.material.side=THREE.DoubleSide;hood.position.set(0,1.2,-.02);upper.add(hood);
+    const peak=new THREE.Mesh(new THREE.ConeGeometry(.14,.36,10),cloth2);peak.position.set(0,1.3,-.28);peak.rotation.x=-2.1;upper.add(peak);
+    fangs(1.05,.19,.04);
+  }else if(cls==='berserker'){
+    ball(.25,helmM,0,1.24,0,1,.95,1,upper,18);
+    const plateF=box(.36,.3,.06,helmM,0,1.12,.2,upper);plateF.rotation.x=-.1;
+    box(.26,.035,.02,slitM,0,1.17,.235,upper);box(.035,.16,.02,slitM,0,1.08,.235,upper);
+    for(const side of [-1,1])box(.07,.025,.015,glowM,side*.075,1.17,.245,upper);
+    box(.05,.18,.04,gold,0,1.22,.24,upper);ring(.255,.025,gold,0,1.3,0,upper,1);
+    for(let i=0;i<3;i++){const br=tube(.035,.02,.32,hair,(i-1)*.08,.86,.2,upper,6);br.rotation.x=.15;ball(.03,gold,(i-1)*.08,.74,.22,1,1,1,upper,6);}
+    fangs(1.0,.24,.06);
+  }else if(cls==='paladin'){
+    const helm=tube(.215,.235,.44,helmM,0,1.2,0,upper,18);
+    ball(.215,helmM,0,1.42,0,1,.4,1,upper,16);
+    box(.32,.035,.02,glowM,0,1.23,.225,upper);box(.035,.2,.02,glowM,0,1.17,.226,upper);
+    for(let i=0;i<4;i++)for(const side of [-1,1])ball(.012,slitM,side*(.05+i*.035),1.08,.226,1,1,.5,upper,5);
+    ring(.225,.022,gold,0,1.0,0,upper,1);ring(.225,.022,gold,0,1.38,0,upper,1);
+    const plumeM=classic?std(0xa8323a,{roughness:.9}):angel?std(0xfbf8f0,{roughness:.9}):glowM;
+    for(let i=0;i<5;i++){const pl=ball(.07,plumeM,0,1.52+Math.sin(i/4*Math.PI)*.08,.1-i*.08,.6,1,1.3,upper,8);}
+    if(angel)for(const side of [-1,1]){const wg=ball(.12,gold,side*.25,1.32,-.03,.3,1,.9,upper,8);wg.rotation.z=-side*.5;}
+    fangs(1.04,.23,.06);
+  }else if(cls==='sentinel'){
+    ball(.23,helmM,0,1.2,0,1,1.05,1,upper,18);
+    const fp=box(.3,.3,.06,maskM,0,1.15,.19,upper);
+    for(const side of [-1,1]){const v=box(.16,.03,.02,glowM,side*.07,1.2,.226,upper);v.rotation.z=side*.32;}
+    const fin=box(.04,.12,.44,gold,0,1.43,-.02,upper);
+    for(const side of [-1,1]){const ch=box(.05,.2,.16,helmM,side*.2,1.1,.08,upper);ch.rotation.y=side*.3;}
+    fangs(1.03,.22,.05);
   }
-  box(.06,.02,.02,std(classic?0x9a5a4a:angel?0xc98f7a:0x5a1010),0,1.08,.215,upper);
-  if(!P.eyeGlow)box(.02,.05,.03,skinM,0,1.15,.23,upper);
-  const hairCap=new THREE.Mesh(new THREE.SphereGeometry(.225,16,10,0,TAU,0,1.45),hair);hairCap.position.set(0,1.19,-.015);upper.add(hairCap);
-  if(angel){for(let i=0;i<7;i++){const a=-1.2+i*.4;ball(.06,hair,Math.sin(a)*.2,1.1+(i%2)*.03,Math.cos(a)*-.16,1,1.2,1,upper,8);}}
-  else{const back=ball(.2,hair,0,1.12,-.1,1,1.1,.8,upper,12);}
-  if(plated){const circlet=ring(.225,.03,gold,0,1.31,0,upper,1);if(cls==='paladin'&&angel)for(const side of [-1,1]){const wg=ball(.1,gold,side*.24,1.36,-.03,.35,1,.9,upper,8);wg.rotation.z=-side*.5;}}
-  if(robe&&cls==='warlock'){const hood=new THREE.Mesh(new THREE.SphereGeometry(.29,16,12,Math.PI/2+.9,TAU-1.8,0,2.05),cloth2);hood.material.side=THREE.DoubleSide;hood.position.set(0,1.2,-.02);upper.add(hood);}
   // Arms
   for(const [arm,side] of [[armL,-1],[armR,1]]){
     ball(.13,heavy?skinM:plated?plate:cloth,0,-.03,0,1,1,1,arm,12);
@@ -1931,7 +1987,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     // Frostbound Mage: midnight robe, wide witch hat, shadowed face with glowing eyes, scarf and a floating ice crystal.
     const cloth=std(royal?0x141c3a:0x151a33,{roughness:.9}),panel=std(royal?0x3e4f86:0x2e3760,{roughness:.84});
     const frost=std(0xc4d1eb,{metalness:.25,roughness:.42}),leather=std(0x3b2b29,{roughness:.72}),gun=std(0x617085,{metalness:.7,roughness:.3});
-    const voidMat=std(0x0b1124,{roughness:.95});
+    const voidMat=std(0x0b1124,{roughness:.95});voidMat.userData.keepColor=true;
     glow=new THREE.MeshBasicMaterial({color:royal?0xbdf0ff:0x9fe1ff});
     const eyeMat=new THREE.MeshBasicMaterial({color:royal?0xffffff:0xdaf2ff});
     const ball=(r,mat,x,y,z,sx=1,sy=1,sz=1,parent=upper,seg=16)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,seg,Math.max(8,seg*.6|0)),mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;parent.add(m);return m;};
@@ -2217,8 +2273,13 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     for(let i=0;i<5;i++){const ax=(i%3-1)*.05,az=(i<3?-.03:.04);tube(.012,.012,.3,wood,ax,.48,az,quiver,5);
       const f=box(.008,.11,.05,feather,ax,.6,az,quiver);f.rotation.y=i*.6;}
     // Head: face, eyes, pointed hood and capelet
-    const face=ball(.2,skinMat,0,1.16,.03,1,1.1,.98,upper,16);
-    for(const side of [-1,1]){box(.04,.03,.02,std(0x231a14),side*.08,1.19,.22,upper);box(.07,.018,.02,std(0x4a3626),side*.08,1.235,.215,upper);}
+    const shadowFace=std(0x14110e,{roughness:1});shadowFace.userData.keepColor=true;const face=ball(.2,shadowFace,0,1.16,.03,1,1.1,.98,upper,16);
+    const eyeA=new THREE.MeshBasicMaterial({color:royal?0xbfe9ff:veteran?0xffe08a:0xc8f0a0});
+    for(const side of [-1,1]){const e=box(.06,.022,.02,eyeA,side*.075,1.2,.205,upper);e.rotation.z=-side*.12;}
+    const scarfM=std(royal?0x3a4a4c:veteran?0x5a3a2a:0x4a3a24,{roughness:.9});
+    const wrap=new THREE.Mesh(new THREE.SphereGeometry(.215,16,10,0,TAU,1.55,1.1),scarfM);wrap.position.set(0,1.17,.02);upper.add(wrap);
+    const tail=box(.12,.32,.03,scarfM,.1,.98,-.2,upper);tail.rotation.z=-.25;tail.rotation.x=.3;
+    for(let i=0;i<3;i++)box(.3-i*.04,.012,.01,std(0x2a2016),0,1.12-i*.05,.215-i*.004,upper);
     const hood=new THREE.Mesh(new THREE.SphereGeometry(.285,18,12,Math.PI/2+.85,TAU-1.7,0,2.1),hoodMat);hood.material.side=THREE.DoubleSide;hood.position.set(0,1.2,-.02);upper.add(hood);
     const hoodTop=new THREE.Mesh(new THREE.SphereGeometry(.285,18,8,0,TAU,0,.75),hoodMat);hoodTop.position.set(0,1.2,-.02);upper.add(hoodTop);
     const hoodTip=new THREE.Mesh(new THREE.ConeGeometry(.13,.42,10),hoodMat);hoodTip.position.set(0,1.18,-.36);hoodTip.rotation.x=-2.2;upper.add(hoodTip);
@@ -3126,7 +3187,7 @@ function detFx(d){
   if(o.shock)shockwave(s.x,s.z,o.shock.sp,o.shock.max,o.shock.dmg,c.shockCol,o.status);
 }
 function stormHazard(shape,delay,damage,extra={}){
-  hostDanger(shape,{color:G.boss.col,delay,dmg:D(damage*G.boss.dmg*(B.phase===3?1.16:1)),srcX:B.x,srcZ:B.z,
+  hostDanger(shape,{color:G.boss.col,delay,dmg:D(damage*G.boss.dmg*(B.phase===3&&!G.boss.fair?1.16:1)),srcX:B.x,srcZ:B.z,
     owner:'storm',status:'zapped',fx:'bolt',...extra});
 }
 function lightningThrow(d){
@@ -4272,7 +4333,15 @@ function updatePlayer(dt){
       P.vx=lerp(P.vx,mx*sp,sm);P.vz=lerp(P.vz,mz*sp,sm);vx=P.vx;vz=P.vz;
       const spd=Math.hypot(vx,vz),amp=clamp(spd/SPD,0,1.35);
       if(lockTarget&&!sprint)turnTo(faceTarget,16,dt);else if(spd>.5)turnTo(Math.atan2(vx,vz),sprint?11:18,dt);
-      P.walk+=dt*spd*1.7;
+      // Eased gait: amplitude blends in and out, cadence rises gently with speed, stride lengthens when sprinting.
+      const run=clamp((amp-1)/.35,0,1);
+      P.moveAmp=lerp(P.moveAmp||0,amp,1-Math.exp(-9*dt));const ma=P.moveAmp;
+      P.walk+=dt*(ma>.03?(3.3+spd*.95):0);
+      const accel=dt>0?(spd-(P.lastSpd??spd))/dt:0;P.lastSpd=spd;
+      P.accLean=lerp(P.accLean||0,clamp(accel*.012,-.12,.14),1-Math.exp(-6*dt));
+      const turn=dt>0?wrap(P.facing-(P.prevFacing??P.facing))/dt:0;P.prevFacing=P.facing;
+      P.bank=lerp(P.bank||0,clamp(-turn*.03*Math.min(1,ma),-.17,.17),1-Math.exp(-8*dt));
+      P.breath=(P.breath||0)+dt;const still=clamp(1-ma*6,0,1),breathe=Math.sin(P.breath*1.75)*still;
       if(P.cls==='mage'){pose.move=amp;pose.gait=P.walk%TAU;}
       if(P.cls==='rogue'){
         const forward=vx*Math.sin(P.facing)+vz*Math.cos(P.facing);
@@ -4281,9 +4350,10 @@ function updatePlayer(dt){
         pose.move=amp;pose.gait=P.ninjaGait%TAU;
         pose.strafe=spd>.25?sideways/spd:0;
       }
-      pose.legL=Math.sin(P.walk)*.7*amp;pose.legR=-pose.legL;
-      pose.armR=restR-Math.sin(P.walk)*.42*amp;pose.armL=restL+Math.sin(P.walk)*.36*amp;
-      pose.lean=sprint?.3:spd*.02;pose.upperY=0;
+      {const sw=Math.sin(P.walk),stride=lerp(.5,.8,run)*ma,aw=Math.sin(P.walk-.38);
+      pose.legL=sw*stride*(sw>0?1:.8);pose.legR=-sw*stride*(sw<0?1:.8);
+      pose.armR=restR-.12*run-aw*lerp(.36,.6,run)*ma+breathe*.03;pose.armL=restL-.12*run+aw*lerp(.3,.55,run)*ma-breathe*.03;
+      pose.lean=.02+ma*.05+run*.17+P.accLean+breathe*.012;pose.upperY=0;pose.bank=P.bank;}
       if(sprint&&Math.random()<.15)burst(P.x,.1,P.z,1,0x3a3530,1.2,.12,.35,2);
       if(blockHeld){P.state='block';P.t=0;break;}
       tryActions(mx,mz,ml);break;}
@@ -5194,7 +5264,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
     model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY+twist,s);
   }
   if(rolling)model.spin.rotation.x=p.spin;else model.spin.rotation.x=lerp(model.spin.rotation.x,st==='dead'?-1.45:0,st==='dead'?s*.25:1);
-  model.spin.rotation.z=lerp(model.spin.rotation.z,walking?p.legL*.06:0,s);
+  model.spin.rotation.z=lerp(model.spin.rotation.z,walking?p.legL*.045+(p.bank||0):0,s);
   const sq=1-.16*tuck;model.spin.scale.set(1,sq,1);
   model.spin.position.y=rolling?lerp(.95,.74,tuck):lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
   if(model.mageMotion)animateMageRig(model,p,st,dt,s);
@@ -5368,7 +5438,7 @@ function netTick(dt,force=false){
 function setScreen(id){
   closeOnlineRoster();
   if(id!=='hub'&&document.body.classList.contains('village-active'))leaveVillagePresence();
-  ['hub','menu','skins','solo','mp','lobby','end','pause','binds','cameraSettings'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
+  ['hub','menu','skins','news','solo','mp','lobby','end','pause','binds','cameraSettings'].forEach(s=>$(s).classList.toggle('hidden',s!==id));
   document.body.classList.toggle('village-active',id==='hub');
   if(id!==null&&id!=='hub'&&document.pointerLockElement===canvas)document.exitPointerLock();
 }
@@ -5454,7 +5524,8 @@ function chamberClearPending(){
 
 function setupRoom(def,first){
   clearSeal();P.effects={};lockChoice=null;lockTarget=null;G.room=def;G.cleared=false;G.wave=0;G.waveTotal=def.waves||0;G.waveDelay=2.5;G.advT=-1;G.clearT=-1;G.waveHp=1;
-  if(def.type==='boss'){G.boss=BOSSES[def.boss];G.bossId=def.boss;}
+  if(def.type==='boss'){G.boss=BOSSES[def.boss];G.bossId=def.boss;
+    if(def.boss==='thoruun'&&!G.diff.ultra&&(G.diff.n==='Normal'||G.diff.n==='Easy'))G.boss={...G.boss,...ZEUS_FAIR};}
   G.arena=def.arena;
   buildArena(def.arena);doorGroup=null;if(G.campaign)buildDoor();
   dangers.forEach(disposeDanger);dangers=[];projs.forEach(removeProjectile);projs=[];eprojs.forEach(disposeEnemyProjectile);eprojs=[];
@@ -5860,8 +5931,45 @@ const VILLAGE_PLACES={
   skins:{title:'Skin House',x:11,z:-11,yaw:-.32,kind:'house',roof:0x8d536e,wall:0xedc8ba},
   small:{title:'Party Booth',hint:'2 slots',x:-15,z:4,yaw:Math.PI/2,kind:'booth',roof:0x3e8090,wall:0xb49470},
   large:{title:'Party Booth',hint:'5 slots',x:15,z:4,yaw:-Math.PI/2,kind:'booth',roof:0x8f6042,wall:0xc4a07a},
-  board:{title:'Find a Party',x:0,z:15,yaw:Math.PI,kind:'board',roof:0x76614b,wall:0xa78a5d}
+  board:{title:'Find a Party',x:0,z:15,yaw:Math.PI,kind:'board',roof:0x76614b,wall:0xa78a5d},
+  news:{title:'Notice Board',hint:'Updates',x:-8.5,z:10,yaw:Math.atan2(8.5,-10),kind:'notice',roof:0x5d4a3a,wall:0x9c7f58}
 };
+
+// ==== NOTICE BOARD (newest first; add a new entry at the top for each update) ====
+const NEWS=[
+  {date:'26 Nov 2026',title:'Angels, Devils and a Fairer Storm',tag:'New',items:[
+    'New free skin set: Angel & Devil. Every match, each character is randomly given a halo and feathered wings, or horns, bat wings and a tail.',
+    'Blacksmith, Soul Link, Warlock, Berserker, Paladin and Sentinel have new detailed models.',
+    'The Archer has a detailed Ranger model with a recurve bow, and a steel crossbow at Mastery 3.',
+    'Movement animations are smoother: steps ease in and out, arms follow the stride, and characters lean into speed changes and turns.',
+    'Zeus is now fairer on Easy and Normal: less health and damage, slower attacks and a later enrage. Hard and above are unchanged.',
+    'Added this Notice Board to the village.']},
+  {date:'26 Nov 2026',title:'Frostbound Mage and Clearer Guides',items:[
+    'The Mage has been rebuilt as the Frostbound Mage, with new gear at each mastery rank.',
+    'The Character House now lists every move with its key, cooldown, mana cost and exact numbers, and shows what each mastery rank changes.',
+    'Rolling now tucks into a ball, and walking has more natural body motion.',
+    'Party Chat panel in the lobby, and proximity voice chat: press M to toggle your microphone.',
+    'The Ninja received a refreshed model with new sprint and Shadow Step animations.',
+    'Balance: Soul Link ultimate charge heavily reduced; Jester and Paladin damage increased; Blacksmith blade damage restored; Zeus damage reduced.']},
+  {date:'25 Nov 2026',title:'Mastery, Village and New Heroes',items:[
+    'Character mastery: play a class to earn points and unlock upgrades at Rank 2 and Rank 3.',
+    'New classes: Blacksmith, Soul Link, Jester and Ninja.',
+    'The village hub is now shared with other players in real time.',
+    'Zeus, the Storm Tyrant was rebuilt with new attack patterns, and the Ultra difficulty was added.',
+    'Hold the attack button to keep attacking, on mouse, touch or rebound controls.',
+    'Press Tab during a match to see the party roster and each player\'s ping.']},
+  {date:'24 Nov 2026',title:'Paladin, Sentinel and the Oathbreaker',items:[
+    'New classes: Paladin and Sentinel. New boss: Vaelis, the Oathbreaker.',
+    'Every class has distinct equipment at Mastery 2 and 3.',
+    'Mobile touch controls with a customisable layout, and in-game chat with /.']},
+  {date:'23 Nov 2026',title:'Launch',items:[
+    'Hollow Crown multiplayer: parties of up to five, permanent death and spectating.',
+    'Classes, bosses, arenas, difficulties, a Campaign mode of eight chambers, ultimates on G and a keybind editor.']}
+];
+function renderNews(){
+  $('newsList').innerHTML=NEWS.map(n=>`<div class="nItem"><div class="nHead"><b>${esc(n.title)}${n.tag?`<span class="nTag">${esc(n.tag)}</span>`:''}</b><span>${esc(n.date)}</span></div><ul>${n.items.map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>`).join('');
+  $('newsList').scrollTop=0;
+}
 const villageScene=new THREE.Scene(),villageCamera=new THREE.PerspectiveCamera(69,innerWidth/innerHeight,.075,115);
 villageScene.background=new THREE.Color(0xc2d5db);
 villageScene.fog=new THREE.Fog(0xc2d5db,29,75);
@@ -5927,6 +6035,21 @@ function buildVillage(){
     const dist=Math.hypot(site.x,site.z);
     paving(2.7,dist-3,site.x*(dist+1)/(2*dist),site.z*(dist+1)/(2*dist),Math.atan2(site.x,site.z));
     const h=grp(site.x,0,site.z,villageScene);h.rotation.y=site.yaw;
+    if(site.kind==='notice'){
+      for(const x of [-.82,.82])box(.15,2.3,.16,timber,x,1.15,0,h);
+      box(1.86,1.24,.12,std(0x7a5a3a),0,1.62,0,h);
+      box(1.98,.08,.16,timber,0,2.27,0,h);box(1.98,.08,.16,timber,0,.98,0,h);
+      const roofL=box(1.15,.07,.62,std(site.roof),-.52,2.52,0,h);roofL.rotation.z=.42;
+      const roofR=box(1.15,.07,.62,std(site.roof),.52,2.52,0,h);roofR.rotation.z=-.42;
+      const papers=[0xf2e8cf,0xe9dcb8,0xf5eedd,0xdfe8ef,0xf0d9c4];
+      [[-.55,1.85,-.06],[-.05,1.9,.04],[.48,1.82,-.03],[-.42,1.36,.05],[.12,1.38,-.05],[.58,1.33,.08]].forEach(([x,y,r],i)=>{
+        const pp=new THREE.Mesh(new THREE.PlaneGeometry(.42,.36),std(papers[i%papers.length],{roughness:.9}));pp.position.set(x,y,.065);pp.rotation.z=r;h.add(pp);
+        for(let k=0;k<3;k++){const ln=new THREE.Mesh(new THREE.PlaneGeometry(.3,.025),std(0x6a5a48));ln.position.set(x,y+.08-k*.07,.067);ln.rotation.z=r;h.add(ln);}
+        const pin=new THREE.Mesh(new THREE.SphereGeometry(.025,6,6),new THREE.MeshBasicMaterial({color:[0xc0392b,0x2e6da4,0xd4a017][i%3]}));pin.position.set(x,y+.15,.08);h.add(pin);
+      });
+      villageSign(site.title,site.hint,0,2.82,.1,h);villageSpace(h,0,0,1.9,.25);
+      continue;
+    }
     if(site.kind==='board'){
       for(const x of [-.92,.92])box(.16,2.18,.17,timber,x,1.09,0,h);
       box(2.1,1.32,.18,floor,0,1.69,0,h);
@@ -6044,9 +6167,10 @@ function villageAvatar(cls,level,skin){
   return makePlayer(cls,level,skin,villageScene);
 }
 function animateVillager(v,dt){
-  v.pace+=v.moving?dt*10:0;
-  const swing=v.moving?Math.sin(v.pace)*.62:0;
-  const pose={...VILLAGE_WALK_POSE,move:v.moving?1:0,gait:v.pace,armR:-.4-swing*.49,armL:-.32+swing*.49,legL:swing,legR:-swing};
+  v.amp=lerp(v.amp||0,v.moving?1:0,1-Math.exp(-8*dt));
+  v.pace+=v.amp>.03?dt*9.4:0;
+  const sw=Math.sin(v.pace),swing=sw*.6*v.amp*(sw>0?1:.82),arm=Math.sin(v.pace-.38)*.47*v.amp;
+  const pose={...VILLAGE_WALK_POSE,move:v.amp,gait:v.pace,armR:-.4-arm,armL:-.32+arm,legL:swing,legR:-sw*.6*v.amp*(sw<0?1:.82),lean:.03+v.amp*.06};
   if(v.model.ninjaRig){
     const distance=v.ninjaX===undefined?0:Math.hypot(v.x-v.ninjaX,v.z-v.ninjaZ);
     v.ninjaX=v.x;v.ninjaZ=v.z;
@@ -6268,6 +6392,7 @@ function hubEnter(id){
   if(id==='class'){state='menu';setScreen('menu');renderClassCards();return;}
   if(id==='skins'){$('skinClass').value=myClass;state='skins';setScreen('skins');renderSkins();return;}
   if(id==='solo'){openSoloBooth();return;}
+  if(id==='news'){state='news';setScreen('news');renderNews();return;}
   $('partySize').value=id==='small'?'2':'5';$('mpTitle').textContent=id==='board'?'Find a Party':'Party Booth';
   openPartyBooth();
 }
@@ -6286,7 +6411,7 @@ function initHub(){
   $('skinClass').innerHTML=Object.entries(CLASSES).map(([id,c])=>`<option value="${id}">${c.name}</option>`).join('');
   $('skinClass').onchange=renderSkins;
   $('skinClassic').onclick=()=>equipSkin('classic');$('skinCelestial').onclick=()=>equipSkin('celestial');$('skinPixel').onclick=()=>equipSkin('pixel');
-  $('skinBack').onclick=returnToHub;$('classBack').onclick=returnToHub;
+  $('skinBack').onclick=returnToHub;$('newsBack').onclick=returnToHub;$('classBack').onclick=returnToHub;
   $('hubSettings').onclick=()=>{resetVillageInput();state='hubSettings';openCameraSettings('hub');};
   buildVillage();initVillageControls();
 }
