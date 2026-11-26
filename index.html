@@ -1613,7 +1613,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
-  let glow=null,bowRig=null,mageMotion=null,jesterRig=null;
+  let glow=null,bowRig=null,mageMotion=null,jesterRig=null,ninjaRig=null;
   const veteran=level>=2,royal=level===3;
   if(skin==='pixel')pixelGear(cls,level,{upper,armL,armR,hipL,hipR});
   else if(cls==='jester'){
@@ -1904,26 +1904,59 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
       for(const side of [-1,1])gearSpike(spear,light,side*.2,-1.44,0,.076,.52,Math.PI+side*.26);
     }
   }else if(cls==='rogue'){
-    const leather=std(0x2a2026,{roughness:.8}),dark=std(0x15121a),cloth=std(royal?0x182624:veteran?0x31513a:0x4a1a2a,{roughness:.85}),skin=std(0xd8b898),blade=std(veteran?0x72c280:0xd6dce6,{metalness:.45,roughness:.28,emissive:veteran?0x2b8f42:0x000000,emissiveIntensity:royal?.65:.23}),maskM=std(0x111015);
-    box(.25,.95,.3,dark,0,-.47,0,hipL);box(.25,.95,.3,dark,0,-.47,0,hipR);
-    box(.28,.2,.4,leather,0,-.9,.05,hipL);box(.28,.2,.4,leather,0,-.9,.05,hipR);
-    hewnBlock(.7,.88,.42,leather,0,.46,0,upper);box(.74,.12,.46,cloth,0,.08,0,upper);
-    box(.1,1.0,.46,cloth,-.12,.5,0,upper).rotation.z=-.55;
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.23,14,12),skin);head.position.y=1.17;upper.add(head);
-    box(.4,.18,.12,maskM,0,1.08,.18,upper);
-    const hood=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10,0,TAU,0,1.9),cloth);hood.position.set(0,1.21,-.03);upper.add(hood);
-    const cloak=std(royal?0x141b22:veteran?0x214033:0x2a0e18,{side:THREE.DoubleSide});
-    if(royal){
-      for(const side of [-1,1]){
-        const tail=bossCape(.41,1.45,cloak,upper,.31,-.26);
-        tail.position.x=side*.24;tail.rotation.z=side*.14;
+    const cloth=std(royal?0x202c46:0x20283d,{roughness:.86});
+    const dark=std(0x101725,{roughness:.83}),stitch=std(veteran?0x52617c:0x3d4b66);
+    const trim=std(royal?0x9a4156:0x772b40),skin=std(0xc68d77);
+    const steel=std(veteran?0x8ad8ba:0xbac8dc,{metalness:.64,roughness:.31});
+    const fold=std(0x2d354c,{side:THREE.DoubleSide});
+    for(const leg of [hipL,hipR]){
+      const pants=new THREE.Mesh(new THREE.CylinderGeometry(.147,.123,.77,8),cloth);
+      pants.position.y=-.39;leg.add(pants);
+      hewnBlock(.28,.19,.41,dark,0,-.83,.07,leg);
+      for(let i=0;i<4;i++){
+        const wrap=hewnBlock(.26,.065,.265,stitch,0,-.48-i*.073,.012,leg);
+        wrap.rotation.z=(i%2?.31:-.31);
       }
-      gearGem(upper,blade,0,1.36,.19,.095,[.7,1,.5]);
-    }else bossCape(.7,1.1,cloak,upper,.45,-.24);
-    if(veteran)hewnBlock(.48,.14,.47,cloth,0,.97,0,upper);
-    for(const arm of [armR,armL]){box(.2,.68,.2,leather,0,-.34,0,arm);box(.22,.14,.22,dark,0,-.68,0,arm);}
-    box(.23,.055,.23,blade,0,-.76,.08,armL).rotation.y=Math.PI/4;
-    {const dg=grp(0,-.74,0,armR);box(.05,.18,.06,dark,0,-.02,0,dg);box(.2,.04,.06,cloth,0,-.12,0,dg);hewnBlock(veteran?.095:.06,royal?.72:.5,.024,blade,0,royal?-.51:-.38,0,dg);}
+    }
+    hewnBlock(.74,.86,.44,cloth,0,.46,0,upper);
+    hewnBlock(.75,.13,.49,stitch,0,.10,0,upper);
+    const seam=box(.043,.69,.035,trim,.14,.46,.25,upper);seam.rotation.z=-.27;
+    box(.15,.105,.054,dark,-.07,.10,.263,upper);
+    for(const side of [-1,1]){
+      const hem=bossCape(.29,.52,fold,upper,.04,.17);
+      hem.position.x=side*.17;hem.rotation.z=side*.09;
+      box(.031,.44,.029,trim,side*.23,-.08,.185,upper).rotation.z=side*.08;
+    }
+    const head=grp(0,.95,0,upper);
+    const hood=new THREE.Mesh(new THREE.SphereGeometry(.268,16,11),dark);
+    hood.scale.set(.92,1.16,.91);hood.position.set(0,.24,-.018);head.add(hood);
+    hewnBlock(.345,.12,.114,skin,0,.257,.184,head);
+    hewnBlock(.355,.17,.12,cloth,0,.119,.17,head);
+    hewnBlock(.46,.13,.40,stitch,0,-.016,-.017,head);
+    const eyes=std(0xe6d8bb);
+    for(const side of [-1,1]){
+      box(.09,.031,.027,eyes,side*.085,.263,.248,head).rotation.z=side*.17;
+      box(.03,.044,.017,dark,side*.085,.261,.265,head);
+    }
+    const scarf=bossCape(.19,royal?.87:.69,fold,upper,.89,-.25);
+    scarf.position.x=.19;
+    const sheath=grp(0,.46,-.29,upper);sheath.rotation.z=-.53;
+    hewnBlock(.125,1.31,.13,dark,0,0,0,sheath);
+    hewnBlock(.145,.105,.15,stitch,0,.42,0,sheath);
+    hewnBlock(.21,.052,.089,steel,0,.68,0,sheath);
+    box(.077,.27,.081,dark,0,.81,0,sheath);
+    for(let i=0;i<4;i++)box(.083,.026,.092,stitch,0,.71+i*.058,0,sheath).rotation.z=.22;
+    for(const arm of [armR,armL]){
+      hewnBlock(.245,.57,.25,cloth,0,-.30,0,arm);
+      for(let i=0;i<3;i++)hewnBlock(.245,.065,.25,stitch,0,-.42-i*.072,.02,arm).rotation.z=(i%2?.29:-.29);
+      hewnBlock(.18,.2,.18,dark,0,-.67,.015,arm);
+    }
+    const dagger=grp(0,-.72,0,armR);
+    box(.077,.18,.081,dark,0,-.045,0,dagger);
+    box(.21,.055,.09,stitch,0,-.13,0,dagger);
+    hewnBlock(.09,royal?.52:.42,.042,steel,0,royal?-.40:-.36,0,dagger);
+    if(veteran)gearGem(upper,steel,0,.72,.265,.058,[.7,1,.45]);
+    ninjaRig={head,scarf};
   }else{
     const tunic=std(royal?0x303b3a:veteran?0x416d55:0x2f5a32,{roughness:.85}),leather=std(0x5a3a22),dark=std(0x2a241e),skin=std(0xd8b898),wood=std(0x6a4a2a),str=new THREE.MeshBasicMaterial({color:0xe8e0c8});
     box(.26,.95,.3,dark,0,-.47,0,hipL);box(.26,.95,.3,dark,0,-.47,0,hipR);
@@ -1969,7 +2002,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
@@ -2636,8 +2669,12 @@ function handleEv(e,d,from,local){
     case 'boom':boomFx(d.x,d.z,d.s||1);break;
     case 'ultfx':ultFx(d);break;
     case 'doom':doomFx(d.x,d.z);break;
-    case 'pstep':SFX.whoosh();burst(d.ox,1,d.oz,22,0x8a4aff,5,.16,.5,1);burst(d.x,1,d.z,22,0x8a4aff,5,.16,.5,1);break;
-    case 'smoke':{noise(.6,500,.18,.5);for(let i=0;i<3;i++)burst(d.x,.8,d.z,25,i?0x5a5560:0x8a8590,2.2,.45,2.2,-.4);break;}
+    case 'pstep':
+      SFX.whoosh();
+      if(d.ninja){ninjaPuffs(d.ox,d.oz,5,.53);ninjaPuffs(d.x,d.z,3,.41);}
+      else{burst(d.ox,1,d.oz,22,0x8a4aff,5,.16,.5,1);burst(d.x,1,d.z,22,0x8a4aff,5,.16,.5,1);}
+      break;
+    case 'smoke':renderSmokeGrenade(d);break;
     case 'eproj':{const m=new THREE.Mesh(new THREE.SphereGeometry(.3,10,8),new THREE.MeshBasicMaterial({color:d.col||0xb06aff}));m.position.set(d.x,1.3,d.z);scene.add(m);eprojs.push({m,x:d.x,z:d.z,vx:d.vx,vz:d.vz,dmg:d.dmg,minion:d.minion,col:d.col||0xb06aff,life:3});SFX.cast();break;}
     case 'mhit':if(NET.isHost){const m=mins.get(d.id);if(m){m.hp-=d.dmg;m.flash=1;if(m.hp<=0)killMinion(m);else if(d.stun){emit('cancel',{owner:'min:'+m.id});m.st='move';m.t=Math.max(m.t,1.5);}}}break;
     case 'cleared':if(G.cleared||d.chamber!==undefined&&d.chamber!==G.ci)break;G.cleared=true;if(G.campaign)restAfterChamber();SFX.heal();
@@ -3454,9 +3491,13 @@ function tryActions(mx,mz,ml){
       buf.heavy=-9;useSkill('shuriken');P.facing=aimAngle();
       startCast({dur:.32,at:.13,pose:'forward',move:.68,fn:()=>{shoot('shuriken',23,6,47);SFX.whoosh();}});return true;
     }
-    if(gameTime-buf.q<.32&&ready('step')){buf.q=-9;useSkill('step');shadowStep();return true;}
+    if(gameTime-buf.q<.32&&ready('step')){buf.q=-9;useSkill('step');
+      startCast({dur:.29,at:.12,pose:'ninjaStep',move:.32,fn:shadowStep});return true;}
     if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');P.poisonT=P.level>=2?8:6;if(P.level===3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
-    if(gameTime-buf.f<.32&&ready('smoke')){buf.f=-9;useSkill('smoke');P.smoke=2.5;emit('smoke',{x:P.x,z:P.z});return true;}
+    if(gameTime-buf.f<.32&&ready('smoke')){buf.f=-9;useSkill('smoke');
+      startCast({dur:.32,at:.11,pose:'ninjaSmoke',move:.65,face:false,fn:()=>{
+        P.smoke=2.5;emit('smoke',{x:P.x,z:P.z,a:P.facing});
+      }});return true;}
     buf.heavy=buf.q=buf.e=buf.f=-9;
   }else if(P.cls==='sentinel'){
     if(gameTime-buf.light<.32&&ready('lance')){
@@ -3842,12 +3883,51 @@ function renderMendingRay(d,from){
   }});
   burst(end.x,end.y,end.z,10,0x9dfce0,2,.085,.48,-1.5);
 }
+function ninjaPuffs(x,z,count,size){
+  const group=grp(x,arenaHeight(x,z)+.09,z,scene);
+  const geometry=new THREE.IcosahedronGeometry(1,1);
+  const clouds=Array.from({length:count},(_,i)=>{
+    const material=new THREE.MeshBasicMaterial({color:i%3===0?0xaeb8ce:0x505966,transparent:true,depthWrite:false});
+    const mesh=new THREE.Mesh(geometry,material);group.add(mesh);
+    mesh.rotation.set(i*.39,i*.63,-i*.37);
+    return {mesh,angle:i*2.39996,delay:i*.028,spread:rand(.6,1.3)};
+  });
+  const life=count>5?1.48:.54;
+  addFx({dur:life+count*.028,update(dt){
+    for(const {mesh,angle,delay,spread} of clouds){
+      const u=(this.t-delay)/life,progress=clamp(u,0,1),growth=ease(progress/.42);
+      mesh.visible=u>0&&u<1;
+      mesh.material.opacity=.37*ease(progress/.15)*(1-ease((progress-.39)/.61));
+      const radius=spread*(.14+growth)*size;
+      mesh.position.set(Math.cos(angle)*radius,(progress*.8+spread*.15)*size,Math.sin(angle)*radius);
+      const scale=size*spread*(.25+growth*.73);
+      mesh.scale.set(scale,scale*.83,scale);
+      mesh.rotation.y+=dt*.75;
+    }
+  },dispose(){scene.remove(group);geometry.dispose();for(const {mesh} of clouds)mesh.material.dispose();}});
+}
+function renderSmokeGrenade(d){
+  const {x,z}=d;
+  if(!Number.isFinite(x)||!Number.isFinite(z))return;
+  const angle=Number.isFinite(d.a)?d.a:0,y=arenaHeight(x,z);
+  const grenade=new THREE.Mesh(new THREE.IcosahedronGeometry(.12,0),new THREE.MeshBasicMaterial({color:0x2c3347}));
+  scene.add(grenade);
+  addFx({dur:.19,update(dt,k){
+    const progress=clamp(k,0,1),ahead=.37+.65*progress;
+    grenade.position.set(x+Math.sin(angle)*ahead,y+1.08*(1-progress)+.32*Math.sin(progress*Math.PI),z+Math.cos(angle)*ahead);
+    grenade.rotation.x+=dt*18;
+    if(k>=1){
+      noise(.46,500,.16,.5);
+      ninjaPuffs(grenade.position.x,grenade.position.z,11,.95);
+    }
+  },dispose(){scene.remove(grenade);grenade.geometry.dispose();grenade.material.dispose();}});
+}
 function shadowStep(){
   const ox=P.x,oz=P.z;let x,z;
   if(LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<32){x=LT.x-Math.sin(LT.f)*(LT.r+1.4);z=LT.z-Math.cos(LT.f)*(LT.r+1.4);}
   else{const a=aimAngle();x=P.x+Math.sin(a)*8;z=P.z+Math.cos(a)*8;}
-  [x,z]=clampArena(x,z,.8);P.x=x;P.z=z;P.facing=bossAngle();P.iframe=.45;P.vx=P.vz=0;P.kx=P.kz=0;P.state='idle';
-  emit('pstep',{x,z,ox,oz});
+  [x,z]=clampArena(x,z,.8);P.x=x;P.z=z;P.facing=bossAngle();P.iframe=.45;P.vx=P.vz=0;P.kx=P.kz=0;
+  emit('pstep',{x,z,ox,oz,ninja:true});
 }
 function venomBonus(){return [3,4,6][P.level-1];}
 function applyVenom(enemy){
@@ -3920,7 +4000,7 @@ function updatePlayer(dt){
       const spd=Math.hypot(vx,vz),amp=clamp(spd/SPD,0,1.35);
       if(lockTarget&&!sprint)turnTo(faceTarget,16,dt);else if(spd>.5)turnTo(Math.atan2(vx,vz),sprint?11:18,dt);
       P.walk+=dt*spd*1.7;
-      if(P.cls==='mage'){pose.move=amp;pose.gait=P.walk%TAU;}
+      if(P.cls==='mage'||P.cls==='rogue'){pose.move=amp;pose.gait=P.walk%TAU;}
       pose.legL=Math.sin(P.walk)*.7*amp;pose.legR=-pose.legL;
       pose.armR=restR-Math.sin(P.walk)*.42*amp;pose.armL=restL+Math.sin(P.walk)*.36*amp;
       pose.lean=sprint?.3:spd*.02;pose.upperY=0;
@@ -4005,6 +4085,17 @@ function updatePlayer(dt){
       else if(ml>0)turnTo(Math.atan2(mx,mz),8,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.4;pose.legR=-pose.legL;
       switch(c.pose){
+        case 'ninjaStep':{
+          const tuck=ease(k)*(1-ease((t-c.at)/(c.dur-c.at)));
+          pose.lean=.69*tuck;pose.armR=-.55+.9*tuck;pose.armL=-.6-.48*tuck;
+          pose.legL=-.47*tuck;pose.legR=.54*tuck;pose.jump=-.17*tuck;pose.upperY=.32*tuck;
+          break;
+        }
+        case 'ninjaSmoke':{
+          const flick=ease(k)*(1-ease((t-c.at)/(c.dur-c.at)));
+          pose.armR=-.43-1.05*flick;pose.armL=-.35;pose.upperY=-.47*flick;pose.lean=.29*flick;
+          break;
+        }
         case 'jesterThrow':jesterThrowPose(pose,t,c.at,c.dur,c.bombKind);break;
         case 'mageBeam':
         case 'mageFire':
@@ -4762,7 +4853,15 @@ function animateJesterRig(model,p,st,s){
   rig.palm.set(0,-.75,.03).applyEuler(hand.rotation).add(hand.position);
   rig.prop.position.set(0,.58,.76).lerp(rig.palm,clamp(stage-1,0,1));
 }
+function ninjaMovePose(p,st){
+  const strength=clamp(p.move??(st==='walk'?1:0),0,1.3);
+  const phase=p.gait??0,stride=Math.sin(phase)*strength;
+  return {...p,armR:-.82-stride*.48,armL:-.94+stride*.57,
+    armRz:-.24,armLz:.24,legL:stride*.94,legR:-stride*.94,lean:.10+strength*.28,
+    upperY:stride*.18,jump:Math.sin(phase)**2*strength*.057};
+}
 function applyPose(model,p,st,dt,px,pz,f,spinY){
+  if(model.ninjaRig&&(st==='idle'||st==='walk'))p=ninjaMovePose(p,st);
   if(model.jesterRig&&(st==='idle'||st==='walk')){
     const sway=p.legL*.055;
     p={...p,armR:-1.12+sway,armL:-1.12-sway,armRz:-.32,armLz:.32};
@@ -4810,6 +4909,11 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   model.spin.position.y=rolling?lerp(.95,.74,tuck):lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
   if(model.mageMotion)animateMageRig(model,p,st,dt,s);
   if(model.jesterRig)animateJesterRig(model,p,st,s);
+  if(model.ninjaRig){
+    model.ninjaRig.head.rotation.x=lerp(model.ninjaRig.head.rotation.x,-p.lean*.63,s);
+    model.ninjaRig.scarf.rotation.x=lerp(model.ninjaRig.scarf.rotation.x,.12+(p.move||0)*.66,s);
+    model.ninjaRig.scarf.rotation.z=Math.sin(p.gait||0)*.13*(p.move||0);
+  }
   if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
 }
 
