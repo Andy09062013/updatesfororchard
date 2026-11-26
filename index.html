@@ -480,9 +480,9 @@ const JESTER_BOMBS={
   confusion:{id:'confusionBomb',key:'F',name:'Confusion Bomb',cd:19,color:0xf6a4ff,r:3.1,damage:[0,0,0],rainDamage:0}
 };
 const CLASSES={
-  sword:{name:'Blacksmith',hp:125,speed:6.8,desc:'Forge better swords by dealing damage. Empower adds 2% damage per use for the round, up to 30%.',
+  sword:{name:'Blacksmith',hp:125,speed:6.8,desc:'Forge better swords by dealing damage. Empower adds 2% damage per use for the round.',
     skills:[{k:'LMB',n:'Forge Strike'},{id:'forge',k:'Q',n:'Empower',cd:10}],
-    ctrl:[['light','Forge Wood → Iron → Gold → Diamond → Doombringer by landing hits'],['q','Gain +2% damage for this round per use, up to +30%'],['passive','Last Stand · Survive one fatal hit at 1 HP with a 30 HP shield']]},
+    ctrl:[['light','Forge Wood → Iron → Gold → Diamond → Doombringer by landing hits'],['q','Gain +2% damage for this round per use'],['passive','Last Stand · Survive one fatal hit at 1 HP with a 30 HP shield']]},
   soul:{name:'Soul Link',hp:135,speed:6.8,ult:'Soul Sanctuary',ultHint:'Linked damage charges the ultimate. Grants invincibility and restores 20 HP per second for 7 seconds.',
     desc:'A green-robed support who shares attacks and empowers linked allies.',
     skills:[{id:'link',k:'LMB',n:'Soul Link',cd:.65},{id:'unlink',k:'RMB',n:'Unlink',cd:.35},{id:'renewSelf',k:'Q',n:'Mend Soul',cd:9},{id:'soulEmpower',k:'E',n:'Empower',cd:14},{id:'saturate',k:'F',n:'Saturate',cd:18}],
@@ -518,10 +518,10 @@ const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e
 const MASTERY_THRESHOLDS=[0,60,195];
 const FORGE_BLADES=[
   {name:'Wood',damage:15,time:.54,threshold:0,color:0xa56536},
-  {name:'Iron',damage:21,time:.50,threshold:240,color:0xb7c4d0},
-  {name:'Gold',damage:27,time:.48,threshold:720,color:0xffc747},
-  {name:'Diamond',damage:32,time:.44,threshold:1450,color:0x69e9ec},
-  {name:'Doombringer',damage:36,time:.40,threshold:2450,color:0xd65eff}
+  {name:'Iron',damage:25,time:.50,threshold:240,color:0xb7c4d0},
+  {name:'Gold',damage:37,time:.48,threshold:720,color:0xffc747},
+  {name:'Diamond',damage:50,time:.44,threshold:1450,color:0x69e9ec},
+  {name:'Doombringer',damage:60,time:.40,threshold:2450,color:0xd65eff}
 ];
 const UPGRADES={
   jester:[['Q','Blazing Bomb','Fire Bomb hits for 56 damage before igniting the ground.'],['E','Glacial Bomb','Ice Bomb hits for 40 damage and slows the boss for 5 seconds.']],
@@ -551,8 +551,8 @@ const UPGRADE_GEAR={
 // ==== MOVE GUIDE: [action, move name, plain description] ====
 const MOVE_GUIDE={
   sword:[
-    ['light','Forge Strike','Swing your sword. Landing hits forges a better blade during the fight: Wood 15, Iron 21, Gold 27, Diamond 32, Doombringer 36 damage per hit.'],
-    ['q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks up to +30%.'],
+    ['light','Forge Strike','Swing your sword. Landing hits forges a better blade during the fight: Wood 15, Iron 25, Gold 37, Diamond 50, Doombringer 60 damage per hit.'],
+    ['q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks with every use.'],
     ['passive','Last Stand','Once per fight, a hit that would kill you leaves you at 1 HP with a 30 HP shield instead.']],
   soul:[
     ['light','Soul Link','Link to a teammate within 24 units. You take 50% of the damage they receive, and their damage charges your ultimate.'],
@@ -622,8 +622,8 @@ const ULT_GUIDE={
 };
 // Mastery ranks: [key, new move name, full description at this rank, short summary of the change]
 const MASTERY_GUIDE={
-  sword:[['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks up to +30%.','New gear only. Abilities are unchanged.'],
-         ['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks up to +30%.','New gear only. Abilities are unchanged.']],
+  sword:[['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks with every use.','New gear only. Abilities are unchanged.'],
+         ['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks with every use.','New gear only. Abilities are unchanged.']],
   soul:[['Q','Mend Soul','Restore 44 HP to yourself.','Mend Soul heals 44 HP (was 38).'],
         ['Q','Mend Soul','Restore 50 HP to yourself.','Mend Soul heals 50 HP (was 44).']],
   mage:[['F','Radiant Ward','Allies within 13 units take 45% less damage for 7 seconds. Enemies within 7 units take 30 damage and are stunned.','Arcane Ward lasts 7s (was 5s) and deals 30 damage (was 18).'],
@@ -3384,7 +3384,7 @@ function tryActions(mx,mz,ml){
       P.swingBlade=FORGE_BLADES[P.bladeTier||0];startSimpleSwing();return true;
     }
     if(gameTime-buf.q<.32&&ready('forge')){
-      buf.q=-9;useSkill('forge');P.forgePower=Math.min(15,(P.forgePower||0)+1);
+      buf.q=-9;useSkill('forge');P.forgePower=(P.forgePower||0)+1;
       ringFx(P.x,P.z,0xffae53,3,.42);
       floatText('EMPOWER +'+(P.forgePower*2)+'%',P.x,2.8,P.z,'label');return true;
     }
