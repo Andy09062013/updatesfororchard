@@ -4,7 +4,7 @@ const clientDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().enc
 const clientVersion = Array.from(new Uint8Array(clientDigest), byte => byte.toString(16).padStart(2, "0")).join("");
 const HTML = clientSource.replace('<meta name="hc-build" content="">', `<meta name="hc-build" content="${clientVersion}">`);
 
-type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any; afk?: boolean; lastFrame?: number; dead?: boolean };
+type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any; afk?: boolean; lastFrame?: number; dead?: boolean; voice?: boolean };
 type Room = {
   code: string;
   host: string;
@@ -77,7 +77,7 @@ const charLevel = (value: unknown) => value === 2 || value === 3 ? value : 1;
 function view(r: Room) {
   return {
     code: r.code, host: r.host, public: r.public, capacity: r.capacity, state: r.state, settings: r.settings,
-    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin, ready: p.ready })),
+    players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin, ready: p.ready, voice: !!p.voice })),
   };
 }
 function send(ws: any, m: any) { try { ws.send(JSON.stringify(m)); } catch {} }
@@ -189,6 +189,26 @@ function handle(ws: any, m: any) {
       if (ws.data.lastChat && now - ws.data.lastChat < 400) return;
       ws.data.lastChat = now;
       bcast(r, { t: "chat", from: p.id, name: p.name, text });
+      break;
+    }
+    case "voice": {
+      const p = r?.players.get(ws.data.id);
+      if (!r || !p) return;
+      p.voice = m.on === true;
+      bcast(r, { t: "voice", id: p.id, on: p.voice }, p.id);
+      pushLobby(r);
+      break;
+    }
+    case "rtc": {
+      if (!r || !r.players.has(ws.data.id)) return;
+      const target = r.players.get(String(m.to ?? ""));
+      if (!target || target.id === ws.data.id || !m.data || typeof m.data !== "object") return;
+      const now = Date.now();
+      ws.data.rtcWindow = ws.data.rtcWindow && now - ws.data.rtcWindow.start < 1000 ? ws.data.rtcWindow : { start: now, n: 0 };
+      if (++ws.data.rtcWindow.n > 120) return;
+      const out = JSON.stringify({ t: "rtc", from: ws.data.id, data: m.data });
+      if (out.length > 20000) return;
+      try { target.ws.send(out); } catch {}
       break;
     }
     case "set": {
