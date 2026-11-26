@@ -494,6 +494,8 @@ body.village-active>canvas:active{cursor:grabbing}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script>
 (()=>{
 const TAU=Math.PI*2;
@@ -1742,13 +1744,14 @@ const CELESTIAL_PAL={
   devil:{plate:0x2b2124,gold:0x9b2a1e,cloth:0x5a0f17,cloth2:0x1a0a0c,leather:0x2a1512,dark:0x120607,skin:0xa8322c,hair:0x140a0a,eye:0xffa040,glow:0xff4a12,eyeGlow:true}
 };
 function themeMaterials(root,theme){
-  const done=new Set(),c=new THREE.Color(),hsl={h:0,s:0,l:0};
+  const done=new Map(),c=new THREE.Color(),hsl={h:0,s:0,l:0};
   const A=CELESTIAL_PAL[theme];
   root.traverse(o=>{
     if(!o.isMesh||!o.material||Array.isArray(o.material))return;
-    const m=o.material;if(done.has(m))return;
-    done.add(m);
-    if(!m.color||m.userData.keepColor)return;
+    if(done.has(o.material)){const src=o.material;o.material=done.get(src);o.userData.srcMat=src;return;}
+    const src=o.material,m=src.clone();done.set(src,m);o.material=m;o.userData.srcMat=src;
+    if(!m.color||src.userData.keepColor)return;
+    if(m.emissive&&(m.emissive.r+m.emissive.g+m.emissive.b)>.3){const gc=theme==='angel'?0xfff1b8:0xff5a1a;m.color.setHex(gc);m.emissive.setHex(gc);return;}
     m.color.getHSL(hsl);const {h,s:sat,l}=hsl;
     if(m.isMeshBasicMaterial){m.color.setHex(theme==='angel'?(l>.8?0xffffff:0xfff1b8):(l>.8?0xffb070:0xff5a1a));return;}
     const isSkin=h>.02&&h<.13&&sat>.2&&sat<.75&&l>.45&&l<.88;
@@ -2000,11 +2003,171 @@ function mountLimbJoint(parent,length,clearance=0){
   }
   return hinge;
 }
+
+// ==== CHARACTER MODELS (Quaternius Universal Base Characters, Modular Outfits and Universal Animation Library, CC0) ====
+// Each class is a glTF in models/ (shared textures in models/tex/). Animations come from models/anims.glb.
+const MODEL_VERSION='2';
+const GLB={tpl:{},clips:{},upper:{},ready:false,listeners:[]};
+const GLB_CLASS_LIST=['sword','soul','mage','archer','warlock','berserker','paladin','sentinel','jester','rogue'];
+const CHAR_SCALE=1.28;
+const UPPER_BONE=/^(spine_0[123]|neck_01|Head|clavicle_[lr]|upperarm_[lr]|lowerarm_[lr]|hand_[lr]|middle_01_[lr])\./;
+const MELEE_IDLE=new Set(['sword','berserker','paladin','sentinel']);
+// Outfit textures are shared between classes and tinted per class.
+const CLASS_TINT={sword:{MI_Peasant:0x9a8a78},soul:{MI_Peasant:0x7fc7a8},mage:{MI_Peasant:0x5a6aa8},warlock:{MI_Peasant:0x8a5a9a},
+  paladin:{MI_Peasant:0x8a8a90},sentinel:{MI_Ranger:0x7fb8b0},jester:{MI_Peasant:0xd04a5a},rogue:{MI_Ranger:0x55596a}};
+function prepTemplate(sc){
+  sc.traverse(o=>{if(o.isMesh){o.castShadow=true;o.userData.glbShared=true;o.frustumCulled=false;}});
+  return {scene:sc};
+}
+function loadModels(){
+  if(!THREE.GLTFLoader||!THREE.SkeletonUtils||location.protocol==='file:'&&!window.__glbBase)return Promise.resolve();
+  const base=window.__glbBase||'models/',loader=new THREE.GLTFLoader();
+  const one=(url,fn)=>new Promise(res=>loader.load(url,g=>{try{fn(g);}catch(e){console.warn(e);}res();},undefined,()=>res()));
+  return one(base+'anims.glb?v='+MODEL_VERSION,g=>{
+    for(const c of g.animations){GLB.clips[c.name]=c;
+      GLB.upper[c.name]=new THREE.AnimationClip(c.name+'_upper',c.duration,c.tracks.filter(t=>UPPER_BONE.test(t.name)));}
+  }).then(()=>{
+    if(!Object.keys(GLB.clips).length)return null;
+    // Your own class first, then the rest in the background; refresh visible models as each arrives.
+    const order=[myClass,...GLB_CLASS_LIST.filter(n=>n!==myClass)];
+    const loadOne=n=>one(base+n+'.gltf?v='+MODEL_VERSION,g=>{GLB.tpl[n]=prepTemplate(g.scene);}).then(()=>{if(GLB.tpl[n]){GLB.ready=true;for(const f of GLB.listeners)try{f(n);}catch(e){}}});
+    return order.reduce((p,n)=>p.then(()=>loadOne(n)),Promise.resolve());
+  });
+}
+const _m4=new THREE.Matrix4(),_v3=new THREE.Vector3(),_v3b=new THREE.Vector3();
+// A socket keeps the old rig's frame so the existing weapon and prop code can be reused on the new skeleton.
+function frameSocket(bone,root,m){
+  const s=new THREE.Object3D();
+  // Set the matrix directly: decomposing it breaks on the mirrored right-side bones.
+  s.matrixAutoUpdate=false;
+  s.matrix.copy(root.matrixWorld).invert().multiply(bone.matrixWorld).invert().multiply(m);
+  bone.add(s);return s;
+}
+function handSocket(bone,tip,root){
+  const inv=new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const h=bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv),t=tip.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+  const dir=t.sub(h).normalize(),grip=h.clone().addScaledVector(dir,.07);
+  const Y=dir.clone().negate(),Z=new THREE.Vector3(0,0,1),X=new THREE.Vector3().crossVectors(Y,Z).normalize();Z.crossVectors(X,Y).normalize();
+  const m=new THREE.Matrix4().makeBasis(X,Y,Z);m.setPosition(grip.addScaledVector(Y,.74));
+  return frameSocket(bone,root,m);
+}
+function glbBody(cls,level,inner){
+  const tpl=GLB.tpl[cls];if(!tpl||!GLB.clips.Idle_Loop)return null;
+  const sc=THREE.SkeletonUtils.clone(tpl.scene),holder=new THREE.Group();
+  holder.scale.set(-CHAR_SCALE,CHAR_SCALE,CHAR_SCALE);holder.add(sc);inner.add(holder);
+  sc.traverse(o=>{const m=/^R(\d)(\d?)_/.exec(o.name);if(!m)return;const lo=+m[1],hi=m[2]?+m[2]:3;o.visible=level>=lo&&level<=hi;});
+  const tint=CLASS_TINT[cls];
+  if(tint){const done=new Map();sc.traverse(o=>{if(!o.isMesh||!o.material||Array.isArray(o.material))return;
+    const key=Object.keys(tint).find(k=>o.material.name.startsWith(k));if(!key)return;
+    if(!done.has(o.material)){const m=o.material.clone();m.color.multiply(new THREE.Color(tint[key]));done.set(o.material,m);}o.material=done.get(o.material);});}
+  let top=inner;while(top.parent)top=top.parent;top.updateMatrixWorld(true);
+  const B=n=>sc.getObjectByName(n);
+  const sockets={
+    armR:handSocket(B('hand_r'),B('middle_01_r'),inner),armL:handSocket(B('hand_l'),B('middle_01_l'),inner),
+    upper:frameSocket(B('spine_03'),inner,new THREE.Matrix4().makeTranslation(0,.95,0)),
+    hipR:new THREE.Group(),hipL:new THREE.Group()};
+  const holders={upper:new THREE.Object3D(),armR:new THREE.Object3D(),armL:new THREE.Object3D(),hipR:new THREE.Object3D(),hipL:new THREE.Object3D()};
+  const mixer=new THREE.AnimationMixer(sc),acts={};
+  const act=(name,upper)=>{const key=name+(upper?'_u':'');if(!acts[key]){const c=upper?GLB.upper[name]:GLB.clips[name];if(!c)return null;const a=mixer.clipAction(c);a.play();a.weight=0;a.paused=true;acts[key]=a;}return acts[key];};
+  return {sc,holder,sockets,holders,mixer,act,acts,cls,anim:{phase:0,speed:0,last:null,cur:null,curT:0,w:0,stepSign:1,dir:1,prevSt:null,swing:0}};
+}
+// Keep the procedural weapons and props; drop the procedural body (the character model replaces it).
+function stripProceduralBody(sockets,keep){
+  const keepSet=new Set(keep.filter(Boolean));
+  for(const [k,sock] of Object.entries(sockets)){
+    for(const child of [...sock.children]){
+      if(keepSet.has(child))continue;
+      const isArm=k==='armL'||k==='armR';
+      const glowMesh=child.isMesh&&child.material&&child.material.isMeshBasicMaterial;
+      if(!child.isMesh&&isArm)continue;
+      if(isArm&&glowMesh)continue;
+      let hasKeep=false;child.traverse(o=>{if(keepSet.has(o))hasKeep=true;});
+      if(hasKeep)continue;
+      sock.remove(child);
+    }
+  }
+}
+const LOCO=[['idle',0],['Walk_Loop',2.2],['Jog_Fwd_Loop',6.2],['Sprint_Loop',9.6]];
+const CHANNEL_POSES=new Set(['mageBeam','raise','sky','both','mageSanctuary','mageWard','mageBurst']);
+// Which clip a game state plays: [clip, timeScale, loop, fullBody]
+function actionFor(model,st,cls){
+  const local=model===PM&&typeof P!=='undefined'&&P,c=local&&P.cast,melee=MELEE_IDLE.has(cls);
+  switch(st){
+    case 'roll':return ['Roll',2.55,false,true];
+    case 'dead':return ['Death01',1.15,false,true];
+    case 'hurt':return ['Hit_Chest',1.1,false,false];
+    case 'heal':return ['Interact',1.7,false,false];
+    case 'block':return ['Sword_Idle',1,true,false];
+    case 'simpleSwing':return ['Sword_Attack',2.6,false,false];
+    case 'cleave':return ['Sword_Attack',2.9,false,false];
+    case 'crush':return ['Sword_Attack',1.55,false,false];
+    case 'whirl':return ['Sword_Attack',2.3,true,false];
+    case 'stab':return [model.anim.swing%2?'Punch_Cross':'Punch_Jab',2.7,false,false];
+    case 'draw':return ['Pistol_Aim_Neutral',1,true,false];
+    case 'siphon':return ['Spell_Simple_Idle_Loop',1,true,false];
+    case 'bleap':case 'vault':return ['Jump_Start',st==='vault'?1.9:1.4,false,true];
+    case 'ult':return melee||cls==='rogue'?['Sword_Attack',1.4,false,false]:['Spell_Simple_Shoot',.8,false,false];
+    case 'cast':{
+      const pose=c&&c.pose;
+      if(pose==='bow'||pose==='bowC')return ['Pistol_Shoot',1.6,false,false];
+      if(CHANNEL_POSES.has(pose))return ['Spell_Simple_Idle_Loop',1,true,false];
+      const dur=c&&c.dur?c.dur:.4;return ['Spell_Simple_Shoot',clamp(.5/Math.max(.15,dur),.7,2.6),false,false];
+    }
+  }
+  return null;
+}
+function driveAnim(model,p,st,dt){
+  const sk=model.skel,A=sk.anim,root=model.root;
+  // Ground speed from the model's own movement (works for remote players and villagers too).
+  if(A.last){const dx=root.position.x-A.last.x,dz=root.position.z-A.last.z,d=Math.hypot(dx,dz);
+    const v=dt>0&&d<3?d/dt:0;A.speed=lerp(A.speed,v,1-Math.exp(-10*dt));
+    if(d>1e-4){const fwd=Math.sin(root.rotation.y)*dx+Math.cos(root.rotation.y)*dz;A.dir=lerp(A.dir,fwd>=-d*.3?1:-1,1-Math.exp(-8*dt));}}
+  else A.last=new THREE.Vector3();
+  A.last.copy(root.position);
+  const spd=st==='dead'?0:A.speed;
+  // Locomotion weights and a shared phase so feet stay in sync while blending.
+  const idleName=MELEE_IDLE.has(sk.cls)?'Sword_Idle':'Idle_Loop';
+  let w=[0,0,0,0];
+  if(spd<=LOCO[1][1]){const k=clamp(spd/LOCO[1][1],0,1);w[0]=1-k;w[1]=k;}
+  else if(spd<=LOCO[2][1]){const k=(spd-LOCO[1][1])/(LOCO[2][1]-LOCO[1][1]);w[1]=1-k;w[2]=k;}
+  else {const k=clamp((spd-LOCO[2][1])/(LOCO[3][1]-LOCO[2][1]),0,1);w[2]=1-k;w[3]=k;}
+  let rate=0;
+  for(let i=1;i<4;i++){const c=GLB.clips[LOCO[i][0]];const ts=clamp(spd/LOCO[i][1],.55,1.35);rate+=w[i]*ts/c.duration;}
+  const moving=w[0]<.98;
+  A.phase=(A.phase+dt*rate*(A.dir<0?-1:1)+1)%1;
+  const idle=sk.act(idleName,false);idle.weight=w[0];idle.time=(idle.time+dt)%idle.getClip().duration;
+  const other=idleName==='Sword_Idle'?sk.act('Idle_Loop',false):sk.act('Sword_Idle',false);if(other)other.weight=0;
+  for(let i=1;i<4;i++){const a=sk.act(LOCO[i][0],false);a.weight=w[i];a.time=A.phase*a.getClip().duration;}
+  // Action layer.
+  if(st!==A.prevSt&&(st==='stab'))A.swing++;
+  const want=actionFor(model,st,sk.cls);
+  if(want){
+    const [name,ts,loop,full]=want,key=name+(full||!moving?'':'_u');
+    if(A.cur!==key||st!==A.prevSt&&!loop){
+      if(A.cur&&A.cur!==key){const old=sk.acts[A.cur];if(old)old.weight=0;}
+      A.cur=key;A.curT=0;A.curFull=full||!moving;
+    }
+    sk.act(name,!(full||!moving));
+    A.curT+=dt*ts;A.w=Math.min(1,A.w+dt/.08);
+  }else A.w=Math.max(0,A.w-dt/.16);
+  A.prevSt=st;
+  for(const [key,a] of Object.entries(sk.acts)){
+    if(key===A.cur&&A.w>0){
+      const dur=a.getClip().duration,name=key.replace(/_u$/,'');
+      const loop=want?want[2]:false,back=name==='Roll'&&A.dir<0;
+      let t=loop?A.curT%dur:Math.min(A.curT,dur-.001);if(back)t=dur-t;
+      a.time=t;a.weight=30*A.w;
+    }else if(!LOCO.some(l=>l[0]===key)&&key!=='Idle_Loop'&&key!=='Sword_Idle')a.weight=0;
+  }
+  if(!want&&A.w<=0)A.cur=null;
+  sk.mixer.update(0);
+}
 function makePlayer(cls,level=1,skin='classic',world=scene){
   skin=resolveSkin(skin);const theme=(skin==='angel'||skin==='devil')&&cls!=='skeleton'?skin:null;
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
-  const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
-  const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
+  const skel=skin!=='pixel'&&cls!=='skeleton'?glbBody(cls,level,inner):null;
+  const hipL=skel?skel.sockets.hipL:grp(-.2,.95,0,inner),hipR=skel?skel.sockets.hipR:grp(.2,.95,0,inner),upper=skel?skel.sockets.upper:grp(0,.95,0,inner);
+  const armR=skel?skel.sockets.armR:grp(.52,.82,0,upper),armL=skel?skel.sockets.armL:grp(-.52,.82,0,upper);
   let glow=null,bowRig=null,mageMotion=null,jesterRig=null,ninjaRig=null;
   const veteran=level>=2,royal=level===3;
   if(skin==='pixel')pixelGear(cls,level,{upper,armL,armR,hipL,hipR});
@@ -2454,13 +2617,12 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
       bowRig={s1,s2,nock,tipU:[.16,.82],tipL:[.16,-.82]};
     }
   }
-  addClassDetails(cls,{upper,armR,armL},level);
+  if(!skel)addClassDetails(cls,{upper,armR,armL},level);
+  if(skin!=='pixel'&&!skel)tailorHero(cls,theme,level,upper,armL,armR);
+  if(skel)stripProceduralBody(skel.sockets,[bowRig&&bowRig.nock&&bowRig.nock.parent,mageMotion&&mageMotion.flame,mageMotion&&mageMotion.core,mageMotion&&mageMotion.aura,mageMotion&&mageMotion.sparks,mageMotion&&mageMotion.frostOrb,jesterRig&&jesterRig.prop]);
   let celestial=null;
-  if(theme){
-    if(!CELESTIAL_BODY.includes(cls))themeMaterials(root,theme);
-    celestial=addCelestialGear(cls,theme,level,{upper});
-  }
-  if(skin!=='pixel')tailorHero(cls,theme,level,upper,armL,armR);
+  if(theme&&skel&&CELESTIAL_BODY.includes(cls))themeMaterials(skel.sc,theme);
+  if(theme){if(!CELESTIAL_BODY.includes(cls)){const before=glow;themeMaterials(root,theme);if(before){let found=null;root.traverse(o=>{if(!found&&o.isMesh&&o.userData.srcMat===before)found=o.material;});glow=found||before;}}celestial=addCelestialGear(cls,theme,level,{upper});}
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   const knees=[mountLimbJoint(hipL,.46),mountLimbJoint(hipR,.46)];
   const elbows=[mountLimbJoint(armL,.34,.035),mountLimbJoint(armR,.34,.035)];
@@ -2468,7 +2630,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   const drapes=collectDrapes(upper,ninjaRig?.scarf);
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper:skel?skel.holders.upper:upper,armR:skel?skel.holders.armR:armR,armL:skel?skel.holders.armL:armL,hipL:skel?skel.holders.hipL:hipL,hipR:skel?skel.holders.hipR:hipR,skel,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 // Elliptical rings describe fitted garments and embossed metal. Bands share vertices along each fold.
 function fittedShell(parent,material,rows,{pleats=0,fold=0,tip=0,segments=40}={}){
@@ -2602,7 +2764,7 @@ function disposeModel(m,ownsMaterials=false){
   m.root.parent?.remove(m.root);
   const disposeMaterials=ownsMaterials||m.cls||m.eyeLight||m.wrists;
   const materials=disposeMaterials?new Set():null,geometries=new Set();
-  m.root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);if(materials&&o.material)materials.add(o.material);});
+  m.root.traverse(o=>{if(o.userData.glbShared)return;if(o.geometry)geometries.add(o.geometry);if(materials&&o.material)materials.add(o.material);});
   for(const geometry of geometries)geometry.dispose();
   if(materials)for(const material of materials)material.dispose();
 }
@@ -5777,6 +5939,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   model.airLift=p.jump||0;
   if(model.landTime>0){model.landTime=Math.max(0,model.landTime-dt);landing= Math.sin((1-model.landTime/.19)*Math.PI);}
   model.root.position.set(px,model.floor+model.airLift,pz);model.root.rotation.y=f+(p.yaw||0);
+  if(model.skel){if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}driveAnim(model,p,st,dt);return;}
   model.armR.rotation.x=lerp(model.armR.rotation.x,p.armR,s);model.armR.rotation.z=lerp(model.armR.rotation.z,p.armRz,s);
   model.armL.rotation.x=lerp(model.armL.rotation.x,p.armL,s);model.armL.rotation.z=lerp(model.armL.rotation.z,p.armLz||0,s);
   model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY,s);model.upper.rotation.x=lerp(model.upper.rotation.x,p.lean,s);
@@ -6521,6 +6684,11 @@ const VILLAGE_PLACES={
 
 // ==== NOTICE BOARD (newest first; add a new entry at the top for each update) ====
 const NEWS=[
+  {date:'26 Nov 2026',title:'New Character Models and Motion Capture',tag:'New',items:[
+    'Every class has a new textured character model, built on the Universal Base Characters and Modular Outfits by Quaternius (CC0).',
+    'All characters now use motion-captured animations from the Universal Animation Library: walking, jogging, sprinting, rolling, sword attacks, spells, hit reactions and deaths.',
+    'Movement blends smoothly between walking, jogging and sprinting, and you keep running while attacking or casting.',
+    'Each class keeps its helmet or mask, its weapons and its mastery gear.']},
   {date:'26 Nov 2026',title:'Angels, Devils and a Fairer Storm',tag:'New',items:[
     'New free skin set: Angel & Devil. Every match, each character is randomly given a halo and feathered wings, or horns, bat wings and a tail.',
     'Blacksmith, Soul Link, Warlock, Berserker, Paladin and Sentinel have new detailed models.',
@@ -7060,6 +7228,12 @@ function initHub(){
 }
 
 initHub();returnToHub();
+GLB.listeners.push(n=>{
+  if(n===myClass)hub.style=null;
+  for(const v of villagePeers.values())if(v.style&&v.style.startsWith(n+':'))v.style='';
+  if(n===myClass&&state!=='play'&&state!=='end'&&PM&&!PM.skel){disposeModel(PM);PM=makePlayer(myClass,charLevel(myClass),skinFor());}
+});
+loadModels();
 
 // ==== MENU BACKDROP ====
 buildArena('keep');
