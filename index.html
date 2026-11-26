@@ -540,7 +540,7 @@ const UPGRADE_GEAR={
   sword:['Reinforced apron','Gilded apron'],
   soul:['Jade collar','Bright emerald robes'],
   mage:['A silver-edged hat with a star jewel, frost-trimmed scarf, strapped boots and a ringed ice crystal','A crown of ice shards, a glacial cape, glowing cuff runes and a larger orbiting crystal'],
-  archer:['A feathered cowl, a green cape and brass bow fittings','A steel crossbow and a heavier ranger mantle'],
+  archer:['A feathered cowl, a green cape, knee guards and brass-tipped bow limbs','A steel-prod crossbow, a steel pauldron, a heavier ranger mantle and white fletching'],
   warlock:['A bone mask and violet crystal gauntlets','A split horn crown, crimson cloak and larger crystals'],
   berserker:['Crimson war paint and an iron-banded axe','Spiked shoulders, a bone crest and a double-edged axe'],
   rogue:['A green scarf and venom-tinted dagger','A split black cloak, hood crest and longer venom dagger'],
@@ -1958,44 +1958,90 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     if(veteran)gearGem(upper,steel,0,.72,.265,.058,[.7,1,.45]);
     ninjaRig={head,scarf};
   }else{
-    const tunic=std(royal?0x303b3a:veteran?0x416d55:0x2f5a32,{roughness:.85}),leather=std(0x5a3a22),dark=std(0x2a241e),skin=std(0xd8b898),wood=std(0x6a4a2a),str=new THREE.MeshBasicMaterial({color:0xe8e0c8});
-    box(.26,.95,.3,dark,0,-.47,0,hipL);box(.26,.95,.3,dark,0,-.47,0,hipR);
-    box(.3,.18,.4,leather,0,-.9,.05,hipL);box(.3,.18,.4,leather,0,-.9,.05,hipR);
-    hewnBlock(.74,.9,.44,tunic,0,.46,0,upper);box(.78,.12,.48,leather,0,.08,0,upper);
-    box(.08,1.0,.48,leather,.2,.5,0,upper).rotation.z=.6;
-    const quiver=hewnBlock(.22,.8,.22,leather,-.2,.7,-.32,upper);quiver.rotation.z=.3;
-    for(let i=0;i<4;i++)box(.03,.25,.03,str,-.26+i*.04,1.15,-.32,upper);
-    const head=new THREE.Mesh(new THREE.SphereGeometry(.24,14,12),skin);head.position.y=1.18;head.castShadow=true;upper.add(head);
-    const hood=new THREE.Mesh(new THREE.SphereGeometry(.29,12,10,0,TAU,0,1.9),tunic);hood.position.set(0,1.22,-.03);hood.castShadow=true;upper.add(hood);
-    box(.2,.68,.2,tunic,0,-.34,0,armR);box(.2,.68,.2,tunic,0,-.34,0,armL);
+    // Ranger: layered tunic and leather jerkin, pointed hood and capelet, bracer, quiver of fletched arrows,
+    // recurve bow (Ranks 1-2) or a steel-prod crossbow (Rank 3).
+    const tunic=std(royal?0x2c3a3c:veteran?0x3b664e:0x2f5a32,{roughness:.86}),hoodMat=std(royal?0x243033:veteran?0x2f5641:0x264a2a,{roughness:.9});
+    const leather=std(0x5a3a22,{roughness:.75}),darkLeather=std(0x3a2616,{roughness:.8}),cloth=std(0x2a241e,{roughness:.9});
+    const skinMat=std(0xd8b898,{roughness:.7}),wood=std(0x6a4a2a,{roughness:.7}),woodDark=std(0x4a321c,{roughness:.75});
+    const brass=std(veteran?0xc29a52:0x8f7444,{metalness:.45,roughness:.4}),steel=std(0x9aafb0,{metalness:.55,roughness:.35});
+    const str=new THREE.MeshBasicMaterial({color:0xe8e0c8}),feather=std(royal?0xe7e3c4:veteran?0xc84a3a:0xe8e0c8,{roughness:.8});
+    const ball=(r,mat,x,y,z,sx=1,sy=1,sz=1,parent=upper,seg=14)=>{const m=new THREE.Mesh(new THREE.SphereGeometry(r,seg,Math.max(8,seg*.7|0)),mat);m.position.set(x,y,z);m.scale.set(sx,sy,sz);parent.add(m);return m;};
+    const tube=(rt,rb,h,mat,x,y,z,parent=upper,seg=12)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat);m.position.set(x,y,z);parent.add(m);return m;};
+    const link=(a,b,r,mat,parent,seg=8)=>{const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),d=B.clone().sub(A);const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,d.length(),seg),mat);m.position.copy(A).lerp(B,.5);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());parent.add(m);return m;};
+    // Legs: trousers, tall folded boots, knee guards from Rank 2
+    for(const [leg,side] of [[hipL,-1],[hipR,1]]){
+      tube(.12,.11,.5,cloth,0,-.27,0,leg,10);
+      tube(.135,.13,.42,darkLeather,0,-.7,0,leg,12);
+      tube(.155,.15,.09,leather,0,-.5,0,leg,12);
+      ball(.13,darkLeather,0,-.9,.08,1,.62,1.65,leg,12);
+      box(.2,.03,.06,brass,0,-.62,.13,leg);
+      if(veteran){const kg=ball(.1,royal?steel:leather,0,-.44,.1,1.05,1,.6,leg,10);kg.rotation.x=.2;}
+    }
+    // Torso: tunic skirt, jerkin, belt, pouches, bandolier
+    const skirt=tube(.29,.36,.34,tunic,0,.0,0,upper,16);skirt.scale.z=.78;
+    const torso=tube(.27,.29,.7,tunic,0,.47,0,upper,16);torso.scale.z=.76;
+    const jerkin=tube(.285,.3,.5,leather,0,.42,0,upper,16);jerkin.scale.z=.8;
+    for(let i=0;i<4;i++)box(.012,.4,.012,darkLeather,-.09+i*.06,.44,.24,upper);
+    const vneck=box(.14,.14,.02,cloth,0,.78,.215,upper);vneck.rotation.z=Math.PI/4;
+    const belt=new THREE.Mesh(new THREE.TorusGeometry(.3,.04,6,24),darkLeather);belt.rotation.x=Math.PI/2;belt.scale.y=.8;belt.position.y=.16;upper.add(belt);
+    box(.12,.1,.04,brass,0,.16,.25,upper);
+    for(const side of [-1,1])box(.13,.15,.08,leather,side*.24,.06,.15,upper).rotation.y=side*.5;
+    const band=box(.07,1.0,.04,darkLeather,.03,.5,.235,upper);band.rotation.z=.62;
+    // Quiver with fletched arrows
+    const quiver=grp(-.18,.62,-.3,upper);quiver.rotation.z=.32;quiver.rotation.x=-.12;
+    tube(.11,.1,.72,leather,0,0,0,quiver,12);tube(.12,.12,.06,brass,0,.34,0,quiver,12);tube(.115,.115,.05,darkLeather,0,-.2,0,quiver,12);
+    for(let i=0;i<5;i++){const ax=(i%3-1)*.05,az=(i<3?-.03:.04);tube(.012,.012,.3,wood,ax,.48,az,quiver,5);
+      const f=box(.008,.11,.05,feather,ax,.6,az,quiver);f.rotation.y=i*.6;}
+    // Head: face, eyes, pointed hood and capelet
+    const face=ball(.2,skinMat,0,1.16,.03,1,1.1,.98,upper,16);
+    for(const side of [-1,1]){box(.04,.03,.02,std(0x231a14),side*.08,1.19,.22,upper);box(.07,.018,.02,std(0x4a3626),side*.08,1.235,.215,upper);}
+    const hood=new THREE.Mesh(new THREE.SphereGeometry(.285,18,12,Math.PI/2+.85,TAU-1.7,0,2.1),hoodMat);hood.material.side=THREE.DoubleSide;hood.position.set(0,1.2,-.02);upper.add(hood);
+    const hoodTop=new THREE.Mesh(new THREE.SphereGeometry(.285,18,8,0,TAU,0,.75),hoodMat);hoodTop.position.set(0,1.2,-.02);upper.add(hoodTop);
+    const hoodTip=new THREE.Mesh(new THREE.ConeGeometry(.13,.42,10),hoodMat);hoodTip.position.set(0,1.18,-.36);hoodTip.rotation.x=-2.2;upper.add(hoodTip);
+    const hoodRim=new THREE.Mesh(new THREE.TorusGeometry(.245,.022,6,22,Math.PI+.9),veteran?brass:leather);hoodRim.position.set(0,1.16,.13);hoodRim.rotation.z=-.45;hoodRim.rotation.x=-.25;upper.add(hoodRim);
+    const capelet=ball(.38,hoodMat,0,.86,-.01,1,.34,.78,upper,16);
     if(veteran){
-      const leatherTrim=std(royal?0x7b8c8d:0xa68551),feather=std(royal?0xddd9b4:0xc7a85e);
       bossCape(.85,royal?1.34:1.19,std(royal?0x2d414a:0x315744,{side:THREE.DoubleSide}),upper,.35,-.29);
       gearSpike(upper,feather,-.2,1.51,-.02,.075,.38,.55);
-      if(royal)hewnBlock(.39,.28,.48,leatherTrim,.44,.83,0,upper);
-      else hewnBlock(.24,.23,.27,leatherTrim,0,-.59,.025,armL);
+    }
+    if(royal){const pd=ball(.2,steel,.44,.84,0,1.1,.6,1.05,upper,12);pd.rotation.z=-.4;box(.3,.04,.3,brass,.46,.76,0,upper).rotation.z=-.4;}
+    // Arms: sleeves, bracer on the bow arm, gloves
+    for(const [arm,bowArm] of [[armL,true],[armR,false]]){
+      ball(.12,hoodMat,0,-.04,0,1,.9,1,arm,12);
+      tube(.1,.09,.42,tunic,0,-.25,0,arm,10);
+      if(bowArm){tube(.11,.105,.24,leather,0,-.52,0,arm,10);for(const y of [-.45,-.59])tube(.115,.115,.025,brass,0,y,0,arm,10);}
+      else tube(.1,.1,.12,leather,0,-.5,0,arm,10);
+      ball(.09,darkLeather,0,-.68,.01,1,1.1,1,arm,10);
     }
     const bow=grp(0,-.74,0,armL);
     if(level===3){
-      const steel=std(0x9aafb0,{metalness:.35}),brass=std(0xb79b61,{metalness:.38});
+      // Crossbow: wooden stock with butt, steel prod, stirrup, rail, trigger, sight and a loaded bolt
       bow.rotation.x=Math.PI/2;
-      hewnBlock(.18,.2,.98,wood,0,0,.12,bow);
-      hewnBlock(.23,.15,.44,steel,0,.04,.22,bow);
-      for(const sign of [-1,1]){
-        hewnBlock(.59,.08,.15,steel,sign*.31,0,.43,bow).rotation.y=sign*.26;
-        box(.04,.07,.12,brass,sign*.59,0,.34,bow);
-      }
-      const cord=box(.06,.043,1.18,str,0,.03,.34,bow);cord.rotation.y=Math.PI/2;
+      box(.13,.15,1.05,wood,0,0,.15,bow);
+      box(.16,.22,.26,woodDark,0,-.05,-.36,bow);
+      box(.06,.03,.9,brass,0,.085,.2,bow);
+      box(.04,.12,.05,steel,0,-.12,-.05,bow);
+      box(.03,.06,.04,steel,0,.12,-.12,bow);
+      const prodPts=[[0,.02,.6],[.25,.03,.58],[.48,.02,.5],[.62,.02,.38]];
+      for(const sign of [-1,1]){for(let i=0;i<prodPts.length-1;i++){const a=prodPts[i],b=prodPts[i+1];link([a[0]*sign,a[1],a[2]],[b[0]*sign,b[1],b[2]],.035-i*.006,steel,bow,6);}
+        box(.05,.07,.06,brass,sign*.62,.02,.38,bow);
+        link([sign*.62,.03,.38],[0,.06,.02],.008,str,bow,4);}
+      const stirrup=new THREE.Mesh(new THREE.TorusGeometry(.09,.015,5,14,Math.PI),steel);stirrup.position.set(0,.02,.66);stirrup.rotation.x=Math.PI/2;bow.add(stirrup);
+      tube(.012,.012,.5,steel,0,.11,.3,bow,5).rotation.x=Math.PI/2;
+      const bolt=new THREE.Mesh(new THREE.ConeGeometry(.03,.09,4),steel);bolt.position.set(0,.11,.58);bolt.rotation.x=Math.PI/2;bow.add(bolt);
     }else{
-      box(.07,.07,.26,leather,0,0,0,bow);
-      const lu=box(.05,.06,.78,wood,0,.04,.45,bow);lu.rotation.x=-.32;const ll=box(.05,.06,.78,wood,0,.04,-.45,bow);ll.rotation.x=.32;
-      if(veteran){
-        const brass=std(0xaf894d,{metalness:.38});
-        for(const side of [-1,1])hewnBlock(.084,.083,.2,brass,0,.12,side*.68,bow).rotation.x=-side*.32;
+      // Recurve bow: wrapped grip, curved limbs that bend back at the tips (string anchors match the draw rig)
+      box(.075,.075,.28,darkLeather,0,0,0,bow);
+      box(.03,.04,.06,brass,0,.05,.06,bow);
+      const limb=[[0,0,.12],[0,-.07,.38],[0,-.05,.6],[0,.03,.74],[0,.16,.82]];
+      for(const sign of [-1,1]){
+        for(let i=0;i<limb.length-1;i++){const a=limb[i],b=limb[i+1];link([0,a[1],a[2]*sign],[0,b[1],b[2]*sign],.036-i*.006,i===0?woodDark:wood,bow,6);}
+        if(veteran){ball(.035,brass,0,.16,.82*sign,1,1,1,bow,8);link([0,-.065,.3*sign],[0,-.06,.46*sign],.04,brass,bow,6);}
       }
       const s1=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,1),str),s2=new THREE.Mesh(new THREE.BoxGeometry(.012,.012,1),str);bow.add(s1,s2);
       const nock=grp(0,0,0,bow);const ns=new THREE.Mesh(new THREE.BoxGeometry(.035,1,.035),new THREE.MeshBasicMaterial({color:0x8a6a3a}));ns.position.y=-.48;nock.add(ns);
       const nh=new THREE.Mesh(new THREE.ConeGeometry(.05,.16,4),new THREE.MeshBasicMaterial({color:0xcfd6e0}));nh.rotation.x=Math.PI;nh.position.y=-1.02;nock.add(nh);
+      for(let i=0;i<2;i++){const nf=box(.008,.1,.05,feather,0,-.08,0,nock);nf.rotation.y=i*Math.PI/2;}
       bowRig={s1,s2,nock,tipU:[.16,.82],tipL:[.16,-.82]};
     }
   }
