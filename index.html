@@ -132,6 +132,13 @@ button.sm:hover{filter:brightness(1.3)}
 .boss{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);width:min(720px,70vw)}
 .boss .name{font-family:Cinzel,serif;font-size:17px;letter-spacing:.12em;color:#e3cfa6;margin-bottom:6px;text-shadow:0 2px 4px #000}
 .boss .bar{height:12px}
+#incoming{position:absolute;left:50%;top:26%;transform:translateX(-50%);text-align:center;pointer-events:none;padding:5px 12px;background:rgba(25,16,22,.88);color:#ffe4c0;border-bottom:2px solid #e89958;border-radius:3px;font:600 12px/1.5 system-ui;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+#crosshair b{position:absolute;inset:-5px;opacity:0;background:repeating-conic-gradient(from 38deg,white 0 14deg,transparent 14deg 90deg);mask-image:radial-gradient(circle,transparent 0 48%,black 51% 62%,transparent 65%);transition:opacity .07s}
+#crosshair.confirm b{opacity:1}
+#poiseTrack{display:flex;align-items:center;gap:8px;margin-top:3px;font:600 10px/1.3 system-ui;color:#e4d8bf;text-shadow:0 1px 3px #000}
+#poiseTrack span{height:3px;flex:1;background:#292722;overflow:hidden}
+#poiseTrack i{display:block;height:100%;background:#d1b67b;transform-origin:left;transition:transform .09s linear}
+#poiseTrack.open{color:#8effdd}#poiseTrack.open i{background:#8effdd}
 #bChip{background:#e8c66a}
 #bFill{background:linear-gradient(180deg,#a8261a,#5c0f09)}
 #lockTag{position:absolute;right:28px;top:22px;font-size:12px;letter-spacing:.2em;color:#b8a57d;text-transform:uppercase;text-align:right;line-height:1.8}
@@ -421,15 +428,15 @@ body.village-active>canvas:active{cursor:grabbing}
     <div id="runCoins"></div>
 <div id="buffs"></div>
   </div>
-  <div id="team"></div>
+  <div id="team"></div><div id="incoming" class="hidden"></div>
   <div id="lockTag"></div>
   <div id="specTag" class="hidden"></div>
-  <div class="boss"><div class="name" id="bossName"></div><div class="bar"><i id="bChip"></i><i id="bFill"></i></div></div>
+  <div class="boss"><div class="name" id="bossName"></div><div class="bar"><i id="bChip"></i><i id="bFill"></i></div><div id="poiseTrack"><b id="poiseLabel">Stagger</b><span><i id="poiseProgress"></i></span></div></div>
   <div id="skills"></div>
 </div>
 <div id="chargeWrap" class="hidden"><i id="chargeFill"></i></div>
 <div id="tags"></div>
-<div id="crosshair" class="hidden" aria-hidden="true"><i></i></div>
+<div id="crosshair" class="hidden" aria-hidden="true"><i></i><b></b></div>
 <div id="vignette"></div>
 <div id="hurtFx"></div>
 <div id="center"><div class="t"></div><div class="s"></div></div>
@@ -788,7 +795,7 @@ function restoreHealth(amount,source='ability'){
   if(!P||P.dead||P.afk||amount<=0)return 0;
   const factor=activeEffect('zapped')?{ability:.7,passive:.5,flask:1}[source]:1;
   const healed=Math.min(P.maxHp-P.hp,amount*factor);
-  P.hp+=healed;return healed;
+  P.hp+=healed;stats.healed+=healed;return healed;
 }
 const localPlayerId=()=>NET.id||'me';
 const combatPlayer=id=>id===localPlayerId()?P:remotes.get(id);
@@ -874,6 +881,7 @@ function outgoingDamageMultiplier(){
 }
 function recordDamage(dmg){
   stats.dealt+=dmg;
+  if(dmg>0)P.hitMarkerUntil=gameTime+.13;
   if(P.cls==='sword'){
     let tier=P.bladeTier||0;
     while(tier<FORGE_BLADES.length-1&&stats.dealt>=FORGE_BLADES[tier+1].threshold)tier++;
@@ -3097,6 +3105,7 @@ function handleGame(from,d){
     B.nx=d.x;B.nz=d.z;B.ny=d.y;B.nf=d.f;B.hp=d.hp;B.maxHp=d.mhp;B.roaring=!!d.roar;if(d.fl>B.flash)B.flash=d.fl;B.air=!!d.air;B.dashId=d.dash;B.fade=d.fa;
     if(d.ph>=2&&d.ph!==B.phase)setBossPhase(d.ph);
     else if(d.ph!==undefined)B.phase=d.ph;
+    if(Number.isFinite(d.poise)){B.poise=d.poise;B.remoteBroken=!!d.broken;}
     if(Array.isArray(d.control)){
       [B.jesterChillUntil,B.jesterConfusedUntil,B.jesterConfusionReady,B.controlReady]=d.control.map(time=>gameTime+time);
     }
@@ -3256,9 +3265,28 @@ function inside(s,px,pz,pad){
   const sa=Math.sin(s.a),ca=Math.cos(s.a),along=dx*sa+dz*ca,side=dx*ca-dz*sa;
   return along>=-pad&&along<=s.len+pad&&Math.abs(side)<=s.w/2+pad;
 }
+function dangerRate(d){
+  return d.owner==='local'?1:chillRate(d.o.minion===undefined?B:mins.get(d.o.minion));
+}
+function updateIncoming(){
+  const el=$('incoming');
+  let remaining=Infinity, first=null;
+  if(!P.dead&&!P.afk)for(const d of dangers){
+    if(d.det||!(d.o.dmg>0)||(B.dead&&d.o.minion===undefined)||!inside(d.s,P.x,P.z,.35))continue;
+    const seconds=(d.delay-d.t)/dangerRate(d);
+    if(seconds<remaining){remaining=seconds;first=d;}
+  }
+  const visible=remaining<=1.5;
+  el.classList.toggle('hidden',!visible);
+  if(visible){
+    const effect=BOSS_EFFECTS[first.o.status]?.name;
+    const label=(effect||'Incoming hit')+' · '+Math.max(.1,Math.ceil(remaining*10)/10).toFixed(1)+'s';
+    if(el.textContent!==label)el.textContent=label;
+  }
+}
 function updateDangers(dt){
   for(let i=dangers.length-1;i>=0;i--){const d=dangers[i];
-    if(!d.det){d.t+=dt*(d.owner==='local'?1:chillRate(d.o.minion===undefined?B:mins.get(d.o.minion)));const k=clamp(d.t/d.delay,0,1);
+    if(!d.det){d.t+=dt*dangerRate(d);const k=clamp(d.t/d.delay,0,1);
       if(curTheme?.storm)d.fill.material.opacity=.1+.46*k;
       else if(d.s.type==='rect')d.fill.scale.set(1,1,k);else d.fill.scale.set(k,1,k);
       d.outline.material.opacity=.11+.15*k;d.edge.material.opacity=.58+.37*k;
@@ -3287,7 +3315,7 @@ function detFx(d){
     case 'volley':shardLine(s.x,s.z,s.a,s.len,c.col);SFX.ice();break;
     case 'meteor':SFX.boom();shake(.25);burst(s.x,.4,s.z,18,0xff7a20,8,.25,.7);burst(s.x,.4,s.z,10,0x3a2a20,6,.3,.8);break;
     case 'ice':SFX.ice();shake(.15);burst(s.x,.4,s.z,20,0xdff4ff,7,.2,.7);break;
-    case 'wave':spikeLine(s.x,s.z,s.a,s.len,c.pillar);SFX.boom();shake(.4);break;
+    case 'wave':if(s.type==='rect')spikeLine(s.x,s.z,s.a,s.len,c.pillar);else ringFx(s.x,s.z,c.shockCol,s.r,.4);SFX.boom();shake(.4);break;
     case 'whip':electricWhip(s);break;
     case 'current':for(let t=.15;t<1;t+=.26)lightning(s.x+Math.sin(s.a)*s.len*t,s.z+Math.cos(s.a)*s.len*t);break;
     case 'javelin':{
@@ -3375,8 +3403,19 @@ function lightning(x,z){
 function shockwave(x,z,speed,maxR,dmg,col,status){
   const epoch=B.attackEpoch||0;
   const mat=new THREE.MeshBasicMaterial({color:col||0xff6a2a,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
-  const m=new THREE.Mesh(new THREE.CylinderGeometry(1,1,.9,64,1,true),mat);m.position.set(x,arenaHeight(x,z)+.45,z);scene.add(m);
-  addFx({dur:maxR/speed,bossTimed:true,r:1,hit:false,update(dt,k){if((B.attackEpoch||0)!==epoch)return false;const previous=this.r;this.r+=speed*dt;m.scale.set(this.r,1,this.r);mat.opacity=.75*(1-k);
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(1,1,.9,64,1,true),mat);m.position.set(x,.45,z);scene.add(m);
+  const vertices=m.geometry.attributes.position,rest=vertices.array.slice();
+  function fitWave(radius){
+    m.scale.set(radius,1,radius);
+    if(!curTheme?.storm)return;
+    for(let i=0;i<vertices.count;i++){
+      const j=i*3;
+      vertices.setY(i,rest[j+1]+arenaHeight(x+rest[j]*radius,z+rest[j+2]*radius));
+    }
+    vertices.needsUpdate=true;
+  }
+  m.frustumCulled=false;fitWave(1);
+  addFx({dur:maxR/speed,bossTimed:true,r:1,hit:false,update(dt,k){if((B.attackEpoch||0)!==epoch)return false;const previous=this.r;this.r+=speed*dt;fitWave(this.r);mat.opacity=.75*(1-k);
     if(!this.hit&&!B.dead&&P&&!P.dead){const d=Math.hypot(P.x-x,P.z-z);if(d>=previous-.7&&d<=this.r+.7){this.hit=true;if(hurtPlayer(dmg,{x,z,blockable:true,parry:false,boss:true})&&status)applyBossEffect(status);}}},
     dispose(){scene.remove(m);m.geometry.dispose();mat.dispose();}});
 }
@@ -3581,7 +3620,15 @@ function ninjaDodge(){
   return true;
 }
 function hurtPlayer(dmg,src){
-  if(!P||P.dead||P.afk||P.soulInvUntil>gameTime||P.iframe>0||P.hurtInv>0)return;
+  if(!P||P.dead||P.afk||P.soulInvUntil>gameTime||P.hurtInv>0)return;
+  if(P.iframe>0){
+    if(P.state==='roll'&&P.t<=.18&&!P.rollCredited&&dmg>0){
+      P.rollCredited=true;stats.perfectRolls++;
+      gainUlt(3);
+      floatText('PERFECT DODGE',P.x,arenaHeight(P.x,P.z)+2.5,P.z,'heal');
+    }
+    return;
+  }
   if(ninjaDodge())return false;
   P.lastHit=gameTime;
   const raw=dmg;
@@ -3736,7 +3783,7 @@ function shoot(kind,dmg,poise,speed,off){
   if(G.mode==='mp')nsend({t:'g',d:Object.assign({k:'ev',e:'proj'},o)});
 }
 function startRoll(mx,mz,ml){
-  P.state='roll';P.t=0;P.iframe=.36;
+  P.state='roll';P.t=0;P.iframe=.36;P.rollCredited=false;
   if(ml>0){P.rx=mx;P.rz=mz;}else{P.rx=-Math.sin(P.facing);P.rz=-Math.cos(P.facing);}
   if(!lockOn||ml>0)P.facing=Math.atan2(P.rx,P.rz);SFX.roll();
 }
@@ -5575,6 +5622,7 @@ function updateReticle(target){
   const reticle=$('crosshair'),p=target&&project(target.x,target.y,target.z);
   const onScreen=!!(p&&p[0]>18&&p[0]<innerWidth-18&&p[1]>18&&p[1]<innerHeight-18);
   reticle.classList.toggle('hidden',P.dead);
+  reticle.classList.toggle('confirm',P.hitMarkerUntil>gameTime);
   reticle.classList.toggle('target',onScreen);
   reticle.classList.toggle('ally',!!(onScreen&&target.kind==='ally'));
   reticle.style.left=onScreen?p[0]+'px':'50%';reticle.style.top=onScreen?p[1]+'px':'50%';
@@ -5619,8 +5667,12 @@ function updateHealthBar(){
   if(shield>0)label.innerHTML=amount+' <span class="shieldValue">+ '+Math.ceil(shield)+' shield</span>';
   else label.textContent=amount;
 }
+function setHudMarkup(id,markup){
+  const el=$(id);
+  if(el._combatMarkup!==markup){el.innerHTML=markup;el._combatMarkup=markup;}
+}
 function updateHUD(spec){
-  updateTouchHUD();updateForgeProgress();
+  updateTouchHUD();updateForgeProgress();updateIncoming();
   updateHealthBar();
   if(P.cls==='mage'){$('manaFill').style.width=(P.mana/P.maxMana*100)+'%';$('manaTxt').textContent=Math.floor(P.mana)+' / '+P.maxMana;}
   if(G.room&&G.room.type==='minion'){let rem=0;mins.forEach(m=>rem+=Math.max(0,m.hp));const tot=Math.max(1,G.waveHp||1);
@@ -5628,12 +5680,24 @@ function updateHUD(spec){
     $('bFill').style.width=(G.cleared?0:Math.min(100,rem/tot*100))+'%';$('bChip').style.width=$('bFill').style.width;}
   else{$('bossName').textContent=G.boss.n+(B.phase===3?' · Super Enraged':B.phase>=2?' · Enraged':'')+
     (B.jesterChillUntil>gameTime?' · Chilled':'')+(B.action?.name==='confused'||B.jesterConfusedUntil>gameTime?' · Confused':'');$('bFill').style.width=(Math.max(0,B.hp)/B.maxHp*100)+'%';$('bChip').style.width=(B.chip/B.maxHp*100)+'%';}
+  const poiseTrack=$('poiseTrack');
+  const showPoise=!B.dead&&B.maxPoise>0;
+  poiseTrack.classList.toggle('hidden',!showPoise);
+  if(showPoise){
+    const broken=NET.isHost?B.action?.name==='stagger':B.remoteBroken;
+    const progress=broken?1:clamp(1-B.poise/B.maxPoise,0,1);
+    $('poiseProgress').style.transform='scaleX('+progress+')';
+    $('poiseLabel').textContent=broken?'Staggered · 1.5× damage':'Stagger';
+    poiseTrack.classList.toggle('open',!!broken);
+  }
   let f='';for(let i=0;i<P.maxFlasks;i++)f+=`<div class="flask ${i<P.flasks?'':'empty'}"></div>`;
   const uv=Math.floor(P.ult||0);$('ultFill').style.width=uv+'%';$('ultTxt').textContent=uv>=100?P.kit.ult+' ready ('+keyName(BINDS[ultimateBinding(P.kit)],true)+')':'Ultimate '+uv+'%';$('ultBar').classList.toggle('ready',uv>=100);
   const us=$('skU');if(us){us.classList.toggle('ready',uv>=100);us.querySelector('.cdv').style.background=uv<100?`conic-gradient(rgba(0,0,0,.72) ${(1-uv/100)*360}deg, transparent 0)`:'none';}
-  $('flasks').innerHTML=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level===3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
+  const flaskMarkup=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level===3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
+  setHudMarkup('flasks',flaskMarkup);
   $('buffs').textContent=[P.afk?'AFK · Protected':'',G.mode==='mp'&&!NET.combatHost?'Waiting for an active player':'',P.cls==='sword'&&P.forgePower?'Empower · +'+P.forgePower*2+'% damage':'',P.bubbleUntil>gameTime?'Heavenfall · 95% reduction':'',P.soulInvUntil>gameTime?'Soul Sanctuary':'',P.soulPowerUntil>gameTime?'Soul Empowered':'',P.cls==='soul'?`Linked allies · ${soulAllies(localPlayerId()).length}`:activeProtector(localPlayerId())?'Soul Linked':'',P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
-  $('lockTag').innerHTML=(lockTarget?'Locked: '+esc(lockTarget.name):lockOn?'Lock-On: Seeking target':'Lock-On: Off')+'<br>'+G.diff.n+' · '+ARENAS[G.arena].n+(G.campaign?`<br>Campaign · Chamber ${G.ci+1} of ${CAMPAIGN.length}`:'');
+  const lockMarkup=(lockTarget?'Locked: '+esc(lockTarget.name):lockOn?'Lock-On: Seeking target':'Lock-On: Off')+'<br>'+G.diff.n+' · '+ARENAS[G.arena].n+(G.campaign?`<br>Campaign · Chamber ${G.ci+1} of ${CAMPAIGN.length}`:'');
+  setHudMarkup('lockTag',lockMarkup);
   P.kit.skills.forEach((s,i)=>{const el=$('sk'+i);if(!el)return;
     const cd=s.id?P.cd[s.id]||0:0,frac=s.id&&s.cd?cd/s.cd:0;
     el.querySelector('.cdv').style.background=frac>0?`conic-gradient(rgba(0,0,0,.72) ${frac*360}deg, transparent 0)`:'none';
@@ -5643,7 +5707,7 @@ function updateHUD(spec){
     el.classList.toggle('nomana',!!(s.cost&&P.mana<s.cost));});
   let teamH='';
   remotes.forEach(r=>{teamH+=`<div class="tm ${r.dead?'dead':''}">${esc(r.name)} <span style="color:#8a806a">·  ${classData(r.cls).name}${r.dead?' · Fallen':r.afk?' · AFK':''}</span><div class="tb"><i style="width:${r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100)}%"></i></div></div>`;});
-  $('team').innerHTML=teamH;
+  setHudMarkup('team',teamH);
   const sp=$('specTag');
   if(P.dead&&G.mode==='mp'){sp.classList.remove('hidden');sp.innerHTML=spec?`Spectating ${esc(spec.name)}<small>Left click to switch ally</small>`:'All allies have fallen';}else sp.classList.add('hidden');
   const cw=$('chargeWrap');let ch=beamChargeProgress();
@@ -5681,7 +5745,7 @@ function netTick(dt,force=false){
   if(NET.isHost&&(mins.size||G.bossId==='morvane'||(G.room&&G.room.type==='minion'))){nsend({t:'g',d:{k:'m',w:G.wave,wt:G.waveTotal,seq:minId,wh:Math.round(G.waveHp||1),l:[...mins.values()].map(m=>[m.id,MTYPE_IDX.indexOf(m.type),r2(m.x),r2(m.z),r2(m.f),Math.round(m.hp),Math.round(m.maxHp),m.st==='wind'?1:0,r2(Math.max(0,(m.jesterChillUntil||0)-gameTime))])}});}
   if(NET.isHost){
   if(BM){const q=B.pose;
-    nsend({t:'g',d:{k:'b',x:r2(B.x),z:r2(B.z),y:r2(B.y),f:r2(B.facing),hp:r2(B.hp),mhp:B.maxHp,ph:B.phase,roar:B.action?.name==='roar',control:[Math.max(0,(B.jesterChillUntil||0)-gameTime),B.action?.name==='confused'?Math.max(0,B.action.dur-B.action.t):0,Math.max(0,(B.jesterConfusionReady||0)-gameTime),Math.max(0,(B.controlReady||0)-gameTime)].map(r2),fl:r2(B.flash),air:B.air?1:0,dash:B.dashId||0,fa:r2(B.fade===undefined?1:B.fade),
+    nsend({t:'g',d:{k:'b',x:r2(B.x),z:r2(B.z),y:r2(B.y),f:r2(B.facing),hp:r2(B.hp),mhp:B.maxHp,ph:B.phase,poise:r2(B.poise),broken:B.action?.name==='stagger',roar:B.action?.name==='roar',control:[Math.max(0,(B.jesterChillUntil||0)-gameTime),B.action?.name==='confused'?Math.max(0,B.action.dur-B.action.t):0,Math.max(0,(B.jesterConfusionReady||0)-gameTime),Math.max(0,(B.controlReady||0)-gameTime)].map(r2),fl:r2(B.flash),air:B.air?1:0,dash:B.dashId||0,fa:r2(B.fade===undefined?1:B.fade),
       p:[q.armR,q.armL,q.upperY,q.lean,q.crouch,q.legL,q.legR].map(r2)}});}
     const anyAlive=(!P.dead)||[...remotes.values()].some(r=>!r.dead);
     if(!anyAlive&&!G.won&&!G.wiped&&!chamberClearPending()){G.wiped=true;emit('wipe',{});}
@@ -5723,7 +5787,7 @@ function startGame(cfg){
   P={cls:myClass,level,skin,kit:C,x:0,z:0,facing:Math.PI,hp:C.hp,maxHp:C.hp,chip:C.hp,mana:C.mana||0,maxMana:C.mana||0,flasks:G.diff.flasks,maxFlasks:G.diff.flasks,
     vx:0,vz:0,runT:0,rollCd:0,state:'idle',t:0,combo:0,hitDone:false,iframe:0,hurtInv:0,blockStart:-9,kx:0,kz:0,rx:0,rz:0,healed:false,walk:0,dead:false,cd:{},ward:0,guard:0,thornsUntil:0,effects:{},charge:0,lastDash:0,lastHit:gameTime,regen:false,tok:0};
   C.skills.forEach(s=>{if(s.id)P.cd[s.id]=0;});
-  stats={start:performance.now(),taken:0,flasks:0,parries:0,dealt:0};
+  stats={start:performance.now(),taken:0,flasks:0,parries:0,dealt:0,perfectRolls:0,healed:0};
   lockOn=cameraPrefs.autoLock;hadLock=false;endTimer=-1;timeScale=1;specIdx=0;
   clearCombatInput();
   NET.combatHost=cfg.host??null;NET.isHost=G.mode==='solo'||cfg.host===NET.id;
@@ -5960,7 +6024,7 @@ function endGame(win){
   remotes.forEach(r=>r.tag.style.display='none');
   $('endTitle').textContent=win?(G.campaign?'CAMPAIGN COMPLETE':'VICTORY ACHIEVED'):(G.mode==='mp'?'THE PARTY HAS FALLEN':'YOU HAVE FALLEN');
   $('endStats').innerHTML=`<b>+${G.earned} mastery earned · ${profile.mastery[G.original.cls]||0} total</b><br>`+(G.campaign?`Campaign · ${G.diff.n}<br>`+(win?`All ${CAMPAIGN.length} chambers conquered<br>Time Elapsed: ${tm}`:`Fell in ${G.room.t}: ${G.room.s}<br>Time Survived: ${tm}`):`${G.boss.n} · ${G.diff.n}<br>`+(win?`Time Elapsed: ${tm}`:`Boss Health Remaining: ${Math.round(B.hp/B.maxHp*100)}%<br>Time Survived: ${tm}`))+
-    `<br>Damage Dealt: ${Math.round(stats.dealt)}<br>Damage Taken: ${Math.round(stats.taken)}<br>Flasks Consumed: ${stats.flasks}`+(stats.parries?`<br>Successful Parries: ${stats.parries}`:'');
+    `<br>Damage Dealt: ${Math.round(stats.dealt)}<br>Damage Taken: ${Math.round(stats.taken)}<br>Flasks Consumed: ${stats.flasks}<br>HP Recovered: ${Math.round(stats.healed)}<br>Perfect Dodges: ${stats.perfectRolls}`+(stats.parries?`<br>Successful Parries: ${stats.parries}`:'');
   renderEndButtons();
 }
 function renderEndButtons(){
