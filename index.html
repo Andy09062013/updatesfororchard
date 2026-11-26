@@ -1613,11 +1613,11 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
-  let glow=null,bowRig=null,mageMotion=null;
+  let glow=null,bowRig=null,mageMotion=null,jesterRig=null;
   const veteran=level>=2,royal=level===3;
   if(skin==='pixel')pixelGear(cls,level,{upper,armL,armR,hipL,hipR});
   else if(cls==='jester'){
-    const red=std(royal?0xa52677:0x9e244d),violet=std(royal?0x237365:0x403085);
+    const red=std(royal?0xb72954:0xbc2945),violet=std(royal?0x364cba:0x4057b6);
     const gold=std(veteran?0xffd273:0xda9b4f,{metalness:.45,roughness:.42});
     const ivory=std(0xf1d4a2),mask=std(0x24152b);
     for(const [leg,dye,side] of [[hipL,red,-1],[hipR,violet,1]]){
@@ -1633,22 +1633,52 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
       collar.rotation.z=-side*.35;
       gearGem(upper,gold,side*.4,.76,.29,.062,[1,1,1]);
     }
-    gearGem(upper,ivory,0,1.18,.035,.25,[.92,1.05,.88]);
-    box(.35,.1,.07,mask,0,1.21,.244,upper);
-    for(const side of [-1,1])box(.065,.042,.02,gold,side*.10,1.21,.282,upper);
-    box(.49,.12,.49,gold,0,1.39,0,upper);
-    for(const [side,dye] of [[-1,red],[1,violet]]){
-      gearSpike(upper,dye,side*.21,1.55,0,.24,.5,-side*.91);
-      gearSpike(upper,dye,side*.49,1.59,0,.105,.28,-side*2.2);
-      gearGem(upper,gold,side*.59,1.49,0,veteran?.09:.067,[1,1,1]);
+    const head=grp(0,1.04,0,upper);
+    const maskRig=grp(0,-1.04,0,head);
+    gearGem(maskRig,ivory,0,1.18,.035,.25,[.92,1.05,.88]);
+    box(.35,.1,.07,mask,0,1.21,.244,maskRig);
+    for(const side of [-1,1])box(.065,.042,.02,gold,side*.10,1.21,.282,maskRig);
+    box(.49,.12,.49,gold,0,1.39,0,maskRig);
+    for(const side of [-1,1]){
+      const points=[new THREE.Vector3(side*.12,1.4,0),new THREE.Vector3(side*.27,1.70,-.035),
+        new THREE.Vector3(side*.53,1.72,-.08),new THREE.Vector3(side*.71,1.55,-.045),
+        new THREE.Vector3(side*.75,1.43,.015)];
+      for(let i=0;i<points.length-1;i++){
+        const from=points[i],to=points[i+1],delta=to.clone().sub(from);
+        const cap=new THREE.Mesh(new THREE.CylinderGeometry(.22-i*.052,.27-i*.057,delta.length()+.014,6),i%2===(side>0?1:0)?red:violet);
+        cap.position.copy(from).lerp(to,.5);
+        cap.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
+        maskRig.add(cap);
+      }
+      gearGem(maskRig,gold,side*.75,1.40,.015,veteran?.106:.095,[1,1,1]);
+      gearGem(maskRig,red,side*.158,1.105,.206,.05,[1,.75,.22]);
     }
-    if(veteran){gearSpike(upper,violet,0,1.61,-.145,.17,.38,.16);gearGem(upper,gold,-.034,1.8,-.15,.066,[1,1,1]);}
+    box(.50,.095,.51,gold,0,1.389,.009,maskRig);
+    if(veteran){gearSpike(maskRig,violet,0,1.61,-.145,.17,.38,.16);gearGem(maskRig,gold,-.034,1.8,-.15,.066,[1,1,1]);}
     for(const [arm,dye] of [[armL,violet],[armR,red]]){
-      hewnBlock(.24,.68,.25,dye,0,-.31,0,arm);
-      box(.26,.14,.26,gold,0,-.59,0,arm);
+      hewnBlock(.28,.63,.30,dye,0,-.30,0,arm);
+      hewnBlock(.34,.26,.35,dye,0,-.1,0,arm);
+      box(.32,.15,.32,ivory,0,-.53,0,arm);
+      box(.34,.055,.34,gold,0,-.62,0,arm);
+      box(.34,.055,.34,gold,0,-.44,0,arm);
       gearGem(arm,ivory,0,-.7,0,.11,[1,1,1]);
     }
-    for(let i=0;i<3;i++)box(.22,.026,.34,royal?gold:ivory,0,-.74+i*.016,.09,armR).rotation.y=(i-1)*.3;
+    const dark=std(0x241b2e,{roughness:.72});
+    const sash=hewnBlock(.74,.19,.54,dark,0,.17,.018,upper);sash.rotation.z=-.18;
+    for(const side of [-1,1]){
+      for(let i=0;i<3;i++){
+        const diamond=box(.12,.12,.035,i%2?ivory:gold,side*.13,.38+i*.16,.264,upper);
+        diamond.rotation.z=Math.PI/4;
+      }
+      const cuff=side<0?armL:armR;
+      box(.26,.055,.27,dark,0,-.6,0,cuff);
+      gearGem(cuff,gold,0,-.6,.138,.048,[1,1,.58]);
+      const heel=side<0?hipL:hipR;
+      box(.31,.055,.51,dark,0,-.93,.11,heel);
+    }
+    const prop=grp(0,.58,.76,upper);
+    const bomb=makeJesterBombMesh(prop,0xffc977,.32);
+    jesterRig={head,prop,bomb,palm:new THREE.Vector3()};
   }else if(cls==='sword'){
     const cloth=std(0x584044),leather=std(royal?0xb87336:0x754628),metal=std(veteran?0xb4a6a0:0x494245,{metalness:.44}),skinMat=std(0xc89163);
     for(const leg of [hipL,hipR]){
@@ -1744,7 +1774,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     cr.scale.y=1.55;frostOrb.add(cr);
     if(veteran){const orbit=new THREE.Mesh(new THREE.TorusGeometry(royal?.34:.28,.012,5,32),glow);orbit.rotation.x=1.2;frostOrb.add(orbit);}
     for(let i=0;i<(royal?3:veteran?2:0);i++){const a=i/3*TAU;const sp=new THREE.Mesh(new THREE.SphereGeometry(.03,6,6),glow);sp.position.set(Math.sin(a)*.32,Math.cos(a)*.12,Math.cos(a)*.32);frostOrb.add(sp);}
-    const flame=grp(0,-.94,.04,armR);
+    const flame=grp(0,-.94,.04,armL);
     const ember=new THREE.MeshBasicMaterial({color:0xffd285});
     const outer=new THREE.MeshBasicMaterial({color:0xff7133,transparent:true,opacity:.64,depthWrite:false,blending:THREE.AdditiveBlending});
     const core=ball(.105,ember,0,0,0,1,1,1,flame,10);
@@ -1939,7 +1969,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
@@ -1964,7 +1994,10 @@ function setForgeBlade(model,tier){
 function disposeModel(m,ownsMaterials=false){
   if(!m)return;
   m.root.parent?.remove(m.root);
-  if(!ownsMaterials)m.mageMotion?.trail.line.material.dispose();
+  if(!ownsMaterials){
+    m.mageMotion?.trail.line.material.dispose();
+    if(m.jesterRig)for(const material of Object.values(m.jesterRig.bomb))material.dispose();
+  }
   const materials=ownsMaterials?new Set():null;
   m.root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(materials&&o.material)materials.add(o.material);});
   if(materials)for(const material of materials)material.dispose();
@@ -3236,7 +3269,8 @@ function throwJesterBomb(kind){
   const dx=target?target.x-P.x:Math.sin(angle)*12,dz=target?target.z-P.z:Math.cos(angle)*12;
   const reach=Math.min(1,30/(Math.hypot(dx,dz)||1));
   const [tx,tz]=clampArena(P.x+dx*reach,P.z+dz*reach,1);
-  emit('jesterBomb',{kind,x:P.x,z:P.z,tx,tz,rain:false,
+  const launch=PM.jesterRig?.prop.getWorldPosition(new THREE.Vector3());
+  emit('jesterBomb',{kind,x:launch?.x??P.x,z:launch?.z??P.z,y:launch?.y,tx,tz,rain:false,
     travel:clamp(.45+Math.hypot(tx-P.x,tz-P.z)*.014,.45,.85)});
 }
 function startBombRain(){
@@ -3254,24 +3288,33 @@ function startBombRain(){
 function jesterBombRadius(kind,rain){
   return rain?kind==='confusion'?2.7:2.9:JESTER_BOMBS[kind].r;
 }
+function makeJesterBombMesh(group,color,radius){
+  const shell=new THREE.MeshStandardMaterial({color:color===0xffc977?0x8d203d:0x302436,metalness:.37,roughness:.43,emissive:color,emissiveIntensity:.24});
+  const glow=new THREE.MeshBasicMaterial({color});
+  const brass=new THREE.MeshStandardMaterial({color:0xd5a660,metalness:.55,roughness:.32});
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(radius,16,12),shell));
+  const band=new THREE.Mesh(new THREE.TorusGeometry(radius*.94,.024,6,20),brass);group.add(band);
+  const rim=band.clone();rim.rotation.y=Math.PI/2;group.add(rim);
+  box(.13,.13,.13,brass,0,radius,0,group);
+  const spark=new THREE.Mesh(new THREE.OctahedronGeometry(.068),glow);
+  spark.position.set(0,radius+.096,0);group.add(spark);
+  for(const side of [-1,1])box(.085,.085,.031,glow,side*radius*.32,0,radius*.95,group).rotation.z=Math.PI/4;
+  return {shell,glow,brass};
+}
 function renderJesterBomb(d,own){
   const {kind,x,z,tx,tz,rain,travel,wait=0}=d;
   if(!Object.hasOwn(JESTER_BOMBS,kind)||![x,z,tx,tz,travel,wait].every(Number.isFinite)||
     [x,z,tx,tz].some(v=>Math.abs(v)>ARENA+1)||travel<.4||travel>1||wait<0||wait>1.4)return;
   const bomb=JESTER_BOMBS[kind],r=jesterBombRadius(kind,rain),ground=arenaHeight(tx,tz);
   const g=grp(0,0,0,scene);
-  const shell=new THREE.MeshStandardMaterial({color:0x302436,metalness:.27,roughness:.56,emissive:bomb.color,emissiveIntensity:.27});
-  const glow=new THREE.MeshBasicMaterial({color:bomb.color});
-  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(rain?.34:.4,1),shell));
-  const band=new THREE.Mesh(new THREE.TorusGeometry(rain?.31:.37,.052,6,16),glow);
-  g.add(band);
-  box(.15,.19,.15,glow,0,.37,0,g);
+  const {shell,glow,brass}=makeJesterBombMesh(g,bomb.color,rain?.30:.32);
   const markerMat=new THREE.MeshBasicMaterial({color:bomb.color,transparent:true,opacity:.58,depthWrite:false,side:THREE.DoubleSide});
   const markerGeo=new THREE.RingGeometry(r-.085,r,48).rotateX(-Math.PI/2);
   if(curTheme?.storm)fitDangerToTerrain(markerGeo,{x:tx,z:tz});
   const marker=new THREE.Mesh(markerGeo,markerMat);
   marker.position.set(tx,curTheme?.storm?.012:ground+.066,tz);scene.add(marker);
-  const launchY=rain?17:arenaHeight(x,z)+1.45;
+  const floor=arenaHeight(x,z);
+  const launchY=rain?17:Number.isFinite(d.y)?clamp(d.y,floor+.65,floor+3.6):floor+1.45;
   g.visible=marker.visible=wait===0;g.position.set(x,launchY,z);
   addFx({dur:wait+travel,update(dt,k){
     if(this.t<wait)return;
@@ -3288,8 +3331,9 @@ function renderJesterBomb(d,own){
       if(own&&state==='play')hitWithJesterBomb(kind,tx,tz,!!rain,r);
     }
   },dispose(){
-    scene.remove(g,marker);g.traverse(o=>o.geometry?.dispose());
-    shell.dispose();glow.dispose();markerGeo.dispose();markerMat.dispose();
+    scene.remove(g,marker);const geometries=new Set(g.children.map(o=>o.geometry));
+    for(const geometry of geometries)geometry.dispose();
+    shell.dispose();glow.dispose();brass.dispose();markerGeo.dispose();markerMat.dispose();
   }});
 }
 function hitWithJesterBomb(kind,x,z,rain,r){
@@ -3356,7 +3400,7 @@ function tryActions(mx,mz,ml){
       const action=ACTION_KEYS[bomb.key];
       if(gameTime-buf[action]<.32&&ready(bomb.id)){
         buf[action]=-9;useSkill(bomb.id);P.facing=aimAngle();
-        startCast({dur:.6,at:.25,pose:'forward',move:.5,fn:()=>throwJesterBomb(kind)});
+        startCast({dur:.68,at:.34,pose:'jesterThrow',bombKind:kind,move:.5,fn:()=>throwJesterBomb(kind)});
         return true;
       }
     }
@@ -3378,7 +3422,8 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='mage'){
     if(gameTime-buf.light<.32&&ready('mend')){buf.light=-9;useSkill('mend');const tg=allyTarget();if(!tg.self)P.facing=Math.atan2(tg.x-P.x,tg.z-P.z);
       startCast({dur:.32,at:.14,pose:'mageBeam',move:.75,face:false,fn:()=>{const t2=allyTarget(tg.id);emit('heal',{to:t2.id,amt:8,x:P.x,z:P.z,tx:t2.x,tz:t2.z});}});return true;}
-    if(gameTime-buf.heavy<.32&&ready('fireball')){buf.heavy=-9;useSkill('fireball');P.facing=aimAngle();startCast({dur:.4,at:.18,pose:'mageFire',move:.6,fn:()=>{shoot('fire',39,6,30);SFX.fireball();emit('mageCastFx',{kind:'fire',x:P.x,z:P.z,a:P.facing});}});return true;}
+    if(gameTime-buf.heavy<.32&&ready('fireball')){buf.heavy=-9;useSkill('fireball');P.facing=aimAngle();startCast({dur:.4,at:.18,pose:'mageFire',move:.6,fn:()=>{shoot('fire',39,6,30);SFX.fireball();const hand=PM.mageMotion?.flame.getWorldPosition(new THREE.Vector3());
+        emit('mageCastFx',{kind:'fire',x:hand?.x??P.x,z:hand?.z??P.z,y:hand?.y,a:P.facing});}});return true;}
     if(gameTime-buf.q<.32&&ready('sanct')){buf.q=-9;useSkill('sanct');SFX.cast();const tg=allyTarget();
       startCast({dur:.8,at:.5,pose:'mageSanctuary',move:.2,face:false,healFx:true,fn:()=>{const t2=allyTarget(tg.id);emit('mageCastFx',{kind:'sanctuary',x:P.x,z:P.z});emit('zone',{z:{kind:'heal',x:t2.x,z:t2.z,r:6,dur:6,rate:10,credit:true,owner:NET.id||'me'}});}});return true;}
     if(gameTime-buf.e<.32&&ready('burst')){buf.e=-9;useSkill('burst');SFX.cast();startCast({dur:.65,at:.4,pose:'mageBurst',move:.3,face:false,healFx:true,fn:()=>{emit('mageCastFx',{kind:'burst',x:P.x,z:P.z});emit('healburst',{x:P.x,z:P.z,r:13,amt:32,credit:true});}});return true;}
@@ -3679,10 +3724,10 @@ function mageCastPose(p,spell,t,release,end){
   switch(spell){
     case 'mageFire': {
       const wind=ease(draw/.65),throwOut=ease((draw-.65)/.35);
-      p.armR=lerp(lerp(-.38,-2.12,wind),-1.48,throwOut)+.74*recover;
-      p.armRz=lerp(-.25,.29,wind)-.4*throwOut;
-      p.armL=-.36-.63*pulse;
-      p.upperY=.62*wind-.99*throwOut+.37*recover;
+      p.armL=lerp(lerp(-1.25,-2.12,wind),-1.48,throwOut)+.23*recover;
+      p.armLz=lerp(.25,-.29,wind)+.4*throwOut;
+      p.armR=-.36-.63*pulse;
+      p.upperY=-.62*wind+.99*throwOut-.37*recover;
       p.lean=-.26*wind+.47*throwOut-.21*recover;
       p.heat=t<release?.77+.55*draw:.05*(1-recover);
       break;
@@ -3710,8 +3755,9 @@ function mageCastPose(p,spell,t,release,end){
 function mageCastFx(d){
   const y=arenaHeight(d.x,d.z);
   if(d.kind==='fire'){
-    const x=d.x+Math.sin(d.a)*.78,z=d.z+Math.cos(d.a)*.78;
-    burst(x,y+1.55,z,16,0xff9346,3.2,.13,.4,-1);
+    const atHand=Number.isFinite(d.y);
+    const x=d.x+(atHand?0:Math.sin(d.a)*.78),z=d.z+(atHand?0:Math.cos(d.a)*.78);
+    burst(x,atHand?d.y:y+1.55,z,16,0xff9346,3.2,.13,.4,-1);
     return;
   }
   const color=d.kind==='ward'?0x9edcff:0x9fffc9;
@@ -3863,6 +3909,7 @@ function updatePlayer(dt){
   const repeatPrimary=queueHeldPrimary(blockHeld);
   const bA=bossAngle(),faceTarget=lockTarget?Math.atan2(lockTarget.x-P.x,lockTarget.z-P.z):bA,SPD=classData(P.cls).speed*(P.rageT>0?1.3:1)*(activeEffect('frostbite') ? .92 : 1)*(P.soulPowerUntil>gameTime?1.25:1);
   let vx=0,vz=0;const pose=PM.pose;
+  pose.bombStage=0;pose.bombColor=0;pose.headPitch=0;
   pose.spin=0;pose.roll=0;pose.heat=0;pose.focus=0;pose.move=0;pose.lean=0;pose.armRz=0;pose.armLz=0;pose.draw=0;pose.yaw=0;pose.jump=0;
   const restR={sword:-.55,soul:-.4,mage:-.35,archer:-.25,rogue:-.45,berserker:-.6,warlock:-.35,sentinel:-.48,paladin:-.52,jester:-.46,skeleton:-.44}[P.cls],restL={sword:-.35,soul:-.35,mage:-.25,archer:-.45,rogue:-.45,berserker:-.3,warlock:-.35,sentinel:-.32,paladin:-.4,jester:-.33,skeleton:-.25}[P.cls];
   switch(P.state){
@@ -3958,6 +4005,7 @@ function updatePlayer(dt){
       else if(ml>0)turnTo(Math.atan2(mx,mz),8,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.4;pose.legR=-pose.legL;
       switch(c.pose){
+        case 'jesterThrow':jesterThrowPose(pose,t,c.at,c.dur,c.bombKind);break;
         case 'mageBeam':
         case 'mageFire':
         case 'mageSanctuary':
@@ -4688,7 +4736,37 @@ function animateMageRig(model,p,st,dt,s){
     spark.scale.setScalar(.55+.4*Math.sin(angle*2)**2);
   });
 }
+function jesterThrowPose(p,t,release,end,kind){
+  const wind=ease(t/(release*.64));
+  const snap=ease((t-release*.64)/(release*.36));
+  const recover=ease((t-release)/(end-release));
+  p.armL=lerp(lerp(-1.12,-3.03,wind),-1.32,snap)+.20*recover;
+  p.armLz=lerp(lerp(.32,-.48,wind),.03,snap)+.29*recover;
+  p.armR=-1.12+.68*wind-.16*snap-.52*recover;
+  p.armRz=-.32-.32*wind+.23*snap+.09*recover;
+  p.upperY=-.64*wind+1.02*snap-.38*recover;
+  p.lean=-.17*wind+.55*snap-.38*recover;
+  p.headPitch=.33*snap*(1-recover);
+  p.bombStage=t<release?1+wind:3;
+  p.bombColor=JESTER_BOMBS[kind].color;
+}
+function animateJesterRig(model,p,st,s){
+  const rig=model.jesterRig,stage=st==='cast'?(p.bombStage||0):0;
+  rig.head.rotation.x=lerp(rig.head.rotation.x,p.headPitch||0,s);
+  rig.prop.visible=st==='idle'||st==='walk'||(stage>=1&&stage<3);
+  if(!rig.prop.visible)return;
+  const color=stage?p.bombColor:0xffc977;
+  rig.bomb.glow.color.setHex(color);
+  rig.bomb.shell.emissive.setHex(color);
+  const hand=model.armL;
+  rig.palm.set(0,-.75,.03).applyEuler(hand.rotation).add(hand.position);
+  rig.prop.position.set(0,.58,.76).lerp(rig.palm,clamp(stage-1,0,1));
+}
 function applyPose(model,p,st,dt,px,pz,f,spinY){
+  if(model.jesterRig&&(st==='idle'||st==='walk')){
+    const sway=p.legL*.055;
+    p={...p,armR:-1.12+sway,armL:-1.12-sway,armRz:-.32,armLz:.32};
+  }
   if(model.mageMotion&&(st==='idle'||st==='walk')){
     const stride=p.move??(st==='walk'?1:0),step=p.gait??model.mageMotion.time*9;
     const sway=Math.sin(step)*stride,breath=Math.sin(model.mageMotion.time*3)*.045;
@@ -4731,6 +4809,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   const sq=1-.16*tuck;model.spin.scale.set(1,sq,1);
   model.spin.position.y=rolling?lerp(.95,.74,tuck):lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
   if(model.mageMotion)animateMageRig(model,p,st,dt,s);
+  if(model.jesterRig)animateJesterRig(model,p,st,s);
   if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
 }
 
@@ -4867,7 +4946,7 @@ function updateRemotes(dt){
   updateTornados(dt);
   const s=1-Math.exp(-15*dt);
   remotes.forEach(r=>{if(r.first)return;r.x=lerp(r.x,r.nx,s);r.z=lerp(r.z,r.nz,s);r.f+=wrap(r.nf-r.f)*s;
-    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0};
+    const a=r.pose;const p={armR:a[0],armRz:a[1],armL:a[2],armLz:a[3],upperY:a[4],lean:a[5],legL:a[6],legR:a[7],spin:a[8],draw:a[9]||0,yaw:a[10]||0,jump:a[11]||0,move:a[12],gait:a[13],heat:a[14]||0,roll:a[15],focus:a[16]||0,bombStage:a[17]||0,bombColor:a[18]||0,headPitch:a[19]||0};
     setForgeBlade(r.model,r.bladeTier||0);
     applyPose(r.model,p,r.st,dt,r.x,r.z,r.f);
     if(r.zapped&&!r.dead&&gameTime>=(r.sparkAt||0)){r.sparkAt=gameTime+.23;zappedArcs(r.x,r.model.root.position.y,r.z);}
@@ -4878,7 +4957,7 @@ function netTick(dt,force=false){
   if(G.mode!=='mp')return;sendT-=dt;if(!force&&sendT>0)return;sendT=1/15;
   const p=PM.pose,r2=v=>Math.round(v*100)/100;
   nsend({t:'g',d:{k:'p',active:!localAway(),x:r2(P.x),z:r2(P.z),f:r2(P.facing),st:P.state,hp:Math.round(Math.max(0,P.hp)),mhp:P.maxHp,dead:P.dead?1:0,rev:G.revived.has(NET.id),restock:G.restock,inv:P.smoke>0?1:0,zapped:activeEffect('zapped')?1:0,
-    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0].map(r2)}});
+    blade:P.bladeTier||0,p:[p.armR,p.armRz,p.armL,p.armLz,p.upperY,p.lean,p.legL,p.legR,p.spin,p.draw||0,p.yaw||0,p.jump||0,p.move||0,p.gait||0,p.heat||0,p.roll||0,p.focus||0,p.bombStage||0,p.bombColor||0,p.headPitch||0].map(r2)}});
   if(NET.isHost&&(mins.size||G.bossId==='morvane'||(G.room&&G.room.type==='minion'))){nsend({t:'g',d:{k:'m',w:G.wave,wt:G.waveTotal,seq:minId,wh:Math.round(G.waveHp||1),l:[...mins.values()].map(m=>[m.id,MTYPE_IDX.indexOf(m.type),r2(m.x),r2(m.z),r2(m.f),Math.round(m.hp),Math.round(m.maxHp),m.st==='wind'?1:0,r2(Math.max(0,(m.jesterChillUntil||0)-gameTime))])}});}
   if(NET.isHost){
   if(BM){const q=B.pose;
