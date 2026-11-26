@@ -289,6 +289,7 @@ body.village-active>canvas:active{cursor:grabbing}
 .skin-art{display:block;width:46px;height:50px;background:var(--skin-theme,#7792bf);border:4px solid #242337;box-shadow:0 4px #171927;position:relative}
 .skin-art::after{content:"";position:absolute;left:9px;top:13px;width:5px;height:5px;background:#f3d4a4;box-shadow:14px 0 #f3d4a4}
 .classic-art{border-radius:22px 22px 11px 11px}
+#skinPixel[hidden]{display:none}
 .pixel-art{clip-path:polygon(22% 0,79% 0,79% 12%,100% 12%,100% 83%,82% 83%,82% 100%,18% 100%,18% 83%,0 83%,0 12%,22% 12%)}
 .ft.oof{font:bold italic clamp(33px,5vw,59px)/1 system-ui,sans-serif;color:#ffe26c;-webkit-text-stroke:1px #321d43;text-shadow:3px 4px #65285e,-2px -2px #361f42;letter-spacing:.05em;z-index:10}
 
@@ -309,9 +310,9 @@ body.village-active>canvas:active{cursor:grabbing}
     <div class="field"><label for="skinClass">Preview character</label><select id="skinClass"></select></div>
     <div class="skin-options">
       <button class="skin-tile" id="skinClassic"><span class="skin-art classic-art" aria-hidden="true"></span><strong>Classic</strong><span id="classicState"></span></button>
-      <button class="skin-tile" id="skinPixel"><span class="skin-art pixel-art" aria-hidden="true"></span><strong>8-bit</strong><span id="pixelState"></span></button>
+      <button class="skin-tile" id="skinPixel" hidden><span class="skin-art pixel-art" aria-hidden="true"></span><strong>8-bit</strong><span id="pixelState"></span></button>
     </div>
-    <p class="desc">The free 8-bit outfit gives each class blocky gear, choppy animation, and cartoon impact effects.</p>
+
   </div>
   <button class="big alt" id="skinBack">Back to Village</button>
 </section>
@@ -1608,6 +1609,7 @@ function pixelDeath(x,z,cls){
 }
 
 function makePlayer(cls,level=1,skin='classic',world=scene){
+  skin=availableSkin(skin);
   const root=grp(),spin=grp(0,.95,0,root),inner=grp(0,-.95,0,spin);
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
@@ -4808,7 +4810,7 @@ function updateHUD(spec){
 
 // ==== REMOTES ====
 function addRemote(p){
-  const skin=p.skin==='pixel'?'pixel':'classic',model=makePlayer(p.cls,safeLevel(p.level),skin);const tag=document.createElement('div');tag.className='ntag';tag.innerHTML=`${esc(p.name)}<div class="hb"><i></i></div>`;$('tags').appendChild(tag);
+  const skin=availableSkin(p.skin),model=makePlayer(p.cls,safeLevel(p.level),skin);const tag=document.createElement('div');tag.className='ntag';tag.innerHTML=`${esc(p.name)}<div class="hb"><i></i></div>`;$('tags').appendChild(tag);
   remotes.set(p.id,{id:p.id,name:p.name,cls:p.cls,skin,original:{cls:p.cls,level:safeLevel(p.level),skin},model,tag,level:safeLevel(p.level),x:0,z:0,f:0,nx:0,nz:0,nf:0,vx:0,vz:0,hp:CLASSES[p.cls].hp,mhp:CLASSES[p.cls].hp,dead:false,st:'idle',first:true,
     pose:[-.5,0,-.3,0,0,0,0,0,0],spin:0});
 }
@@ -4864,7 +4866,7 @@ function startGame(cfg){
   const me=players.find(p=>p.id===(G.mode==='mp'?NET.id:'me'))||players[0];myClass=me.cls;
   profile=readProfile()||profile;
   const level=G.mode==='mp'?safeLevel(me.level??charLevel(myClass)):charLevel(myClass);
-  const skin=G.mode==='mp'?(me.skin==='pixel'?'pixel':'classic'):skinFor();
+  const skin=G.mode==='mp'?availableSkin(me.skin):skinFor();
   G.original={cls:myClass,level,skin};
   PM=makePlayer(myClass,level,skin);
   const n=players.length,idx=players.indexOf(me);G.np=n;G.myIdx=idx;
@@ -5298,7 +5300,7 @@ function renderLobby(){
   const r=NET.room;if(!r)return;const me=r.players.find(p=>p.id===NET.id),capacity=r.capacity||5;
   $('lobbyCode').textContent=r.code;$('pCount').textContent=r.players.length;$('pCap').textContent=capacity;
   let h='';for(let i=0;i<capacity;i++){const p=r.players[i];
-    if(p)h+=`<div class="slot"><span class="nm">${esc(p.name)}${p.id===NET.id?' <span style="color:#8a806a">(You)</span>':''}</span><span class="cls">${CLASSES[p.cls].name} · Mastery ${safeLevel(p.level)}${p.skin==='pixel'?' · 8-bit':''}</span>${p.voice?'<span class="mic">MIC</span>':''}${p.id===r.host?'<span class="crown">HOST</span>':`<span class="rdy ${p.ready?'on':''}">${p.ready?'Ready':'Not Ready'}</span>`}</div>`;
+    if(p)h+=`<div class="slot"><span class="nm">${esc(p.name)}${p.id===NET.id?' <span style="color:#8a806a">(You)</span>':''}</span><span class="cls">${CLASSES[p.cls].name} · Mastery ${safeLevel(p.level)}${availableSkin(p.skin)==='pixel'?' · 8-bit':''}</span>${p.voice?'<span class="mic">MIC</span>':''}${p.id===r.host?'<span class="crown">HOST</span>':`<span class="rdy ${p.ready?'on':''}">${p.ready?'Ready':'Not Ready'}</span>`}</div>`;
     else h+='<div class="slot emptySlot"><span class="nm">Open slot</span></div>';}
   $('slots').innerHTML=h;
   $('lobbyClasses').innerHTML=Object.entries(CLASSES).map(([k,c])=>`<button class="sm ${me&&me.cls===k?'on':''}" data-c="${k}">${c.name}</button>`).join('');
@@ -5555,7 +5557,7 @@ function syncVillage(peers){
   const seen=new Set();
   for(const v of peers){
     if(!v||typeof v.id!=='string'||v.id===NET.id||!Object.hasOwn(CLASSES,v.cls)||![v.x,v.z,v.facing].every(Number.isFinite))continue;
-    const level=safeLevel(v.level),skin=v.skin==='pixel'?'pixel':'classic';
+    const level=safeLevel(v.level),skin=availableSkin(v.skin);
     const style=v.cls+':'+level+':'+skin;
     const old=villagePeers.get(v.id);
     if(!old||old.style!==style||old.name!==v.name){
@@ -5700,11 +5702,16 @@ function initVillageControls(){
   });
 }
 
+const PIXEL_SKINS_AVAILABLE=false;
+function availableSkin(skin){
+  return PIXEL_SKINS_AVAILABLE&&skin==='pixel'?'pixel':'classic';
+}
 function skinFor(){
-  return (profile.skin??(Object.values(profile.skins||{}).includes('pixel')?'pixel':'classic'))==='pixel'?'pixel':'classic';
+  return availableSkin(profile.skin??(Object.values(profile.skins||{}).includes('pixel')?'pixel':'classic'));
 }
 function renderSkins(){
   const id=$('skinClass').value||myClass,skin=skinFor();
+  $('skinPixel').hidden=!PIXEL_SKINS_AVAILABLE;
   $('skinClassic').classList.toggle('sel',skin==='classic');$('skinPixel').classList.toggle('sel',skin==='pixel');
   $('skinClassic').setAttribute('aria-pressed',skin==='classic');$('skinPixel').setAttribute('aria-pressed',skin==='pixel');
   $('classicState').textContent=skin==='classic'?'Equipped for all':'Equip for all';
@@ -5712,8 +5719,9 @@ function renderSkins(){
   $('skins').style.setProperty('--skin-theme','#'+PIXEL_COLORS[id][0].toString(16).padStart(6,'0'));
 }
 function equipSkin(skin){
+  if(!PIXEL_SKINS_AVAILABLE)return;
   profile=readProfile()||profile;
-  profile.skin=skin==='pixel'?'pixel':'classic';
+  profile.skin=availableSkin(skin);
   saveProfile();renderSkins();updateHubLabel();
 }
 function updateHubLabel(){
