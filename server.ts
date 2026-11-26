@@ -4,7 +4,7 @@ const clientDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().enc
 const clientVersion = Array.from(new Uint8Array(clientDigest), byte => byte.toString(16).padStart(2, "0")).join("");
 const HTML = clientSource.replace('<meta name="hc-build" content="">', `<meta name="hc-build" content="${clientVersion}">`);
 
-type Player = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel"; ready: boolean; ws: any; afk?: boolean; lastFrame?: number; dead?: boolean; voice?: boolean };
+type Player = { id: string; name: string; cls: string; level: number; skin: string; ready: boolean; ws: any; afk?: boolean; lastFrame?: number; dead?: boolean; voice?: boolean };
 type Room = {
   code: string;
   host: string;
@@ -21,7 +21,7 @@ const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "se
 const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm" };
 const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
 const MAX = 5;
-const skinType = (value: unknown) => value === "pixel" ? "pixel" : "classic";
+const skinType = (value: unknown): string => value === "pixel" || value === "celestial" || value === "angel" || value === "devil" ? value : "classic";
 function roomCapacity(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= MAX ? value : fallback;
 }
@@ -43,7 +43,7 @@ function probePing(player: OnlinePlayer, now: number) {
   send(player.ws, { t: "pingProbe", token: player.probe });
 }
 
-type Presence = { id: string; name: string; cls: string; level: number; skin: "classic" | "pixel";
+type Presence = { id: string; name: string; cls: string; level: number; skin: string;
   x: number; z: number; facing: number; moving: boolean; seen: number };
 const village = new Map<string, Presence>();
 const VILLAGE_LIMIT = 32;
@@ -248,7 +248,7 @@ function handle(ws: any, m: any) {
       r.finished = false;
       for (const p of r.players.values()) { p.afk = false; p.lastFrame = Date.now(); p.dead = false; }
       pushLobby(r);
-      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin })) });
+      bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin, theme: p.skin === "celestial" ? (Math.random() < 0.5 ? "angel" : "devil") : undefined })) });
       break;
     }
     case "toLobby": {
