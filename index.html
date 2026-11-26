@@ -1751,7 +1751,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
     const aura=new THREE.Mesh(new THREE.IcosahedronGeometry(.19,1),outer);flame.add(aura);
     const sparks=Array.from({length:4},()=>ball(.027,ember,0,0,0,1,1,1,flame,6));
     flame.scale.setScalar(.001);flame.visible=false;
-    mageMotion={flame,core,aura,sparks,frostOrb,skirt,tailA,tailB,time:0,heat:0};
+    mageMotion={flame,core,aura,sparks,frostOrb,skirt,tailA,tailB,trail:makeFrostTrail(root),time:0,heat:0};
     // Small frost mote in the left hand for heals
     ball(.06,glow,0,-.78,.05,1,1,1,armL,8);
   }else if(cls==='warlock'){
@@ -1964,6 +1964,7 @@ function setForgeBlade(model,tier){
 function disposeModel(m,ownsMaterials=false){
   if(!m)return;
   m.root.parent?.remove(m.root);
+  if(!ownsMaterials)m.mageMotion?.trail.line.material.dispose();
   const materials=ownsMaterials?new Set():null;
   m.root.traverse(o=>{if(o.geometry)o.geometry.dispose();if(materials&&o.material)materials.add(o.material);});
   if(materials)for(const material of materials)material.dispose();
@@ -3678,7 +3679,7 @@ function mageCastPose(p,spell,t,release,end){
   switch(spell){
     case 'mageFire': {
       const wind=ease(draw/.65),throwOut=ease((draw-.65)/.35);
-      p.armR=lerp(lerp(-1.89,-2.12,wind),-1.48,throwOut)+.74*recover;
+      p.armR=lerp(lerp(-.38,-2.12,wind),-1.48,throwOut)+.74*recover;
       p.armRz=lerp(-.25,.29,wind)-.4*throwOut;
       p.armL=-.36-.63*pulse;
       p.upperY=.62*wind-.99*throwOut+.37*recover;
@@ -4606,6 +4607,48 @@ function updateBow(model,draw,dt){
   seg(b.s1,b.tipU);seg(b.s2,b.tipL);
   b.nock.visible=d>.04;b.nock.position.y=ny;
 }
+const FROST_TRAIL_LIFE=.26,FROST_TRAIL_POINTS=16;
+function makeFrostTrail(root){
+  const geometry=new THREE.BufferGeometry();
+  for(const attr of ['position','color']){
+    geometry.setAttribute(attr,new THREE.BufferAttribute(new Float32Array(FROST_TRAIL_POINTS*3),3).setUsage(THREE.DynamicDrawUsage));
+  }
+  geometry.setDrawRange(0,0);
+  const material=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.32,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  const line=new THREE.Line(geometry,material);
+  line.frustumCulled=false;line.visible=false;root.add(line);
+  return {line,samples:[],position:new THREE.Vector3(),local:new THREE.Vector3(),rootPosition:new THREE.Vector3(),seen:false};
+}
+function updateFrostTrail(model,carrying){
+  const {frostOrb,trail,time}=model.mageMotion,{line,samples,position,local,rootPosition}=trail;
+  const root=model.root;
+  const step=trail.seen?Math.hypot(root.position.x-rootPosition.x,root.position.z-rootPosition.z):0;
+  trail.seen=true;rootPosition.copy(root.position);
+  if(!frostOrb.visible||step>1.8)samples.length=0;
+  while(samples.length&&time-samples[0].time>=FROST_TRAIL_LIFE)samples.shift();
+  if(carrying&&step>.003&&step<=1.8){
+    frostOrb.getWorldPosition(position);
+    const last=samples[samples.length-1];
+    if(!last||position.distanceToSquared(last.position)>.0025){
+      if(samples.length>=FROST_TRAIL_POINTS)samples.shift();
+      samples.push({position:position.clone(),time});
+    }
+  }
+  line.visible=samples.length>=2;
+  if(!line.visible)return;
+  const geo=line.geometry;
+  const points=geo.attributes.position,colors=geo.attributes.color;
+  for(let i=0;i<samples.length;i++){
+    const sample=samples[i];
+    root.worldToLocal(local.copy(sample.position));
+    points.setXYZ(i,local.x,local.y,local.z);
+    const fade=Math.max(0,1-(time-sample.time)/FROST_TRAIL_LIFE);
+    colors.setXYZ(i,fade,fade,fade);
+  }
+  points.needsUpdate=colors.needsUpdate=true;
+  geo.setDrawRange(0,samples.length);
+}
 function animateMageRig(model,p,st,dt,s){
   const rig=model.mageMotion;
   rig.time+=dt;
@@ -4625,10 +4668,12 @@ function animateMageRig(model,p,st,dt,s){
   rig.tailB.rotation.x=.18+Math.sin(t*8-.9)*(.055+.11*(p.move||0))+.57*tuck;
   const carrying=st==='idle'||st==='walk';
   rig.frostOrb.rotation.y=t*.38;
-  rig.frostOrb.position.set(0,-.69,.02).applyEuler(model.armR.rotation).add(model.armR.position);
-  rig.frostOrb.position.y+=.32+Math.sin(t*2.7)*.045;
+  const palm=model.armL;
+  rig.frostOrb.position.set(0,-.69,.02).applyEuler(palm.rotation).add(palm.position);
+  rig.frostOrb.position.y+=.22+Math.sin(t*2.7)*.026;
   rig.frostOrb.visible=!rolling&&st!=='dead'&&!(st==='cast'&&p.heat>0);
-  if(carrying)rig.frostOrb.position.z+=.04;
+  if(carrying)rig.frostOrb.position.z+=.08;
+  updateFrostTrail(model,carrying);
   rig.frostOrb.scale.setScalar(1+(st==='cast'||st==='ult'?(p.focus||0)*.48:0));
   const castHeat=st==='cast'?(p.heat||0):0;
   rig.heat=castHeat>0?lerp(rig.heat,castHeat,1-Math.exp(-19*dt)):0;
@@ -4647,8 +4692,8 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(model.mageMotion&&(st==='idle'||st==='walk')){
     const stride=p.move??(st==='walk'?1:0),step=p.gait??model.mageMotion.time*9;
     const sway=Math.sin(step)*stride,breath=Math.sin(model.mageMotion.time*3)*.045;
-    p={...p,armR:-1.89+breath-sway*.065,armRz:.37+sway*.045,armL:-.38+sway*.38,
-      upperY:-.14+sway*.13,jump:(1-Math.cos(step*2))*.026*stride};
+    p={...p,armR:-.38-sway*.38,armL:-1.25+breath+sway*.055,armLz:-.32+sway*.04,
+      upperY:.09+sway*.13,jump:(1-Math.cos(step*2))*.026*stride};
   }
   if(model.skin==='pixel'){
     model.poseTime+=dt;
