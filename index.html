@@ -3675,7 +3675,7 @@ function mageCastPose(p,spell,t,release,end){
   switch(spell){
     case 'mageFire': {
       const wind=ease(draw/.65),throwOut=ease((draw-.65)/.35);
-      p.armR=lerp(lerp(-1.33,-2.12,wind),-1.48,throwOut)+.74*recover;
+      p.armR=lerp(lerp(-.4,-2.12,wind),-1.48,throwOut)+.74*recover;
       p.armRz=lerp(-.25,.29,wind)-.4*throwOut;
       p.armL=-.36-.63*pulse;
       p.upperY=.62*wind-.99*throwOut+.37*recover;
@@ -4606,7 +4606,7 @@ function updateBow(model,draw,dt){
 function animateMageRig(model,p,st,dt,s){
   const rig=model.mageMotion;
   rig.time+=dt;
-  const t=rig.time,carry=st==='walk'||st==='idle',rolling=st==='roll';
+  const t=rig.time,rolling=st==='roll';
   const roll=clamp(p.roll??Math.abs(p.spin)/TAU,0,1),tuck=rolling?ease(roll/.23)*ease((1-roll)/.26):0;
   if(rolling){
     model.hipL.rotation.x=lerp(model.hipL.rotation.x,-1.45*tuck,s);
@@ -4624,7 +4624,8 @@ function animateMageRig(model,p,st,dt,s){
   rig.frostOrb.position.y=-.6+Math.sin(t*2.6)*.06;
   rig.frostOrb.visible=!rolling;
   rig.frostOrb.scale.setScalar(1+(st==='cast'||st==='ult'?(p.focus||0)*.48:0));
-  rig.heat=lerp(rig.heat,carry?.77:st==='cast'?(p.heat||0):0,1-Math.exp(-19*dt));
+  const castHeat=st==='cast'?(p.heat||0):0;
+  rig.heat=castHeat>0?lerp(rig.heat,castHeat,1-Math.exp(-19*dt)):0;
   rig.flame.visible=rig.heat>.035;
   rig.flame.scale.setScalar(Math.max(.001,rig.heat));
   rig.flame.position.y=-.92+Math.sin(t*8)*.038;
@@ -4640,7 +4641,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(model.mageMotion&&(st==='idle'||st==='walk')){
     const stride=p.move??(st==='walk'?1:0),step=p.gait??model.mageMotion.time*9;
     const sway=Math.sin(step)*stride,breath=Math.sin(model.mageMotion.time*3)*.045;
-    p={...p,armR:-1.33+breath-sway*.07,armRz:-.24+sway*.05,armL:-.38+sway*.38,
+    p={...p,armR:-.4+breath-sway*.42,armRz:-.08+sway*.05,armL:-.38+sway*.38,
       upperY:-.14+sway*.13,jump:(1-Math.cos(step*2))*.026*stride};
   }
   if(model.skin==='pixel'){
