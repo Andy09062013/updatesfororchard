@@ -4772,9 +4772,13 @@ function updatePlayer(dt){
       const t=P.t,dur=.34,h0=.1,h1=.18,right=P.combo%2===0;
       if(t>.04&&t<h1){vx=Math.sin(P.facing)*3.5;vz=Math.cos(P.facing)*3.5;}
       if(t>=h0&&t<=h1)checkPlayerHit(2.1,NINJA_STAB_DAMAGE,3,false);
-      const k=ease(t/h1);
-      pose.armR=lerp(-.7,-1.7,k);pose.armL=-.5;pose.upperY=(right?1:-1)*lerp(-.35,.35,k);
-      pose.legL=.35;pose.legR=-.25;pose.lean=.12;
+      const pull=ease(t/.075),strike=ease((t-.075)/.072),recover=ease((t-h1)/(dur-h1));
+      pose.armR=restR+.52*pull-1.78*strike+1.26*recover;
+      pose.armRz=-.16-.39*pull+.45*strike+.10*recover;
+      pose.armL=restL-.60*strike+.60*recover;
+      pose.upperY=(right?1:-1)*(.53*pull-1.10*strike+.57*recover);
+      const lunge=strike*(1-recover);
+      pose.legL=-.42*lunge;pose.legR=.34*lunge;pose.lean=.38*lunge;pose.knee=.25*lunge;
       if(t>h1){
         if(t>=.235&&gameTime-buf.light<.32){buf.light=-9;P.combo++;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();SFX.swing();break;}
         if(gameTime-buf.roll<.32||gameTime-buf.q<.32||gameTime-buf.heavy<.32){P.state='idle';tryActions(mx,mz,ml);break;}
@@ -4839,7 +4843,13 @@ function updatePlayer(dt){
       const sp=13*Math.pow(1-k,.55)+1.5;vx=P.rx*sp;vz=P.rz*sp;
       const back=Math.abs(wrap(Math.atan2(P.rx,P.rz)-P.facing))>1.6;
       pose.roll=k;
-      pose.spin=(back?-1:1)*TAU*ease((k-.035)/.93);pose.legL=-.4;pose.legR=-.4;pose.armR=-1;pose.armL=-1;
+      const load=ease(k/.11)*(1-ease((k-.13)/.18));
+      const recover=ease((k-.72)/.28);
+      const tumble=ease((k-.08)/.79);
+      pose.spin=(back?-1:1)*TAU*tumble;
+      pose.legL=lerp(-.23,.46,recover);pose.legR=-.28;
+      pose.armR=lerp(-1.3,restR,recover);pose.armL=lerp(-1.15,restL,recover);
+      pose.knee=load*.48;pose.lean=load*.38;
       if(Math.random()<.4)burst(P.x,.1,P.z,1,0x3a3530,1.5,.15,.4,2);
       if(t>=dur){P.state='idle';P.rollCd=.27;P.runT=ml>0?.65:0;}
       break;}
@@ -4864,7 +4874,13 @@ function updatePlayer(dt){
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
       if(t>=1.6||!LT.alive)P.state='idle';break;}
     case 'ult':{updateUlt(dt,pose,mx,mz);vx=P.uvx||0;vz=P.uvz||0;break;}
-    case 'hurt':{pose.lean=-.35;pose.armR=-.3;pose.armL=-.2;if(P.t>=.42)P.state='idle';break;}
+    case 'hurt':{
+      const recoil=ease(P.t/.065)*(1-ease((P.t-.095)/.30));
+      pose.lean=-.46*recoil;pose.upperY=-.24*recoil;pose.bank=.20*recoil;
+      pose.armR=restR-.65*recoil;pose.armL=restL-.48*recoil;
+      pose.armRz=-.32*recoil;pose.armLz=.36*recoil;
+      pose.legL=.24*recoil;pose.legR=-.43*recoil;pose.knee=.36*recoil;
+      if(P.t>=.42)P.state='idle';break;}
     case 'dead':{pose.lean=-1.5*ease(P.t/.8);pose.armR=.2;pose.armL=.2;break;}
   }
   updatePlayerGesture(pose,dt);
@@ -4951,7 +4967,12 @@ const ATK={
     }
     const k=clamp((a.t-launch)/air,0,1);
     B.x=lerp(a.x,a.tx,k);B.z=lerp(a.z,a.tz,k);B.y=Math.sin(Math.PI*k)*8.3;B.air=k<1;
-    p.armR=k<1?-2.75:-.8;p.armL=k<1?-2.35:-.6;p.crouch=k<1?-.32:-.54;p.lean=k<1?-.16:.48;
+    const tuck=Math.sin(Math.PI*k),reach=ease((k-.62)/.36);
+    const recover=ease((a.t-launch-air)/(.60*B.speedMul));
+    p.armR=lerp(lerp(-2.75,-.8,reach),-.35,recover);
+    p.armL=lerp(lerp(-2.35,-.6,reach),-.22,recover);
+    p.crouch=-.32*tuck-.54*reach*(1-recover);p.lean=lerp(-.16,.48,reach)*(1-recover);
+    p.legL=-.62*tuck;p.legR=-.44*tuck;
     return a.t>=launch+air+.68*B.speedMul;
   },
   stormRush(dt,a){
@@ -4995,7 +5016,12 @@ const ATK={
       a.flight={x:B.x,z:B.z,tx:x,tz:z,duration:travel};
     }
     if(a.flight&&!a.thrown&&a.t>=W){a.thrown=true;emit('stormThrow',a.flight);}
-    p.armR=a.t<W?-2.82:-1.05;p.armL=-.58;p.upperY=a.t<W?.66:-.48;p.lean=a.t<W?-.22:.42;
+    const wind=ease(a.t/(W*.84)),throwing=ease((a.t-W+.085)/.18),recover=ease((a.t-W-.13)/(.78*B.speedMul));
+    p.armR=-.35-2.47*wind+1.77*throwing+.70*recover;
+    p.armL=-.2-1.20*wind+.82*throwing+.38*recover;
+    p.upperY=.66*wind-1.14*throwing+.48*recover;
+    p.lean=-.22*wind+.64*throwing-.42*recover;
+    p.crouch=-.22*wind+.10*throwing+.12*recover;p.legL=-.33*(wind-recover);p.legR=.22*(wind-recover);
     return a.t>=W+1.4*B.speedMul;
   },
   thunderWhip(dt,a){
@@ -5008,7 +5034,10 @@ const ATK={
       stormHazard(swing,delay,35,{fx:'whip',parry:true,chillWindup:delay});
       if(B.phase>=2)stormHazard({...swing,a:B.facing+1.05,r:12.6,half:.9},delay+.58,31,{fx:'whip',parry:true,chillWindup:delay});
     }
-    p.armR=a.t<W?-1.75:-.68;p.armL=-1;p.upperY=a.t<W?.8:-1.05;p.lean=a.t<W?-.24:.36;
+    const wind=ease(a.t/(W*.76)),sweep=ease((a.t-W+.10)/.2),recover=ease((a.t-W-.15)/(.78*B.speedMul));
+    p.armR=-.35-1.4*wind+1.07*sweep+.33*recover;p.armL=-.2-.8*wind+.8*recover;
+    p.upperY=.80*wind-1.85*sweep+1.05*recover;
+    p.lean=-.24*wind+.60*sweep-.36*recover;p.crouch=-.30*wind+.13*sweep+.17*recover;
     return a.t>=W+1.15*B.speedMul;
   },
   skyJudgment(dt,a){
@@ -5250,7 +5279,10 @@ const ATK={
     const k=clamp((a.t-C)/AIR,0,1);
     if(k<1){B.x=lerp(a.sx,a.tx,k);B.z=lerp(a.sz,a.tz,k);B.y=Math.sin(Math.PI*k)*9;p.armR=lerp(-3.1,-1,k);p.armL=-2.8;p.lean=lerp(-.2,.4,k);
       const a2=Math.atan2(a.tx-a.sx,a.tz-a.sz);if(Math.hypot(a.tx-a.sx,a.tz-a.sz)>.5)B.facing+=wrap(a2-B.facing)*.1;return false;}
-    B.air=false;B.y=0;p.crouch=-.7;p.armR=-.9;p.lean=.4;if(c.both)p.armL=-.9;
+    const recover=ease((a.t-C-AIR)/(R*.76));
+    B.air=false;B.y=0;
+    p.crouch=-.7*(1-recover);p.armR=lerp(-.9,-.35,recover);p.lean=.4*(1-recover);
+    if(c.both)p.armL=lerp(-.9,-.2,recover);
     return a.t>=C+AIR+R;},
   fire(dt,a){a.t+=dt;const c=G.boss,W=.75,p=B.pose;
     if(a.t<W){trackTurn(dt,2);const k=ease(a.t/W);p.armR=lerp(-.3,-3.0,k);p.armL=lerp(-.2,-3.0,k);p.lean=-.2*k;return false;}
@@ -5616,58 +5648,86 @@ function handInTorso(model,side,out){
   if(joint)out.sub(joint.position).applyEuler(joint.rotation).add(joint.position);
   return out.applyEuler(shoulder.rotation).add(shoulder.position);
 }
+// Use actual ground travel for the gait, including interpolated multiplayer avatars.
+function locomotionPose(model,p,walking,dt,x,z,f){
+  const motion=model.locomotion??={x,z,phase:0,blend:0,lateral:0,forward:1};
+  const dx=x-motion.x,dz=z-motion.z,distance=Math.hypot(dx,dz);
+  motion.x=x;motion.z=z;
+  const stride=walking?clamp(p.move||0,0,1.35):0;
+  const run=ease((stride-1)/.35),cycle=lerp(2.03,2.33,run);
+  const canStep=walking&&stride>.025&&distance<1.25&&dt>0;
+  const blend=1-Math.exp(-22*dt);
+  motion.blend=lerp(motion.blend,canStep?Math.min(1,stride*2.6):0,blend);
+  if(distance>=1.25){motion.blend=0;motion.phase=0;}
+  if(canStep&&distance>1e-5){
+    const sin=Math.sin(f),cos=Math.cos(f);
+    motion.lateral=lerp(motion.lateral,(dx*cos-dz*sin)/distance,blend);
+    motion.forward=lerp(motion.forward,(dx*sin+dz*cos)/distance,blend);
+    motion.phase=(motion.phase+distance/cycle)%1;
+  }
+  if(walking&&p.preview){
+    motion.blend=Math.min(1,stride*2.6);
+    motion.phase=(p.gait/TAU)%1;motion.lateral=0;motion.forward=1;
+  }
+  return {...p,gait:motion.phase*TAU,stepWeight:motion.blend,stepX:motion.lateral,stepZ:motion.forward,cycle};
+}
+function strideFoot(phase,weight,cycle,run){
+  const stance=.52,extent=cycle*stance*.5;
+  if(phase<stance)return {z:(extent-phase*cycle)*weight,lift:0};
+  const swing=(phase-stance)/(1-stance);
+  return {z:lerp(-extent,extent,ease(swing))*weight,lift:Math.sin(Math.PI*swing)**2*lerp(.21,.32,run)*weight};
+}
+function bendToFoot(hip,knee,ankle,x,y,z,plant){
+  const upper=.46,lower=.33;
+  hip.rotation.order='ZXY';
+  const tilt=Math.atan2(x,y);
+  const h=Math.hypot(x,y),dist=clamp(Math.hypot(h,z),.19,upper+lower-.001);
+  const flex=Math.acos(clamp((dist*dist-upper*upper-lower*lower)/(2*upper*lower),-1,1));
+  const angle=-Math.atan2(z,h)-Math.atan2(lower*Math.sin(flex),upper+lower*Math.cos(flex));
+  hip.rotation.x=lerp(hip.rotation.x,angle,plant);
+  hip.rotation.z=lerp(hip.rotation.z,tilt,plant);
+  knee.rotation.x=lerp(knee.rotation.x,flex,plant);
+  ankle.rotation.x=lerp(ankle.rotation.x,-angle-flex,plant);
+  ankle.rotation.z=lerp(ankle.rotation.z,-tilt,plant);
+}
 function updatePlayerJoints(model,p,st,s,tuck,walking,speed,phase){
   const run=ease((speed-1)/.35);
-  const flex=.37+.47*run,side=p.strafe||0,back=p.backstep?-1:1;
+  const weight=walking?(p.stepWeight||0):0,step=phase/TAU;
+  const support=Math.cos(phase)*weight;
   const heavy=model.cls==='paladin'||model.cls==='berserker'||model.cls==='sword';
-  const stride=Math.sin(phase)*Math.min(1,speed);
-  const swing=walking&&Number.isFinite(p.gait);
-  const support=swing?Math.sin(phase-.53)*Math.min(1,speed)*back:0;
-  model.spin.position.x=lerp(model.spin.position.x,-support*(heavy?.068:.045)+side*speed*.023,s);
-  const weight=walking?.022*speed:p.knee?Math.min(.11,p.knee*.13):Math.max(0,p.lean)*.09;
-  model.spin.position.z=lerp(model.spin.position.z,weight*(1-tuck),s);
-
-  let left=0,right=0;
-  if(swing){
-    const lateral=1-.58*Math.abs(side);
-    const pitch=lerp(.48,.68,run)*lateral*(model.cls==='rogue'?.83:1);
-    left=stride*pitch*back;right=-left;
-    const step=back*stride;
-    model.hipL.rotation.z=lerp(model.hipL.rotation.z,-side*stride*.2,s);
-    model.hipR.rotation.z=lerp(model.hipR.rotation.z,-side*stride*.2,s);
-    model.knees[0].rotation.x=lerp(model.knees[0].rotation.x,Math.max(0,-step)*flex,s);
-    model.knees[1].rotation.x=lerp(model.knees[1].rotation.x,Math.max(0,step)*flex,s);
-  }else{
-    left=p.legL;right=p.legR;
-    model.hipL.rotation.z=lerp(model.hipL.rotation.z,0,s);
-    model.hipR.rotation.z=lerp(model.hipR.rotation.z,0,s);
-    const bend=tuck*1.36+(p.knee||0);
-    model.knees[0].rotation.x=lerp(model.knees[0].rotation.x,bend,s);
-    model.knees[1].rotation.x=lerp(model.knees[1].rotation.x,bend*.88,s);
-  }
-  model.hipL.rotation.x=lerp(model.hipL.rotation.x,lerp(left,-1.33,tuck),s);
-  model.hipR.rotation.x=lerp(model.hipR.rotation.x,lerp(right,-1.25,tuck),s);
-  let lowest=0;
+  const useFeet=weight>.01;
+  const pelvis=lerp(.95,lerp(.724,.642,run)+.020*Math.cos(phase*2),weight);
+  model.spin.position.x=lerp(model.spin.position.x,-support*(heavy?.062:.041),s);
+  model.spin.position.z=lerp(model.spin.position.z,(walking?.018*speed:Math.max(0,p.lean)*.09)*(1-tuck),s);
+  if(useFeet)model.spin.position.y=pelvis;
   for(let i=0;i<2;i++){
-    const hip=i===0?model.hipL:model.hipR,knee=model.knees[i];
-    const plant=swing?(i===0?Math.max(0,stride):Math.max(0,-stride)):0;
-    const foot=walking?clamp(-hip.rotation.x-knee.rotation.x,-.46,.42)-plant*.08:0;
-    const ankle=model.ankles[i];
-    ankle.rotation.x=lerp(ankle.rotation.x,foot-.23*tuck,s);
-    const shin=hip.rotation.x+knee.rotation.x;
-    const extension=.46*Math.cos(hip.rotation.x)+.33*Math.cos(shin)+.16*Math.cos(shin+ankle.rotation.x);
-    lowest=Math.max(lowest,extension);
-  }
-  if(swing){
-    // Let the support leg set the pelvis height while the other foot lifts.
-    const plant=clamp(lowest,.80,.95);
-    model.spin.position.y=lerp(model.spin.position.y,plant,clamp(speed*2,0,1));
+    const hip=i===0?model.hipL:model.hipR,knee=model.knees[i],ankle=model.ankles[i];
+    if(useFeet){
+      const {z,lift}=strideFoot((step+i*.5)%1,weight,p.cycle,run);
+      // Remove the pelvis sway from the foot target so the supporting boot stays put.
+      bendToFoot(hip,knee,ankle,z*p.stepX-model.spin.position.x,
+        pelvis-.16-lift,z*p.stepZ-model.spin.position.z,lerp(s,1,weight));
+    }else{
+      hip.rotation.x=lerp(hip.rotation.x,lerp(i===0?p.legL:p.legR,i===0?-1.33:-1.25,tuck),s);
+      hip.rotation.z=lerp(hip.rotation.z,0,s);
+      knee.rotation.x=lerp(knee.rotation.x,(tuck*1.36+(p.knee||0))*(i===0?1:.88),s);
+      ankle.rotation.x=lerp(ankle.rotation.x,-.23*tuck,s);
+      ankle.rotation.z=lerp(ankle.rotation.z,0,s);
+    }
   }
   const props=model.cls==='archer'||model.cls==='jester';
   const rightBend=st==='heal'?-.14:walking?(props?-.11:-.09-.28*run):-.08;
   const leftBend=st==='block'?-.34:st==='heal'?-.62:walking?(props?-.07:-.13-.26*run):-.09;
   model.elbows[0].rotation.x=lerp(model.elbows[0].rotation.x,leftBend-.7*tuck,s);
   model.elbows[1].rotation.x=lerp(model.elbows[1].rotation.x,rightBend-.74*tuck,s);
+}
+const rollHead=new THREE.Vector3();
+function keepRollAboveFloor(model,tuck){
+  // Approximate the head and shoulders as a contact sphere during the tumble.
+  // The root stays at the gameplay position while the rig rolls over its shoulder.
+  rollHead.set(0,1.21,.04).applyEuler(model.upper.rotation).multiply(model.spin.scale).applyEuler(model.spin.rotation);
+  const contact=.22-model.spin.position.y-rollHead.y;
+  model.spin.position.y+=Math.max(0,contact)*ease(tuck*2.5);
 }
 function applyPose(model,p,st,dt,px,pz,f,spinY){
   if(model.celestial){const c=model.celestial;c.t+=dt;
@@ -5681,6 +5741,13 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
     }
     if(c.halo){c.halo.rotation.y=c.t*.6;c.halo.position.y=c.haloY+Math.sin(c.t*2.2)*.025;}
     if(c.tail){c.tail.rotation.y=Math.sin(c.t*1.7)*.4;c.tail.rotation.x=Math.sin(c.t*1.1)*.08;}}
+  const walking=st==='idle'||st==='walk'||st==='block';
+  const sourceGait=p.gait||0;
+  if(model.skin!=='pixel')p=locomotionPose(model,p,walking,dt,px,pz,f);
+  if(p.stepWeight&&walking&&st!=='block'&&!model.ninjaRig&&!model.mageMotion&&!model.jesterRig){
+    const sway=(Math.sin(p.gait-.38)-Math.sin(sourceGait-.38))*(p.stepWeight||0);
+    p={...p,armR:p.armR-sway*.31,armL:p.armL+sway*.31,upperY:p.upperY+Math.sin(p.gait)*(p.stepWeight||0)*.14};
+  }
   if(model.ninjaRig&&(st==='idle'||st==='walk'))p=ninjaMovePose(p,st);
   if(model.jesterRig&&(st==='idle'||st==='walk')){
     const sway=p.legL*.055;
@@ -5701,7 +5768,8 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
     p={...p,jump:grid(p.jump||0)};
   }
   updateBow(model,p.draw||0,dt);
-  const s=model.skin==='pixel'?1:1-Math.exp(-22*dt);
+  const attack=st==='stab'||st==='simpleSwing'||st==='cleave'||st==='hurt';
+  const s=model.skin==='pixel'?1:1-Math.exp(-(attack?33:22)*dt);
   const floor=arenaHeight(px,pz);
   model.floor=dt>0?lerp(model.floor??floor,floor,1-Math.exp(-19*dt)):floor;
   let landing=0;
@@ -5712,10 +5780,10 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   model.armR.rotation.x=lerp(model.armR.rotation.x,p.armR,s);model.armR.rotation.z=lerp(model.armR.rotation.z,p.armRz,s);
   model.armL.rotation.x=lerp(model.armL.rotation.x,p.armL,s);model.armL.rotation.z=lerp(model.armL.rotation.z,p.armLz||0,s);
   model.upper.rotation.y=lerp(model.upper.rotation.y,p.upperY,s);model.upper.rotation.x=lerp(model.upper.rotation.x,p.lean,s);
-  const rolling=st==='roll',vaulting=st==='vault',walking=st==='idle'||st==='walk'||st==='block';
+  const rolling=st==='roll',vaulting=st==='vault';
   // Roll: tuck into a ball (knees to chest, head down, arms wrapped) and tumble around the hips.
   const rk=rolling?clamp(p.roll??Math.abs(p.spin)/TAU,0,1):0;
-  const tuck=rolling?ease(rk/.23)*ease((1-rk)/.24):0;
+  const tuck=rolling?ease((rk-.065)/.22)*ease((.93-rk)/.26):vaulting?Math.sin(Math.PI*clamp(p.roll||0,0,1))*.40:0;
   const legT=rolling?lerp(p.legL,-1.55,tuck):p.legL,legT2=rolling?lerp(p.legR,-1.4,tuck):p.legR;
   // Walk: torso counter-twist, hip sway and a small bob that dips at full stride.
   const stride=walking?clamp(p.move??Math.abs(p.legL)/.7,0,1.2):0;
@@ -5724,7 +5792,7 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
     model.hipL.rotation.x=lerp(model.hipL.rotation.x,legT,s);model.hipR.rotation.x=lerp(model.hipR.rotation.x,legT2,s);
   }
   if(rolling){
-    model.upper.rotation.x=lerp(model.upper.rotation.x,.95*tuck,1-Math.exp(-30*dt));
+    model.upper.rotation.x=lerp(model.upper.rotation.x,p.lean+.91*tuck,1-Math.exp(-30*dt));
     model.armR.rotation.x=lerp(model.armR.rotation.x,-1.9*tuck+p.armR*(1-tuck),1-Math.exp(-30*dt));
     model.armL.rotation.x=lerp(model.armL.rotation.x,-1.9*tuck+p.armL*(1-tuck),1-Math.exp(-30*dt));
   }else if(walking){
@@ -5732,11 +5800,12 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
   }
   const spin=rolling||vaulting?p.spin:st==='dead'?-1.45:0;
   model.spin.rotation.x=wrap(model.spin.rotation.x+wrap(spin-model.spin.rotation.x)*(rolling||vaulting?1-Math.exp(-67*dt):st==='dead'?s*.4:s));
-  model.spin.rotation.z=lerp(model.spin.rotation.z,walking?p.legL*.045+(p.bank||0):0,s);
+  model.spin.rotation.z=lerp(model.spin.rotation.z,walking?p.legL*.04+(p.bank||0):(p.bank||0),s);
   const sq=1-.15*tuck;model.spin.scale.set(1-.07*tuck,sq,1-.07*tuck);
-  model.spin.position.y=rolling?lerp(.95,.74,tuck):lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
+  model.spin.position.y=rolling?.95-.26*tuck-(p.knee||0)*.18:lerp(model.spin.position.y,st==='dead'?.25:.95-.075*Math.min(1,stride),st==='dead'?s:1-Math.exp(-28*dt));
   if(model.knees)updatePlayerJoints(model,landing?{...p,knee:(p.knee||0)+landing*.49}:p,st,s,tuck,walking&&landing<.15,p.move||0,p.gait||0);
   model.spin.position.y-=landing*.08;
+  if(rolling)keepRollAboveFloor(model,tuck);
   if(model.mageMotion)animateMageRig(model,p,st,dt,s);
   if(model.jesterRig)animateJesterRig(model,p,st,s);
   if(model.ninjaRig){
@@ -6690,13 +6759,12 @@ function animateVillager(v,dt){
   v.pace+=v.amp>.03?dt*9.4:0;
   const sw=Math.sin(v.pace),swing=sw*.6*v.amp*(sw>0?1:.82),arm=Math.sin(v.pace-.38)*.47*v.amp;
   const pose={...VILLAGE_WALK_POSE,move:v.amp,gait:v.pace,armR:-.4-arm,armL:-.32+arm,legL:swing,legR:-sw*.6*v.amp*(sw<0?1:.82),lean:.03+v.amp*.06};
-  if(v.model.ninjaRig){
-    const distance=v.ninjaX===undefined?0:Math.hypot(v.x-v.ninjaX,v.z-v.ninjaZ);
-    v.ninjaX=v.x;v.ninjaZ=v.z;
+  {
+    const distance=v.visualX===undefined?0:Math.hypot(v.x-v.visualX,v.z-v.visualZ);
+    v.visualX=v.x;v.visualZ=v.z;
     const speed=dt>0&&distance<1.5?Math.min(1.35,distance/(dt*5.2)):0;
-    v.ninjaSpeed=lerp(v.ninjaSpeed||0,speed,1-Math.exp(-19*dt));
-    v.ninjaGait=(v.ninjaGait||0)+(distance<1.5?distance*2.1:0);
-    pose.move=v.ninjaSpeed;pose.gait=v.ninjaGait%TAU;
+    v.visualSpeed=lerp(v.visualSpeed||0,speed,1-Math.exp(-19*dt));
+    pose.move=v.visualSpeed;
   }
   applyPose(v.model,pose,v.moving?'walk':'idle',dt,v.x,v.z,v.facing);
 }
@@ -6924,7 +6992,7 @@ function renderSkinPreview(dt,now){
   }
   stage.time+=frame;
   const gait=stage.time*8.6,move=stage.moving?.78:0,swing=Math.sin(gait)*move;
-  const pose={...VILLAGE_WALK_POSE,move,gait,armR:-.51-swing*.35,armL:-.45+swing*.3,legL:swing*.52,legR:-swing*.52};
+  const pose={...VILLAGE_WALK_POSE,preview:true,move,gait,armR:-.51-swing*.35,armL:-.45+swing*.3,legL:swing*.52,legR:-swing*.52};
   const facing=.38+Math.sin(stage.time*.61)*.74;
   applyPose(stage.model,pose,stage.moving?'walk':'idle',frame,0,0,facing);
   stage.model.root.position.y-=stage.model.floor||0;
