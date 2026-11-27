@@ -1865,14 +1865,14 @@ function addCelestialGear(cls,theme,level,R){
       for(let i=0;i<8;i++){const a=i/8*TAU;const sp=new THREE.Mesh(new THREE.ConeGeometry(.02,.11,4),haloMat);sp.position.set(Math.cos(a)*.3,.11,Math.sin(a)*.3);halo.add(sp);}}
     const white=std(0xfbf8f0,{roughness:.7}),soft=std(0xe9e3d3,{roughness:.75}),tip=std(veteran?0xe2c26a:0xdcd4c0,{roughness:.6,metalness:veteran?.3:0});
     for(const side of [-1,1]){
-      const w=grp(side*.12,.86,-.27,upper);w.rotation.y=side*.42;w.scale.setScalar(span);
+      const w=grp(side*.16,.86,-.39,upper);w.rotation.y=side*.55;w.scale.setScalar(span);
       const feather=(len,wid,x,y,ang,mat)=>{const f=new THREE.Mesh(new THREE.SphereGeometry(.5,10,6),mat);f.scale.set(wid,len,.025);f.position.set(x,y,0);f.rotation.z=ang;w.add(f);return f;};
-      for(let i=0;i<8;i++){const a=side*(1.02+i*.155),len=.76-i*.056;
+      for(let i=0;i<8;i++){const a=side*(.84-i*.085),len=.76-i*.056;
         feather(len,.118,side*(.43+i*.062),.28-i*.09,a,i<3?tip:white);
-        feather(len*.64,.059,side*(.43+i*.062),.26-i*.09,a,soft).position.z=.016;
+        feather(len*.64,.059,side*(.43+i*.062),.26-i*.09,a,soft).position.z=-.016;
       }
-      for(let i=0;i<5;i++){feather(.36,.1,side*(.28+i*.06),.34-i*.08,side*(1.05+i*.22),soft);}
-      for(let i=0;i<4;i++){feather(.18,.09,side*(.14+i*.06),.42-i*.05,side*(.9+i*.2),white);}
+      for(let i=0;i<5;i++){feather(.36,.1,side*(.28+i*.06),.34-i*.08,side*(.79-i*.10),soft);}
+      for(let i=0;i<4;i++){feather(.18,.09,side*(.14+i*.06),.42-i*.05,side*(.65-i*.08),white);}
       const bone=new THREE.Mesh(new THREE.SphereGeometry(.5,10,8),soft);bone.scale.set(.75,.11,.06);bone.position.set(side*.33,.44,0);bone.rotation.z=side*.32;w.add(bone);
       out.wings.push(w);w.userData.base=w.rotation.y;w.userData.side=side;
     }
