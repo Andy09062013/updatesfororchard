@@ -12,6 +12,7 @@ type Room = {
   finished?: boolean;
   public: boolean;
   capacity: number;
+  kicked?: Set<string>;
   state: "lobby" | "playing";
   settings: { gm: string; boss: string; arena: string; diff: string };
   players: Map<string, Player>;
@@ -159,7 +160,7 @@ function handle(ws: any, m: any) {
     }
     case "list": {
       const list = [...rooms.values()]
-        .filter((x) => x.public && x.state === "lobby" && x.players.size < x.capacity)
+        .filter((x) => x.public && x.state === "lobby" && x.players.size < x.capacity && !x.kicked?.has(ws.data.id))
         .slice(0, 30)
         .map((x) => ({ code: x.code, hostName: x.players.get(x.host)?.name ?? "Unknown", count: x.players.size, capacity: x.capacity, boss: x.settings.boss, diff: x.settings.diff, gm: x.settings.gm }));
       send(ws, { t: "lobbies", list });
@@ -176,11 +177,21 @@ function handle(ws: any, m: any) {
       if (!room) return send(ws, { t: "error", msg: "No lobby was found with that code." });
       if (room.state !== "lobby") return send(ws, { t: "error", msg: "That expedition is already in progress." });
       if (ws.data.room === room.code) return send(ws, { t: "lobby", room: view(room) });
+      if (room.kicked?.has(ws.data.id)) return send(ws, { t: "error", msg: "The host removed you from that party." });
       if (room.players.size >= room.capacity) return send(ws, { t: "error", msg: "That party booth is full." });
       join(ws, room, m.name, m.cls, m.level, m.skin);
       break;
     }
     case "leave": leave(ws); break;
+    case "kick": {
+      if (!r || r.state !== "lobby" || r.host !== ws.data.id || typeof m.id !== "string" || m.id === r.host) return;
+      const target = r.players.get(m.id);
+      if (!target) return;
+      (r.kicked ??= new Set()).add(target.id);
+      leave(target.ws);
+      send(target.ws, { t: "kicked", code: r.code });
+      break;
+    }
     case "chat":
     case "villageChat": {
       const id = ws.data.id, now = Date.now();
