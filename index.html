@@ -1110,9 +1110,9 @@ const BOSSES={
   sylvara:{n:'Sylvara, the Frost Matriarch',arena:'frost',hp:2600,r:1.3,speed:4,height:5.2,reach:3.6,slamR:3,sweepR:6.2,novaR:6.5,dmg:.9,model:'witch',float:true,
     col:0x3ac8ff,dust:0xbfe8ff,fireCol:0x6ad8ff,pillar:0x9fe8ff,spikeCol:0x7ab8ff,shockCol:0x7ad8ff,rainFx:'ice',p2emis:0x0a3050,
     enrage:['THE MATRIARCH UNLEASHES THE BLIZZARD','Ice now falls without mercy'],d:'An ice sorceress. Frostbite deals damage over time and slows movement by 8%.',
-    moves:{near:[['nova',3],['blink',2.5],['volley',1]],mid:[['volley',3],['frost',2],['rain',1.5],['mirrorIce',2.5],['glacialSpokes',3]],far:[['volley',2],['rain',2],['frost',2],['blink',1],['mirrorIce',1.6]]},
-    p2:{near:[['comboC',2.5],['frost',1.5],['mirrorIce',2],['whiteout',3]],mid:[['rain',2],['frost',2],['comboG',1.5]],far:[['rain',2],['volley',2],['comboG',1.5]]},
-    combos:{comboC:['nova','blink'],comboG:['frost','volley']},p3:[['whiteout',5],['glacialSpokes',4],['comboG',2]],blinkFollow:'nova'},
+    moves:{near:[['iceLance',7],['nova',2],['blink',1.5]],mid:[['iceLance',8],['volley',1.5],['mirrorIce',1.2]],far:[['iceLance',8],['volley',1.5],['glacialSpokes',1]]},
+    p2:{near:[['iceLance',4],['whiteout',1.4]],mid:[['iceLance',4],['glacialSpokes',1.2]],far:[['iceLance',4],['mirrorIce',1.2]]},
+    p3:[['whiteout',2],['glacialSpokes',2]],blinkFollow:'iceLance'},
   ignar:{n:'Ignar, the Molten Colossus',arena:'forge',hp:4200,r:2.8,speed:2.7,height:8,reach:5.4,slamR:4.3,sweepR:9,novaR:6.5,dmg:1.15,model:'colossus',both:true,
     col:0xff5a10,dust:0x3a2a20,fireCol:0xff6a10,pillar:0xff7a20,spikeCol:0xff8a20,shockCol:0xff5a10,rainFx:'meteor',p2emis:0x5a1404,
     enrage:['THE COLOSSUS ERUPTS','Molten fury pours from the earth'],d:'A giant of stone and magma. Its fissures and fire leave victims Scorched.',
@@ -3787,21 +3787,26 @@ function fitDangerToTerrain(geometry,s){
 }
 function addDanger(s,o){
   const g=new THREE.Group();g.position.set(s.x,.045+(dIdx++%12)*.003,s.z);if(s.a!==undefined)g.rotation.y=s.a;
-  const geo=shapeGeo(s),col=o.color||0xff2a1a;
+  const frostWarning=G?.bossId==='sylvara'&&o.owner==='melee';
+  const geo=shapeGeo(s),col=frostWarning?0xb73813:(o.color||0xff2a1a);
   const surface=(color,opacity)=>new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2});
   const outline=new THREE.Mesh(geo,surface(col,.16)),fill=new THREE.Mesh(geo,surface(col,.42));
   const edgeColor=new THREE.Color(col).lerp(new THREE.Color(0xfff2de),.56);
   const edge=new THREE.LineLoop(dangerBorder(s),new THREE.LineBasicMaterial({color:edgeColor,transparent:true,opacity:.58,depthWrite:false}));
+  if(frostWarning){
+    const border=new THREE.Mesh(shapeGeo(s.type==='rect'?{...s,w:s.w+.30,len:s.len+.15}:{...s,r:s.r+.15}),surface(0x301315,.82));
+    border.position.y=-.009;g.add(border);
+  }
   if(curTheme?.storm){fitDangerToTerrain(geo,s);fitDangerToTerrain(edge.geometry,s);}
   fill.position.y=.004;edge.position.y=.012;edge.renderOrder=4;g.add(outline,fill,edge);scene.add(g);
-  const d={s,o,g,outline,fill,edge,t:0,det:false,ft:0,delay:o.delay,owner:o.owner};
+  const d={s,o,g,outline,fill,edge,frostWarning,t:0,det:false,ft:0,delay:o.delay,owner:o.owner};
   if(o.fall)fallFx(s.x,s.z,o.delay,o.fall);
   dangers.push(d);return d;
 }
 function disposeDanger(d){
   scene.remove(d.g);
   for(const child of d.g.children)child.material.dispose();
-  d.outline.geometry.dispose();d.edge.geometry.dispose();
+  for(const geometry of new Set(d.g.children.map(child=>child.geometry)))geometry.dispose();
 }
 function inside(s,px,pz,pad){
   pad=pad||0;const dx=px-s.x,dz=pz-s.z;
@@ -3839,6 +3844,11 @@ function updateDangers(dt){
       }
       else if(d.s.type==='rect')d.fill.scale.set(1,1,k);else d.fill.scale.set(k,1,k);
       d.outline.material.opacity=.11+.15*k;d.edge.material.opacity=.58+.37*k;
+      if(d.frostWarning){
+        d.outline.material.opacity=.34;
+        d.fill.material.opacity=.46+.34*k;
+        d.edge.material.color.setHex(k>.79?0xffdf87:0xff874c);
+      }
       if(d.owner==='storm'&&!d.warned&&(d.delay-d.t)/dangerRate(d)<.34){
         d.warned=true;
         if(inside(d.s,P.x,P.z,.35)&&gameTime>=(P.stormCueAt||0)){
@@ -5654,6 +5664,22 @@ const ATK={
     }
     p.armR=a.t<W?-2.85:-.77;p.armL=-1.35;p.lean=a.t<W?-.2:.5;
     return a.t>=W+1.15;},
+  iceLance(dt,a){
+    a.t+=dt;
+    const p=B.pose,wind=ease(a.t/.60),release=ease((a.t-.98)/.22),recover=ease((a.t-1.2)/.57);
+    p.armR=-.35-2.10*wind+.94*release+1.16*recover;
+    p.armL=-.2-.75*wind+.75*recover;
+    p.upperY=.49*wind-.82*release+.33*recover;
+    p.lean=-.18*wind+.45*release-.27*recover;
+    if(a.t<.28)trackTurn(dt,5);
+    if(a.t>=.28&&!a.go){
+      a.go=true;
+      const angle=Math.atan2(T.x-B.x,T.z-B.z);
+      hostDanger({type:'rect',x:B.x,z:B.z,a:angle,w:1.45,len:ARENA*2},
+        {delay:.82/B.speedMul,dmg:D(29),srcX:B.x,srcZ:B.z,owner:'melee',status:'frostbite',fx:'volley'});
+    }
+    return a.t>=1.83;
+  },
   glacialSpokes(dt,a){
     a.t+=dt;
     const p=B.pose,wind=ease(a.t/.58),release=ease((a.t-.74)/.37),recover=ease((a.t-1.3)/.87);
@@ -5663,7 +5689,7 @@ const ATK={
     p.lean=-.21*wind+.43*release-.22*recover;
     if(a.t>=.36&&!a.go){
       a.go=true;
-      const count=B.phase===3?7:5,base=Math.atan2(T.x-B.x,T.z-B.z);
+      const count=B.phase===3?5:3,base=Math.atan2(T.x-B.x,T.z-B.z);
       for(let i=0;i<count;i++){
         const angle=base+i*TAU/count;
         hostDanger({type:'rect',x:B.x+Math.sin(angle)*2,z:B.z+Math.cos(angle)*2,a:angle,w:2.35,len:25},
@@ -5683,12 +5709,12 @@ const ATK={
       a.go=true;
       const [x,z]=clampArena(T.x,T.z,7);
       const offset=Math.atan2(T.x-B.x,T.z-B.z);
-      for(let i=0;i<8;i++){
-        const angle=offset+i*TAU/8;
-        hostDanger({type:'circle',x:x+Math.sin(angle)*5.8,z:z+Math.cos(angle)*5.8,r:2.55},
+      for(let i=0;i<4;i++){
+        const angle=offset+i*TAU/4;
+        hostDanger({type:'circle',x:x+Math.sin(angle)*5.8,z:z+Math.cos(angle)*5.8,r:2.15},
           {delay:1.03/B.speedMul,dmg:D(26),srcX:x,srcZ:z,owner:'melee',blockable:false,status:'frostbite',color:0x90dfff,fx:'ice'});
       }
-      hostDanger({type:'circle',x,z,r:3.65},{delay:1.83/B.speedMul,dmg:D(36),srcX:x,srcZ:z,owner:'melee',blockable:false,status:'frostbite',color:0xc9f4ff,fx:'ice'});
+      hostDanger({type:'circle',x,z,r:3.0},{delay:1.83/B.speedMul,dmg:D(36),srcX:x,srcZ:z,owner:'melee',blockable:false,status:'frostbite',color:0xc9f4ff,fx:'ice'});
     }
     return a.t>=2.68;
   },
