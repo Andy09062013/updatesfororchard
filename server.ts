@@ -18,7 +18,7 @@ type Room = {
 };
 
 const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin", "jester", "soul"];
-const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm" };
+const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm", sylvara: "frost", morvane: "void" };
 const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
 const MAX = 10;
 const DEFAULT_CAPACITY = 5;
@@ -247,6 +247,16 @@ function handle(ws: any, m: any) {
       pushLobby(r);
       break;
     }
+    case "runContribution": {
+      const p = r?.players.get(ws.data.id);
+      if (!r || r.state !== "playing" || !p || ws.data.reportedRun === r) return;
+      const { damage, healing } = m;
+      if (typeof damage !== "number" || typeof healing !== "number" || !Number.isFinite(damage) ||
+        !Number.isFinite(healing) || damage < 0 || healing < 0) return;
+      ws.data.reportedRun = r;
+      bcast(r, { t: "runContribution", id: p.id, damage: Math.min(1e7, damage), healing: Math.min(1e7, healing) });
+      break;
+    }
     case "start": {
       if (!r || r.host !== ws.data.id || r.state !== "lobby") return;
       const notReady = [...r.players.values()].some((p) => p.id !== r.host && !p.ready);
@@ -254,7 +264,7 @@ function handle(ws: any, m: any) {
       r.state = "playing";
       r.combatHost = r.host;
       r.finished = false;
-      for (const p of r.players.values()) { p.afk = false; p.lastFrame = Date.now(); p.dead = false; }
+      for (const p of r.players.values()) { p.afk = false; p.lastFrame = Date.now(); p.dead = false; p.ws.data.reportedRun = null; }
       pushLobby(r);
       bcast(r, { t: "start", settings: r.settings, host: r.host, players: [...r.players.values()].map((p) => ({ id: p.id, name: p.name, cls: p.cls, level: p.level, skin: p.skin, theme: p.skin === "celestial" ? (Math.random() < 0.5 ? "angel" : "devil") : undefined })) });
       break;
