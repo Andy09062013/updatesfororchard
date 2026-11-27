@@ -181,15 +181,22 @@ function handle(ws: any, m: any) {
       break;
     }
     case "leave": leave(ws); break;
-    case "chat": {
-      if (!r) return;
-      const p = r.players.get(ws.data.id);
-      const text = String(m.text ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 140);
-      if (!p || !text) return;
-      const now = Date.now();
-      if (ws.data.lastChat && now - ws.data.lastChat < 400) return;
+    case "chat":
+    case "villageChat": {
+      const id = ws.data.id, now = Date.now();
+      const player = m.t === "villageChat" ? (!r ? village.get(id) : undefined) : r?.players.get(id);
+      if (!player || ("seen" in player && now - player.seen > 6500) || typeof m.text !== "string") return;
+      const text = m.text.replace(/[\u0000-\u001f]/g, "").trim().slice(0, 140);
+      if (!text || now - (ws.data.lastChat ?? -Infinity) < 400) return;
       ws.data.lastChat = now;
-      bcast(r, { t: "chat", from: p.id, name: p.name, text });
+      const message = { t: m.t, from: id, name: player.name, text };
+      if (r) bcast(r, message);
+      else for (const [peerId, peer] of village) {
+        if (now - peer.seen <= 6500) {
+          const online = onlinePlayers.get(peerId);
+          if (online && !online.ws.data.room) send(online.ws, message);
+        }
+      }
       break;
     }
     case "voice": {
@@ -200,16 +207,16 @@ function handle(ws: any, m: any) {
       pushLobby(r);
       break;
     }
-    case "rtc": {
-      if (!r || !r.players.has(ws.data.id)) return;
-      const target = r.players.get(String(m.to ?? ""));
-      if (!target || target.id === ws.data.id || !m.data || typeof m.data !== "object") return;
+    case "voiceAudio": {
+      const p = r?.players.get(ws.data.id);
+      const audio = m.audio;
+      if (!r || !p?.voice || typeof audio !== "string" || audio.length < 4 || audio.length > 2000 ||
+        audio.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(audio)) return;
       const now = Date.now();
-      ws.data.rtcWindow = ws.data.rtcWindow && now - ws.data.rtcWindow.start < 1000 ? ws.data.rtcWindow : { start: now, n: 0 };
-      if (++ws.data.rtcWindow.n > 120) return;
-      const out = JSON.stringify({ t: "rtc", from: ws.data.id, data: m.data });
-      if (out.length > 20000) return;
-      try { target.ws.send(out); } catch {}
+      let window = ws.data.voiceWindow;
+      if (!window || now - window.start >= 1000) window = ws.data.voiceWindow = { start: now, frames: 0, bytes: 0 };
+      if (++window.frames > 55 || (window.bytes += audio.length) > 32000) return;
+      bcast(r, { t: "voiceAudio", from: p.id, audio }, p.id);
       break;
     }
     case "set": {
