@@ -20,7 +20,8 @@ type Room = {
 const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin", "jester", "soul"];
 const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm" };
 const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
-const MAX = 5;
+const MAX = 10;
+const DEFAULT_CAPACITY = 5;
 const skinType = (value: unknown): string => value === "pixel" || value === "celestial" || value === "angel" || value === "devil" ? value : "classic";
 function roomCapacity(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isInteger(value) && value >= 2 && value <= MAX ? value : fallback;
@@ -165,7 +166,7 @@ function handle(ws: any, m: any) {
       break;
     }
     case "create": {
-      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, capacity: roomCapacity(m.capacity, MAX), state: "lobby", settings: { gm: "boss", boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
+      const room: Room = { code: makeCode(), host: ws.data.id, public: !!m.public, capacity: roomCapacity(m.capacity, DEFAULT_CAPACITY), state: "lobby", settings: { gm: "boss", boss: "varkhul", arena: "keep", diff: "normal" }, players: new Map() };
       rooms.set(room.code, room);
       join(ws, room, m.name, m.cls, m.level, m.skin);
       break;
