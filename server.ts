@@ -19,7 +19,7 @@ type Room = {
 };
 
 const CLASSES = ["sword", "mage", "archer", "rogue", "berserker", "warlock", "sentinel", "paladin", "jester", "soul"];
-const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm", sylvara: "frost", morvane: "void" };
+const BOSSES: Record<string, string> = { varkhul: "keep", thoruun: "storm", sylvara: "frost", morvane: "void", azrael: "void" };
 const DIFFS = ["easy", "normal", "hard", "nightmare", "ultra"];
 const MAX = 10;
 const DEFAULT_CAPACITY = 5;
