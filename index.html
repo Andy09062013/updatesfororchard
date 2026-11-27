@@ -3580,6 +3580,12 @@ function voiceTick(now){
   if(onlineOpen)for(const el of $('onlineRows').querySelectorAll('[data-voice-id]'))updateMicBadge(el,el.dataset.voiceId);
 }
 function onNet(m){
+  if(m.t==='kicked'){
+    if(NET.room?.code!==m.code)return;
+    toMenu();
+    $('hubStatus').textContent='The host removed you from the party.';
+    return;
+  }
   if(m.t==='runContribution'){
     if(G?.mode==='mp'&&['play','end'].includes(state)&&G.cfg.players.some(p=>p.id===m.id)){
       G.contributions.set(m.id,{damage:m.damage,healing:m.healing});
@@ -7082,13 +7088,17 @@ function showLobby(){showTouch(false);state='lobby';try{document.exitPointerLock
 function renderLobby(){
   const r=NET.room;if(!r)return;const me=r.players.find(p=>p.id===NET.id),capacity=r.capacity||5;
   $('lobbyCode').textContent=r.code;$('pCount').textContent=r.players.length;$('pCap').textContent=capacity;
+  const host=r.host===NET.id;
   let h='';for(let i=0;i<capacity;i++){const p=r.players[i];
-    if(p)h+=`<div class="slot"><span class="nm">${esc(p.name)}${p.id===NET.id?' <span style="color:#8a806a">(You)</span>':''}</span><span class="cls">${CLASSES[p.cls].name} · Mastery ${safeLevel(p.level)}${availableSkin(p.skin)==='pixel'?' · 8-bit':''}</span><span class="${micState(p.id)?'':'hidden'}" data-voice-id="${esc(p.id)}">${micState(p.id)?micBadge(micState(p.id)):''}</span>${p.id===r.host?'<span class="crown">HOST</span>':`<span class="rdy ${p.ready?'on':''}">${p.ready?'Ready':'Not Ready'}</span>`}</div>`;
+    if(p)h+=`<div class="slot"><span class="nm">${esc(p.name)}${p.id===NET.id?' <span style="color:#8a806a">(You)</span>':''}</span><span class="cls">${CLASSES[p.cls].name} · Mastery ${safeLevel(p.level)}${availableSkin(p.skin)==='pixel'?' · 8-bit':''}</span><span class="${micState(p.id)?'':'hidden'}" data-voice-id="${esc(p.id)}">${micState(p.id)?micBadge(micState(p.id)):''}</span>${p.id===r.host?'<span class="crown">HOST</span>':`<span class="rdy ${p.ready?'on':''}">${p.ready?'Ready':'Not Ready'}</span>`}${host&&p.id!==NET.id?`<button class="sm kickBtn" type="button" data-kick="${esc(p.id)}" aria-label="Kick ${esc(p.name)}">Kick</button>`:''}</div>`;
     else h+='<div class="slot emptySlot"><span class="nm">Open slot</span></div>';}
   $('slots').innerHTML=h;
+  for(const button of $('slots').querySelectorAll('[data-kick]'))button.onclick=()=>{
+    const guest=r.players.find(player=>player.id===button.dataset.kick);
+    if(guest&&window.confirm('Kick '+guest.name+' from this party?'))nsend({t:'kick',id:guest.id});
+  };
   $('lobbyClasses').innerHTML=Object.entries(CLASSES).map(([k,c])=>`<button class="sm ${me&&me.cls===k?'on':''}" data-c="${k}">${c.name}</button>`).join('');
   $('lobbyClasses').querySelectorAll('button').forEach(b=>b.onclick=()=>{myClass=b.dataset.c;try{localStorage.setItem('hc_class',myClass);}catch(e){}nsend({t:'set',cls:myClass,level:charLevel(myClass),skin:skinFor()});});
-  const host=r.host===NET.id;
   $('lCapacity').value=String(capacity);$('lCapacity').disabled=!host;
   for(const option of $('lCapacity').querySelectorAll('option'))option.disabled=Number(option.value)<r.players.length;
   const camp=r.settings.gm==='campaign';['lMode','lDiff'].forEach(id=>$(id).disabled=!host);$('lBoss').disabled=!host||camp;
