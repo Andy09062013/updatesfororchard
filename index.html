@@ -330,6 +330,9 @@ body.village-active>canvas:active{cursor:grabbing}
   <div class="panel wide">
     <div class="field"><label for="skinClass">Preview character</label><select id="skinClass"></select></div>
     <div class="skin-preview">
+      <label class="field" for="previewRank">Preview mastery
+        <select id="previewRank"><option value="">Current rank</option><option value="4">Rank IV</option><option value="5">Rank V</option></select>
+      </label>
       <canvas id="skinPreview" aria-label="Rotating character preview"></canvas>
       <div class="skin-preview-controls" aria-label="Preview outfit">
         <button class="sm" type="button" data-preview-skin="classic">Classic</button>
@@ -552,7 +555,15 @@ const CLASSES={
 const SKELETON={name:'Skeleton',hp:10,speed:6.9,skills:[{k:'LMB',n:'Rusted Swing'}],ctrl:[['light','Sword swing deals 30 damage']]};
 const classData=id=>id==='skeleton'?SKELETON:CLASSES[id];
 const ACTION_KEYS={LMB:'light',RMB:'heavy',Shift:'block',Space:'roll',Q:'q',E:'e',F:'f'};
-const MASTERY_THRESHOLDS=[0,60,195];
+const MASTERY_THRESHOLDS=[0,60,195,360,600];
+const MASTERY_REGALIA={
+  sword:['Emberforged',0x622d24,0xff983f,'apron'],archer:['Stormstring',0x264b4c,0x8affdc,'ranger'],
+  mage:['Winterstar',0x354e84,0xc3f4ff,'mantle'],jester:['Grand Masquerade',0x882b5b,0xffcd62,'ruff'],
+  rogue:['Moonshadow',0x27314e,0xb7a1ff,'ranger'],soul:['Verdant Covenant',0x185940,0x81ffc3,'mantle'],
+  warlock:['Eclipse',0x402251,0xda95ff,'mantle'],berserker:['Bloodiron',0x683534,0xff885f,'hide'],
+  paladin:['Dawnward',0x48617f,0xffdc80,'plate'],sentinel:['Sunstone',0x236568,0xa3fff1,'plate']
+};
+const combatTier=rank=>Math.min(3,rank);
 const FORGE_BLADES=[
   {name:'Wood',damage:15,time:.54,threshold:0,color:0xa56536},
   {name:'Iron',damage:25,time:.50,threshold:240,color:0xb7c4d0},
@@ -702,7 +713,7 @@ function readProfile(){
 let profile=readProfile()||{mastery:{}};
 function charLevel(id){
   const points=profile.mastery[id]||0;
-  return points>=195?3:points>=60?2:1;
+  return MASTERY_THRESHOLDS.reduce((rank,threshold,i)=>points>=threshold?i+1:rank,1);
 }
 function saveProfile(){try{localStorage.setItem(profileKey,JSON.stringify(profile));}catch(e){}}
 function loadout(cls,level){
@@ -718,12 +729,7 @@ function loadout(cls,level){
 }
 const currentLoadout=()=>state==='play'&&P?P.kit:loadout(myClass,charLevel(myClass));
 function renderUpgrade(){
-  const level=charLevel(myClass),points=profile.mastery[myClass]||0,threshold=MASTERY_THRESHOLDS[level];
-  renderMasteryTrack(level,points);return;
-  $('coinBalance').textContent=threshold?`${points} / ${threshold} mastery points`:`${points} mastery points · Rank 3`;
-  const entry=UPGRADES[myClass][Math.min(level-1,1)];
-  $('upgradeInfo').textContent=threshold?`Rank ${level+1} · ${entry[1]} · ${entry[2]}`:`Unlocked · ${entry[1]}`;
-  $('upgradeLook').textContent=threshold?`Gear · ${UPGRADE_GEAR[myClass][level-1]}`:'';
+  renderMasteryTrack(charLevel(myClass),profile.mastery[myClass]||0);
 }
 function renderMasteryTrack(level,points){
   const ranks=UPGRADES[myClass]||[],gear=UPGRADE_GEAR[myClass]||[];
@@ -734,16 +740,21 @@ function renderMasteryTrack(level,points){
     return `<div class="mr ${state}"><div class="mrh"><span class="mrn">Rank ${rank}</span><span class="mrs">${state==='done'?'Unlocked':need+' points'}</span></div><b>${esc(title)}</b><p>${esc(body)}</p>${look?`<p class="mrg">Gear: ${esc(look)}</p>`:''}</div>`;};
   $('upgradePanel').innerHTML=`<div class="mh"><b>${esc(CLASSES[myClass].name)} Mastery ${level}</b><span>${next?`${points} / ${next} points to Rank ${level+1}`:`${points} points · Max rank`}</span></div>
     <div class="mbar"><i style="width:${pct}%"></i></div>
-    <div class="mranks">${step(1,'Base kit','Every move as listed below.','')}${ranks.map((r,i)=>step(i+2,r[1]+' ('+r[0]+')',r[3]||r[2],gear[i])).join('')}</div>
+    <div class="mranks">${step(1,'Base kit','Every move as listed below.','')}${ranks.map((r,i)=>step(i+2,r[1]+' ('+r[0]+')',r[3]||r[2],gear[i])).join('')}
+    ${step(4,'Veteran Regalia','Reinforced bracers and greaves in your class colors.','')}
+    ${step(5,MASTERY_REGALIA[myClass][0],'Signature mantle, sculpted trim and an animated crest.','')}</div>
     <div class="mhow">Earn mastery by playing this class: 3 points every 20 seconds in battle, 4 to 10 per minion, 50 per boss defeated.</div>`;
 }
 function gainMastery(amount){
   if(!G||P.afk)return;
   profile=readProfile()||profile;
   const cls=G.original.cls;
+  const previous=charLevel(cls);
   profile.mastery[cls]=(profile.mastery[cls]||0)+amount;
   G.earned+=amount;saveProfile();
   $('runCoins').textContent=`+${G.earned} mastery this run`;
+  const rank=charLevel(cls);
+  if(rank>previous&&rank>=4)toast(rank===5?'Mastery V unlocked · '+MASTERY_REGALIA[cls][0]:'Mastery IV unlocked · Veteran Regalia',4);
 }
 const MINION_MASTERY={grunt:4,caster:6,brute:10};
 function rewardKill(id,amount){
@@ -835,7 +846,7 @@ function useSoulActions(){
   }
   if(consume('q')&&ready('renewSelf')){
     useSkill('renewSelf');startGesture('renewSelf');
-    const healed=restoreHealth([38,44,50][P.level-1]);
+    const healed=restoreHealth([38,44,50][combatTier(P.level)-1]);
     ringFx(P.x,P.z,0x8efac4,2.8,.44);SFX.heal();
     if(healed>0)floatText('+'+Math.round(healed),P.x,2.7,P.z,'heal');
     return true;
@@ -1596,7 +1607,7 @@ const PIXEL_COLORS={
 function pixelGear(cls,level,m){
   const {upper,armL,armR,hipL,hipR}=m,[body,detail]=PIXEL_COLORS[cls];
   const shadow=std(0x303045),main=std(body,{roughness:.65}),trim=new THREE.MeshBasicMaterial({color:detail});
-  const steel=std(level===3?0xf3ce83:0xb4ccd6,{metalness:.22,roughness:.58}),skin=std(0xe6ae90);
+  const steel=std(level>=3?0xf3ce83:0xb4ccd6,{metalness:.22,roughness:.58}),skin=std(0xe6ae90);
   for(const leg of [hipL,hipR]){
     box(.24,.63,.24,cls==='skeleton'?main:shadow,0,-.32,0,leg);
     box(.29,.23,.37,main,0,-.82,.05,leg);
@@ -1613,7 +1624,7 @@ function pixelGear(cls,level,m){
     box(.25,.17,.25,shadow,0,-.64,0,arm);
     if(level>=2)box(.31,.16,.33,steel,0,.06,0,arm);
   }
-  if(level===3){
+  if(level>=3){
     box(.58,.1,.45,trim,0,1.38,0,upper);
     for(const x of [-.21,0,.21])box(.087,.12,.21,steel,x,1.47,0,upper);
   }
@@ -1630,7 +1641,7 @@ function pixelGear(cls,level,m){
     box(.046,.09,.29,trim,-.25,0,0,shield);
   }
   if(cls==='jester'){
-    const accent=std(level===3?0x22b7a0:0x5134a3);
+    const accent=std(level>=3?0x22b7a0:0x5134a3);
     box(.28,.66,.043,accent,.17,.47,.231,upper);
     box(.58,.12,.51,main,0,1.38,0,upper);
     for(const side of [-1,1]){
@@ -1645,7 +1656,7 @@ function pixelGear(cls,level,m){
   }
   if(cls==='archer'){
     const weapon=grp(0,-.72,0,armL);
-    if(level===3){
+    if(level>=3){
       box(.25,.18,.9,shadow,0,.04,.09,weapon);
       box(1.03,.13,.19,steel,0,.06,.27,weapon);
       box(.11,.11,.54,trim,0,.16,.21,weapon);
@@ -1662,8 +1673,8 @@ function pixelGear(cls,level,m){
     return;
   }
   if(cls==='warlock'){
-    for(const arm of [armL,armR]){const cube=box(level===3?.3:.23,.23,.22,trim,0,-.71,.13,arm);cube.rotation.z=Math.PI/4;}
-    for(const s of [-1,1])box(.11,level===3?.38:.25,.16,steel,s*.22,1.43,-.02,upper).rotation.z=-s*.26;
+    for(const arm of [armL,armR]){const cube=box(level>=3?.3:.23,.23,.22,trim,0,-.71,.13,arm);cube.rotation.z=Math.PI/4;}
+    for(const s of [-1,1])box(.11,level>=3?.38:.25,.16,steel,s*.22,1.43,-.02,upper).rotation.z=-s*.26;
     return;
   }
   if(cls==='sword'||cls==='soul')return;
@@ -1674,10 +1685,10 @@ function pixelGear(cls,level,m){
     if(staff){
       box(.21,cls==='sentinel'?.42:.24,.19,trim,0,-1.41,0,tool);
       if(level>=2)box(.35,.1,.22,steel,0,-1.28,0,tool);
-      if(level===3)for(const s of [-1,1])box(.09,.25,.15,trim,s*.2,-1.43,0,tool);
+      if(level>=3)for(const s of [-1,1])box(.09,.25,.15,trim,s*.2,-1.43,0,tool);
     }else if(cls==='paladin'||cls==='berserker'){
       box(cls==='berserker'?.64:.31,.3,.18,steel,0,-.55,0,tool);
-      if(level===3)box(.72,.15,.19,trim,0,-.54,.03,tool);
+      if(level>=3)box(.72,.15,.19,trim,0,-.54,.03,tool);
     }else{
       box(.31,.074,.12,main,0,-.25,0,tool);
       box(cls==='rogue'?.11:.17,cls==='rogue'?.43:.68,.094,cls==='rogue'&&level>=2?trim:steel,0,-.54,0,tool);
@@ -1772,7 +1783,7 @@ function themeMaterials(root,theme){
 }
 // Halo + feathered wings, or horns + bat wings + spaded tail. Works on every model.
 function addCelestialGear(cls,theme,level,R){
-  const {upper}=R,veteran=level>=2,royal=level===3,out={theme,t:Math.random()*9,wings:[],halo:null,tail:null};
+  const {upper}=R,veteran=level>=2,royal=level>=3,out={theme,t:Math.random()*9,wings:[],halo:null,tail:null};
   const top={mage:2.14,jester:1.92,archer:1.56,rogue:1.52,paladin:1.72,sentinel:1.62,berserker:1.52,soul:1.5,warlock:1.58}[cls]??1.5;
   const hornY={mage:1.5,jester:1.44,archer:1.36,rogue:1.36,paladin:1.36,sentinel:1.36,berserker:1.36,warlock:1.36}[cls]??1.34;
   const hornX={mage:.27,jester:.2,paladin:.21,berserker:.22}[cls]??.18;
@@ -1829,7 +1840,7 @@ function addCelestialGear(cls,theme,level,R){
 }
 // Detailed angel / devil bodies for classes that only had block models.
 function buildCelestialBody(cls,theme,level,R){
-  const {root,inner,upper,armL,armR,hipL,hipR}=R,veteran=level>=2,royal=level===3,classic=theme==='classic',P=classic?CLASSIC_PAL[cls]:CELESTIAL_PAL[theme],angel=theme==='angel';
+  const {root,inner,upper,armL,armR,hipL,hipR}=R,veteran=level>=2,royal=level>=3,classic=theme==='classic',P=classic?CLASSIC_PAL[cls]:CELESTIAL_PAL[theme],angel=theme==='angel';
   const plate=std(P.plate,{metalness:.55,roughness:.32}),gold=std(P.gold,{metalness:.6,roughness:.3}),cloth=std(P.cloth,{roughness:.85}),cloth2=std(P.cloth2,{roughness:.85});
   const leather=std(P.leather,{roughness:.75}),dark=std(P.dark,{roughness:.8}),skinM=std(P.skin,{roughness:.65}),hair=std(P.hair,{roughness:.6});
   const glowM=new THREE.MeshBasicMaterial({color:P.glow}),eyeM=P.eyeGlow?new THREE.MeshBasicMaterial({color:P.eye}):std(P.eye,{roughness:.3});
@@ -2006,7 +2017,8 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   const hipL=grp(-.2,.95,0,inner),hipR=grp(.2,.95,0,inner),upper=grp(0,.95,0,inner);
   const armR=grp(.52,.82,0,upper),armL=grp(-.52,.82,0,upper);
   let glow=null,bowRig=null,mageMotion=null,jesterRig=null,ninjaRig=null;
-  const veteran=level>=2,royal=level===3;
+  let rankWeapon=null;
+  const veteran=level>=2,royal=level>=3;
   if(skin==='pixel')pixelGear(cls,level,{upper,armL,armR,hipL,hipR});
   else if(CELESTIAL_BODY.includes(cls)){glow=buildCelestialBody(cls,theme||'classic',level,{root,inner,upper,armL,armR,hipL,hipR});
     if(!theme&&cls==='warlock'){const hm=std(0x2a2026,{roughness:.5});for(const sx of [-1,1]){const hn=new THREE.Mesh(new THREE.ConeGeometry(.06,.42,6),hm);hn.position.set(sx*.2,1.48,-.02);hn.rotation.z=-sx*.5;upper.add(hn);}}
@@ -2423,7 +2435,8 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
       ball(.09,darkLeather,0,-.68,.01,1,1.1,1,arm,10);
     }
     const bow=grp(0,-.74,0,armL);
-    if(level===3){
+    if(level>=3){
+      rankWeapon=bow;
       // Crossbow: wooden stock with butt, steel prod, stirrup, rail, trigger, sight and a loaded bolt
       bow.rotation.x=Math.PI/2;
       box(.13,.15,1.05,wood,0,0,.15,bow);
@@ -2462,6 +2475,8 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   }
   if(skin!=='pixel')tailorHero(cls,theme,level,upper,armL,armR);
   const handProp=skin!=='pixel'?signatureGear(cls,theme,level,upper,armL,armR):null;
+  const masterwork=level>=4&&skin!=='pixel'&&MASTERY_REGALIA[cls]?
+    buildMasterwork(cls,theme,level,upper,[armL,armR],[hipL,hipR],rankWeapon):null;
   const forgeBlades=cls==='sword'?buildForgeBlades(armR):null;
   const knees=[mountLimbJoint(hipL,.46),mountLimbJoint(hipR,.46)];
   const elbows=[mountLimbJoint(armL,.34,.035),mountLimbJoint(armR,.34,.035)];
@@ -2469,7 +2484,7 @@ function makePlayer(cls,level=1,skin='classic',world=scene){
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   const drapes=collectDrapes(upper,ninjaRig?.scarf);
   world.add(root);
-  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,handProp,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
+  return {root,spin,upper,armR,armL,hipL,hipR,skin,forgeBlades,bladeTier:0,poseTime:0,lastPose:null,handProp,masterwork,glow,glowColor:glow?.color.clone(),bow:bowRig,mageMotion,jesterRig,ninjaRig,celestial,knees,elbows,ankles,cls,drapes,draw:0,pose:{armR:-.5,armRz:0,armL:-.3,armLz:0,upperY:0,lean:0,legL:0,legR:0,spin:0,draw:0}};
 }
 // Elliptical rings describe fitted garments and embossed metal. Bands share vertices along each fold.
 function fittedShell(parent,material,rows,{pleats=0,fold=0,tip=0,segments=40}={}){
@@ -2538,7 +2553,7 @@ function tailorHero(cls,theme,level,upper,armL,armR){
     }
   }
   if(level>=2)for(const arm of [armL,armR]){
-    fittedShell(arm,cloth,[[-.39,.136,.147,trim],[-.415,.14,.15,dye],[-.51,.148,.156,dye],[-.53,.146,.154,trim]],{tip:level===3?.09:.035,segments:20});
+    fittedShell(arm,cloth,[[-.39,.136,.147,trim],[-.415,.14,.15,dye],[-.51,.148,.156,dye],[-.53,.146,.154,trim]],{tip:level>=3?.09:.035,segments:20});
   }
 }
 function addClassDetails(cls,{upper,armR,armL},level){
@@ -2652,6 +2667,74 @@ function signatureGear(cls,theme,level,upper,armL,armR){
     }
   }
   return handProp;
+}
+function buildMasterwork(cls,theme,rank,upper,arms,hips,weapon){
+  const [,base,light,cut]=MASTERY_REGALIA[cls];
+  const dye=theme?CELESTIAL_PAL[theme].cloth:base;
+  const brass=theme?CELESTIAL_PAL[theme].gold:0xd2af70;
+  const color=theme==='angel'?0xffe3a0:theme==='devil'?0xff654e:light;
+  const satin=std(dye,{side:THREE.DoubleSide,roughness:.66});
+  const metal=rank===5?std(brass,{metalness:.53,roughness:.39}):null;
+  const glow=rank===5?std(color,{emissive:color,emissiveIntensity:.32,roughness:.35}):null;
+  const tunic=std(0xffffff,{vertexColors:true,side:THREE.DoubleSide,roughness:.66});
+  for(const [i,arm] of arms.entries()){
+    fittedShell(arm,tunic,[[-.31,.126,.132,brass],[-.38,.18,.17,dye],[-.49,.174,.167,dye],[-.565,.144,.148,brass]],{pleats:6,fold:.07,tip:.025,segments:24});
+    if(rank===5){
+      relief(arm,[[0,.108],[.065,.05],[.053,-.072],[0,-.145],[-.053,-.072],[-.065,.05]],metal,.017,0,-.43,.162);
+      gearGem(arm,glow,0,-.42,.195,.047,[.62,1.17,.35]);
+      if(cut==='plate'||cut==='hide')fittedShell(arm,tunic,[[.13,.13,.15,brass],[.04,.265,.258,dye],[-.065,.28,.27,brass],[-.16,.23,.245,dye]],{pleats:6,fold:.055,tip:.083,segments:24}).rotation.z=(i?1:-1)*.24;
+    }
+  }
+  for(const leg of hips){
+    relief(leg,[[-.105,.10],[.105,.10],[.122,-.055],[0,-.17],[-.122,-.055]],satin,.025,0,-.62,.157);
+    if(rank===5)gearGem(leg,glow,0,-.625,.188,.046,[.63,1,.43]);
+  }
+  if(rank<5)return null;
+  const length={apron:.74,ranger:.90,mantle:1.29,ruff:.84,hide:1.04,plate:1.18}[cut];
+  const cape=bossCape(cut==='ruff'?.86:.73,length,satin,upper,cut==='apron'?.39:.62,-.37);
+  cape.position.x=cls==='rogue'?.19:0;
+  const crest=grp(0,0,-.125,cape);
+  crest.rotation.y=Math.PI;
+  const shape=cls==='rogue'?[[-.13,-.09],[-.04,.02],[0,.14],[.04,.02],[.13,-.09],[0,-.049]]:
+    cls==='jester'?[[-.14,.06],[-.07,.13],[0,.05],[.07,.13],[.14,.06],[.075,-.11],[-.075,-.11]]:
+    [[-.132,.03],[-.096,.12],[0,.16],[.096,.12],[.132,.03],[.08,-.089],[0,-.16],[-.08,-.089]];
+  relief(crest,shape,metal,.025,0,0,0);
+  gearGem(crest,glow,0,-.003,.043,.079,[.67,1,.4]);
+  if(weapon)for(const side of [-1,1]){
+    relief(weapon,[[-.076,-.025],[.063,-.032],[.136,.058],[.034,.042],[-.076,.048]],metal,.023,side*.30,.064,.525).scale.x=side;
+    gearGem(weapon,glow,side*.46,.045,.52,.062,[1,.63,.55]);
+  }
+  if(cls==='paladin'){
+    const shield=arms[0].children.find(o=>o.userData.guardShield);
+    if(shield){
+      const face=grp(-.249,0,0,shield);face.rotation.y=-Math.PI/2;
+      const sun=new THREE.Mesh(new THREE.TorusGeometry(.227,.019,6,28),metal);face.add(sun);
+      for(let i=0;i<8;i++){
+        const a=i*TAU/8,point=gearGem(face,glow,Math.sin(a)*.292,Math.cos(a)*.292,0,.053,[.48,1,.35]);
+        point.rotation.z=-a;
+      }
+    }
+  }
+  if(cls==='sentinel'||cls==='rogue'||cls==='berserker'){
+    const width=cls==='berserker'?.32:.23;
+    for(const side of [-1,1]){
+      const fin=relief(upper,[[0,0],[side*width,.08],[side*width*.80,.28],[side*.056,.145]],metal,.032,side*.35,.70,-.24);
+      fin.rotation.y=side*.68;
+    }
+  }
+  if(cls==='jester'){
+    const sash=grp(.27,.16,-.28,upper);sash.rotation.y=Math.PI;
+    for(let i=0;i<3;i++){
+      const card=relief(sash,[[-.072,-.095],[.072,-.095],[.072,.095],[-.072,.095]],i%2?metal:satin,.018,.055*(i-1),-.047*i,.018*i);
+      card.rotation.z=.51-i*.44;
+      gearGem(card,glow,0,0,.022,.035,[.75,1,.35]);
+    }
+  }
+  if(cls==='mage'||cls==='soul'||cls==='warlock'){
+    const gem=gearGem(upper,glow,0,.90,-.328,.105,[.72,1.38,.51]);
+    gem.rotation.z=.38;
+  }
+  return glow;
 }
 function buildForgeBlades(arm){
   return FORGE_BLADES.map((tier,i)=>{
@@ -4122,7 +4205,7 @@ function renderJesterBomb(d,own){
   }});
 }
 function hitWithJesterBomb(kind,x,z,rain,r){
-  const bomb=JESTER_BOMBS[kind],damage=rain?bomb.rainDamage:bomb.damage[P.level-1];
+  const bomb=JESTER_BOMBS[kind],damage=rain?bomb.rainDamage:bomb.damage[combatTier(P.level)-1];
   if(P.afk)return;
   if(kind==='fire')emit('zone',{z:{kind:'firePatch',x,z,r,dur:rain?3:4,dmg:rain?3:4,owner:localPlayerId()}});
   if(kind!=='fire')toHost('jesterImpact',{kind,x,z,rain});
@@ -4141,7 +4224,7 @@ function resolveJesterImpact(d,from){
   const radius=jesterBombRadius(kind,d.rain===true);
   const insideBomb=enemy=>Math.hypot(enemy.x-d.x,enemy.z-d.z)<=radius+enemy.r;
   if(kind==='ice'){
-    const until=gameTime+(d.rain===true?3:source.level===3?5:4);
+    const until=gameTime+(d.rain===true?3:source.level>=3?5:4);
     for(const minion of mins.values())if(insideBomb(minion))minion.jesterChillUntil=Math.max(minion.jesterChillUntil||0,until);
     if(!B.dead&&insideBomb(B))B.jesterChillUntil=Math.max(B.jesterChillUntil||0,until);
   }else if(kind==='confusion'&&insideBomb(B)&&bossCanStagger()&&!(B.jesterConfusionReady>gameTime)){
@@ -4192,9 +4275,9 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='paladin'){
     if(consume('light')){startSimpleSwing();return true;}
     if(gameTime-buf.q<.32&&ready('aura')){
-      buf.q=-9;useSkill('aura');startGesture('aura');const level=P.level,r=level===1?7:10;
+      buf.q=-9;useSkill('aura');startGesture('aura');const level=combatTier(P.level),r=level===1?7:10;
       emit('guard',{x:P.x,z:P.z,r,dur:[5,7,8][level-1]});
-      if(level===3)emit('healburst',{x:P.x,z:P.z,r,amt:12});return true;
+      if(level>=3)emit('healburst',{x:P.x,z:P.z,r,amt:12});return true;
     }
     if(gameTime-buf.e<.32&&ready('taunt')){
       buf.e=-9;if(B.dead||Math.hypot(P.x-B.x,P.z-B.z)>26){toast('No boss in taunt range');return false;}
@@ -4212,13 +4295,13 @@ function tryActions(mx,mz,ml){
     if(gameTime-buf.q<.32&&ready('sanct')){buf.q=-9;useSkill('sanct');SFX.cast();const tg=allyTarget();
       startCast({dur:.8,at:.5,pose:'mageSanctuary',move:.2,face:false,healFx:true,fn:()=>{const t2=allyTarget(tg.id);emit('mageCastFx',{kind:'sanctuary',x:P.x,z:P.z});emit('zone',{z:{kind:'heal',x:t2.x,z:t2.z,r:6,dur:6,rate:10,credit:true,owner:NET.id||'me'}});}});return true;}
     if(gameTime-buf.e<.32&&ready('burst')){buf.e=-9;useSkill('burst');SFX.cast();startCast({dur:.65,at:.4,pose:'mageBurst',move:.3,face:false,healFx:true,fn:()=>{emit('mageCastFx',{kind:'burst',x:P.x,z:P.z});emit('healburst',{x:P.x,z:P.z,r:13,amt:32,credit:true});}});return true;}
-    if(gameTime-buf.f<.32&&ready('ward')){buf.f=-9;useSkill('ward');SFX.cast();startCast({dur:.6,at:.38,pose:'mageWard',move:.3,face:false,fn:()=>{emit('mageCastFx',{kind:'ward',x:P.x,z:P.z});emit('ward',{x:P.x,z:P.z,r:13,dur:[5,7,8][P.level-1]});aoeHit(P.x,P.z,7,P.level>=2?30:18,10,false,true);if(P.level===3)emit('healburst',{x:P.x,z:P.z,r:13,amt:18,credit:true});ringFx(P.x,P.z,0x9fd8ff,6,.4);}});return true;}
+    if(gameTime-buf.f<.32&&ready('ward')){buf.f=-9;useSkill('ward');SFX.cast();startCast({dur:.6,at:.38,pose:'mageWard',move:.3,face:false,fn:()=>{emit('mageCastFx',{kind:'ward',x:P.x,z:P.z});emit('ward',{x:P.x,z:P.z,r:13,dur:[5,7,8][combatTier(P.level)-1]});aoeHit(P.x,P.z,7,P.level>=2?30:18,10,false,true);if(P.level>=3)emit('healburst',{x:P.x,z:P.z,r:13,amt:18,credit:true});ringFx(P.x,P.z,0x9fd8ff,6,.4);}});return true;}
     buf.light=buf.heavy=buf.q=buf.e=buf.f=-9;
   }else if(P.cls==='berserker'){
     if(consume('light')){P.state='cleave';P.combo=0;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();return true;}
     if(consume('heavy')){P.state='crush';P.t=0;P.cr=false;P.hitDone=false;P.tok=(P.tok||0)+1;P.hs=false;aimAtBoss();return true;}
     if(gameTime-buf.q<.32&&ready('whirl')){buf.q=-9;useSkill('whirl');P.state='whirl';P.t=0;P.tick=0;SFX.heavySwing();emit('tornado',{dur:3});return true;}
-    if(gameTime-buf.e<.32&&ready('rage')){buf.e=-9;useSkill('rage');startGesture('rage');P.rageT=P.level>=2?10:8;if(P.level>=2){const r=P.level===3?6.6:3.8;ringFx(P.x,P.z,0xde424b,r,.48);aoeHit(P.x,P.z,r,P.level===3?43:25,15,true,P.level===3);}SFX.roar();shake(.3);burst(P.x,1.2,P.z,30,0xc01a10,4,.14,.8,-1);floatText('BLOOD RAGE',P.x,2.9,P.z,'label');return true;}
+    if(gameTime-buf.e<.32&&ready('rage')){buf.e=-9;useSkill('rage');startGesture('rage');P.rageT=P.level>=2?10:8;if(P.level>=2){const r=P.level>=3?6.6:3.8;ringFx(P.x,P.z,0xde424b,r,.48);aoeHit(P.x,P.z,r,P.level>=3?43:25,15,true,P.level>=3);}SFX.roar();shake(.3);burst(P.x,1.2,P.z,30,0xc01a10,4,.14,.8,-1);floatText('BLOOD RAGE',P.x,2.9,P.z,'label');return true;}
     if(gameTime-buf.f<.32&&ready('leap')){buf.f=-9;useSkill('leap');let tx,tz;
       if(LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<24){const a=Math.atan2(LT.x-P.x,LT.z-P.z),d=Math.max(0,Math.hypot(LT.x-P.x,LT.z-P.z)-LT.r-1.2);tx=P.x+Math.sin(a)*d;tz=P.z+Math.cos(a)*d;}
       else{const a=aimAngle();tx=P.x+Math.sin(a)*10;tz=P.z+Math.cos(a)*10;}
@@ -4228,7 +4311,7 @@ function tryActions(mx,mz,ml){
     if(gameTime-buf.light<.32&&ready('bolt')){buf.light=-9;useSkill('bolt');P.facing=aimAngle();startCast({dur:.32,at:.12,pose:'bolt',move:.75,fn:()=>{shoot('bolt',20,4,36);SFX.cast();}});return true;}
     if(gameTime-buf.heavy<.32&&ready('curse')){buf.heavy=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>32){toast('No target in range');return false;}useSkill('curse');P.facing=bossAngle();const target={...LT};
       startCast({dur:.4,at:.2,pose:'curse',move:.5,fn:()=>{P.curse={t:6,tick:.5,boss:target.boss,mid:target.id};emit('cursefx',{x:target.x,z:target.z});}});return true;}
-    if(gameTime-buf.q<.32&&ready('rift')){buf.q=-9;useSkill('rift');const tg=rainTarget();startCast({dur:.55,at:.35,pose:'rift',move:.4,face:false,fn:()=>{emit('zone',{z:{kind:'rift',x:tg[0],z:tg[1],r:P.level===1?4.5:5.7,dur:P.level===3?4.8:4,dmg:P.level>=2?13:11,owner:NET.id||'me'}});if(P.level===3)emit('zone',{z:{kind:'heal',x:tg[0],z:tg[1],r:5.7,dur:6,rate:4}});}});return true;}
+    if(gameTime-buf.q<.32&&ready('rift')){buf.q=-9;useSkill('rift');const tg=rainTarget();startCast({dur:.55,at:.35,pose:'rift',move:.4,face:false,fn:()=>{emit('zone',{z:{kind:'rift',x:tg[0],z:tg[1],r:P.level===1?4.5:5.7,dur:P.level>=3?4.8:4,dmg:P.level>=2?13:11,owner:NET.id||'me'}});if(P.level>=3)emit('zone',{z:{kind:'heal',x:tg[0],z:tg[1],r:5.7,dur:6,rate:4}});}});return true;}
     if(gameTime-buf.e<.32&&ready('siphon')){buf.e=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>16){toast('No target in range');return false;}useSkill('siphon');P.state='siphon';P.t=0;P.tick=0;return true;}
     if(gameTime-buf.f<.32&&ready('blink')){buf.f=-9;useSkill('blink');startGesture('blink');const a=ml>0?Math.atan2(mx,mz):aimAngle();const ox=P.x,oz=P.z;let [x,z]=clampArena(P.x+Math.sin(a)*9,P.z+Math.cos(a)*9,.8);
       P.x=x;P.z=z;P.iframe=.3;P.vx=P.vz=0;emit('pstep',{x,z,ox,oz});return true;}
@@ -4241,7 +4324,7 @@ function tryActions(mx,mz,ml){
     }
     if(gameTime-buf.q<.32&&ready('step')){buf.q=-9;useSkill('step');
       startCast({dur:.29,at:.12,pose:'ninjaStep',move:.32,fn:shadowStep});return true;}
-    if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');startGesture('poison');P.poisonT=P.level>=2?8:6;if(P.level===3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
+    if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');startGesture('poison');P.poisonT=P.level>=2?8:6;if(P.level>=3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
     if(gameTime-buf.f<.32&&ready('smoke')){buf.f=-9;useSkill('smoke');
       startCast({dur:.32,at:.11,pose:'ninjaSmoke',move:.65,face:false,fn:()=>{
         P.smoke=2.5;emit('smoke',{x:P.x,z:P.z,a:P.facing});
@@ -4259,11 +4342,11 @@ function tryActions(mx,mz,ml){
       aoeHit(P.x,P.z,7.5,SENTINEL_DAMAGE.aegis,18,true,false);return true;
     }
     if(gameTime-buf.q<.32&&ready('pulse')){
-      buf.q=-9;useSkill('pulse');const level=P.level,r=[7.5,9,10][level-1];
+      buf.q=-9;useSkill('pulse');const level=combatTier(P.level),r=[7.5,9,10][level-1];
       startCast({dur:.64,at:.38,pose:'pulse',move:.35,fn:()=>{
         ringFx(P.x,P.z,0x85f5d4,r,.48);SFX.slam();
-        aoeHit(P.x,P.z,r,SENTINEL_DAMAGE.pulse[level-1],[23,31,40][level-1],true,level===3);
-        if(level===3)emit('healburst',{x:P.x,z:P.z,r:11,amt:16});
+        aoeHit(P.x,P.z,r,SENTINEL_DAMAGE.pulse[level-1],[23,31,40][level-1],true,level>=3);
+        if(level>=3)emit('healburst',{x:P.x,z:P.z,r:11,amt:16});
       }});return true;
     }
     if(gameTime-buf.e<.32&&ready('sunstrike')){
@@ -4282,9 +4365,9 @@ function tryActions(mx,mz,ml){
     }
   }else if(P.cls==='archer'){
     if(gameTime-buf.f<.32&&ready('vault')){buf.f=-9;useSkill('vault');P.facing=aimAngle();P.state='vault';P.t=0;P.iframe=.5;P.fired=false;SFX.roll();return true;}
-    if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.38,at:.2,pose:'bow',move:.7,fn:()=>{shoot(P.level===3?'crossbolt':'arrow',P.level===3?26:20,6,P.level===3?76:62);SFX.bow();}});return true;}
+    if(gameTime-buf.light<.32&&ready('shot')){buf.light=-9;useSkill('shot');P.facing=aimAngle();startCast({dur:.38,at:.2,pose:'bow',move:.7,fn:()=>{shoot(P.level>=3?'crossbolt':'arrow',P.level>=3?26:20,6,P.level>=3?76:62);SFX.bow();}});return true;}
     if(held('heavy')&&P.cd.charged<=0){buf.heavy=-9;P.state='draw';P.t=0;P.charge=0;return true;}
-    if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:.6,at:.4,pose:'bowC',move:.45,charge:true,fn:()=>{if(P.level===3)shoot('siege',106,27,75);else for(const o of P.level===2?[-.14,-.07,0,.07,.14]:[-.05,0,.05])shoot('arrowC',P.level===2?22:29,13,68,o);SFX.bow();shake(.12);}});return true;}
+    if(gameTime-buf.q<.32&&ready('triple')){buf.q=-9;useSkill('triple');P.facing=aimAngle();startCast({dur:.6,at:.4,pose:'bowC',move:.45,charge:true,fn:()=>{if(P.level>=3)shoot('siege',106,27,75);else for(const o of P.level===2?[-.14,-.07,0,.07,.14]:[-.05,0,.05])shoot('arrowC',P.level===2?22:29,13,68,o);SFX.bow();shake(.12);}});return true;}
     if(gameTime-buf.e<.32&&ready('rain')){buf.e=-9;useSkill('rain');const tg=rainTarget();
       const preview=addDanger({type:'circle',x:tg[0],z:tg[1],r:5.5},{color:0xe8d8a0,delay:.85,dmg:0,owner:'local'});
       startCast({dur:1.05,at:.85,pose:'sky',move:.3,face:false,charge:true,fn:()=>{emit('zone',{z:{kind:'rain',x:tg[0],z:tg[1],r:5.5,dur:3,owner:NET.id||'me'}});SFX.bow();},preview});return true;}
@@ -4397,7 +4480,7 @@ function updateUlt(dt,pose,mx,mz){
       if(t>=.8&&!P.ufin){P.ufin=true;emit('healburst',{x:P.x,z:P.z,r:30,amt:70});emit('ward',{x:P.x,z:P.z,r:30,dur:8});emit('ultfx',{k:'pillar',x:P.x,z:P.z});if(G.mode==='mp')toHost('reviveRequest',{});}
       break;}
     case 'archer':{
-      bowMovePose(pose,'siegeUlt',t,.60,.9,P.level===3);pose.knee+=.11*(1-ease((t-.6)/.30));
+      bowMovePose(pose,'siegeUlt',t,.60,.9,P.level>=3);pose.knee+=.11*(1-ease((t-.6)/.30));
       if(!P.ufin&&Math.random()<.7)burst(P.x+Math.sin(P.facing)*.8,1.5,P.z+Math.cos(P.facing)*.8,1,0xffc040,2,.1,.4,0);
       if(t>=.6&&!P.ufin){P.ufin=true;P.facing=aimAngle();shoot('arrowU',0,0,55);SFX.bow();shake(.25);}
       break;}
@@ -4696,7 +4779,7 @@ function shadowStep(){
   [x,z]=clampArena(x,z,.8);P.x=x;P.z=z;P.facing=bossAngle();P.iframe=.45;P.vx=P.vz=0;P.kx=P.kz=0;
   emit('pstep',{x,z,ox,oz,ninja:true});
 }
-function venomBonus(){return [3,4,6][P.level-1];}
+function venomBonus(){return [3,4,6][combatTier(P.level)-1];}
 function applyVenom(enemy){
   if(!(enemy.venomUntil>gameTime))enemy.venomNext=gameTime+.5;
   enemy.venomUntil=gameTime+3;
@@ -4970,7 +5053,7 @@ function updatePlayer(dt){
           mageCastPose(pose,c.pose,t,c.at,c.dur);
           break;
         case 'bow':case 'bowC':case 'sky':case 'chargedRelease':
-          bowMovePose(pose,c.pose,t,c.at||.001,c.dur,P.level===3);
+          bowMovePose(pose,c.pose,t,c.at||.001,c.dur,P.level>=3);
           break;
       }
       if(c.healFx&&Math.random()<.6)burst(P.x+rand(-.6,.6),.3,P.z+rand(-.6,.6),1,0xf2d870,1,.1,.8,-3);
@@ -4988,7 +5071,7 @@ function updatePlayer(dt){
       if(k>=1&&Math.random()<.5)burst(P.x+Math.sin(P.facing)*.7,1.5,P.z+Math.cos(P.facing)*.7,1,0xfff2b0,1.5,.08,.4,0);
       if(gameTime-buf.roll<.32&&P.rollCd<=0){P.state='idle';tryActions(mx,mz,ml);break;}
       if(!held('heavy')){
-        const full=k>=1,dmg=full?75:Math.round(24+33*k);shoot(P.level===3?'crossbolt':full?'arrowC':'arrow',dmg+(P.level===3?10:0),full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
+        const full=k>=1,dmg=full?75:Math.round(24+33*k);shoot(P.level>=3?'crossbolt':full?'arrowC':'arrow',dmg+(P.level>=3?10:0),full?26:Math.round(5+14*k),62+25*k);SFX.bow();if(full)shake(.15);
         P.cd.charged=.55;startCast({dur:.22,at:0,pose:'chargedRelease',move:.7,fired:true,fn:()=>{}});P.cast.fired=true;
       }
       break;}
@@ -5017,7 +5100,7 @@ function updatePlayer(dt){
     case 'vault':{
       const t=P.t,dur=.55,k=Math.min(1,t/dur),bk=P.facing+Math.PI,sp=14*(1-k)+1;vx=Math.sin(bk)*sp;vz=Math.cos(bk)*sp;
       pose.spin=-TAU*ease(k);pose.roll=k;pose.jump=Math.sin(k*Math.PI)*1.05;pose.legL=.68;pose.legR=.57;pose.armL=-1.57;pose.armR=-1.5;pose.armRz=-1*(t<.22?ease(t/.22):0);pose.draw=t<.22?ease(t/.22):0;
-      if(t>=.22&&!P.fired){P.fired=true;P.facing=aimAngle();shoot(P.level===3?'crossbolt':'arrowC',42,12,66);SFX.bow();}
+      if(t>=.22&&!P.fired){P.fired=true;P.facing=aimAngle();shoot(P.level>=3?'crossbolt':'arrowC',42,12,66);SFX.bow();}
       if(t>=dur)P.state='idle';break;}
     case 'siphon':{
       const t=P.t;vx=mx*SPD*.35;vz=mz*SPD*.35;if(LT.alive)turnTo(bossAngle(),10,dt);
@@ -5979,6 +6062,11 @@ function applyPose(model,p,st,dt,px,pz,f,spinY){
     model.ninjaRig.scarf.rotation.z=Math.sin(p.gait||0)*.13*(p.move||0);
   }
   model.clothTime=(model.clothTime||0)+dt;
+  if(model.masterwork){
+    const motion=st==='cast'||st==='ult'||p.acting;
+    const shine=.29+.09*Math.sin(model.clothTime*4)+(motion?.25:0);
+    model.masterwork.emissiveIntensity=lerp(model.masterwork.emissiveIntensity,shine,s);
+  }
   updateDrapes(model.drapes||[],model.clothTime,p.move||0,p.lean,p.bank||0,s);
   if(model.glow){const strength=st==='cast'?1:.72;model.glow.color.copy(model.glowColor).multiplyScalar(strength);}
 }
@@ -6096,7 +6184,7 @@ function updateHUD(spec){
   let f='';for(let i=0;i<P.maxFlasks;i++)f+=`<div class="flask ${i<P.flasks?'':'empty'}"></div>`;
   const uv=Math.floor(P.ult||0);$('ultFill').style.width=uv+'%';$('ultTxt').textContent=uv>=100?P.kit.ult+' ready ('+keyName(BINDS[ultimateBinding(P.kit)],true)+')':'Ultimate '+uv+'%';$('ultBar').classList.toggle('ready',uv>=100);
   const us=$('skU');if(us){us.classList.toggle('ready',uv>=100);us.querySelector('.cdv').style.background=uv<100?`conic-gradient(rgba(0,0,0,.72) ${(1-uv/100)*360}deg, transparent 0)`:'none';}
-  const flaskMarkup=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level===3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
+  const flaskMarkup=P.cls==='skeleton'?'':f+'&nbsp;Flasks'+(P.cls==='archer'?(P.level>=3?'&nbsp;&nbsp;·&nbsp;&nbsp;Bolts: Unlimited':'&nbsp;&nbsp;·&nbsp;&nbsp;Arrows: Unlimited'):'');
   setHudMarkup('flasks',flaskMarkup);
   $('buffs').textContent=[P.afk?'AFK · Protected':'',G.mode==='mp'&&!NET.combatHost?'Waiting for an active player':'',P.cls==='sword'&&P.forgePower?'Empower · +'+P.forgePower*2+'% damage':'',P.bubbleUntil>gameTime?'Heavenfall · 95% reduction':'',P.soulInvUntil>gameTime?'Soul Sanctuary':'',P.soulPowerUntil>gameTime?'Soul Empowered':'',P.cls==='soul'?`Linked allies · ${soulAllies(localPlayerId()).length}`:activeProtector(localPlayerId())?'Soul Linked':'',P.ward>0?'Ward ('+P.ward.toFixed(1)+'s)':'',P.guard>0?'Guardian Aura ('+P.guard.toFixed(1)+'s)':'',P.thornsUntil>gameTime?'Thorns ('+Math.ceil(P.thornsUntil-gameTime)+'s)':'',...Object.entries(P.effects).map(([id,value])=>BOSS_EFFECTS[id].name+' ('+Math.ceil(value.until-gameTime)+'s)'),P.hot&&P.hot.t>0?'Renew ('+P.hot.t.toFixed(1)+'s)':'',P.rageT>0?'Blood Rage ('+P.rageT.toFixed(1)+'s)':'',P.seal&&lockedAbility(P.seal.action)?P.seal.name+' sealed ('+Math.ceil(P.seal.until-gameTime)+'s)':'',P.poisonT>0?'Envenomed ('+P.poisonT.toFixed(1)+'s)':'',P.smoke>0?'Concealed ('+P.smoke.toFixed(1)+'s)':'',P.regen?'Recovering':''].filter(Boolean).join('  ·  ');
   const lockMarkup=(lockTarget?'Locked: '+esc(lockTarget.name):lockOn?'Lock-On: Seeking target':'Lock-On: Off')+'<br>'+G.diff.n+' · '+ARENAS[G.arena].n+(G.campaign?`<br>Campaign · Chamber ${G.ci+1} of ${CAMPAIGN.length}`:'');
@@ -6163,7 +6251,7 @@ function setScreen(id){
   document.body.classList.toggle('village-active',id==='hub');
   if(id!==null&&id!=='hub'&&document.pointerLockElement===canvas)document.exitPointerLock();
 }
-const safeLevel=value=>value===2||value===3?value:1;
+const safeLevel=value=>Number.isInteger(value)&&value>=1&&value<=MASTERY_THRESHOLDS.length?value:1;
 function startGame(cfg){
   initAudio();
   const camp=cfg.gm==='campaign';
@@ -6709,7 +6797,7 @@ const NEWS=[
     'Press Tab during a match to see the party roster and each player\'s ping.']},
   {date:'24 Nov 2026',title:'Paladin, Sentinel and the Oathbreaker',items:[
     'New classes: Paladin and Sentinel. New boss: Vaelis, the Oathbreaker.',
-    'Every class has distinct equipment at Mastery 2 and 3.',
+    'Mastery IV and V unlock class regalia. Preview both at the Skin House.',
     'Mobile touch controls with a customisable layout, and in-game chat with /.']},
   {date:'23 Nov 2026',title:'Launch',items:[
     'Hollow Crown multiplayer: parties of up to five, permanent death and spectating.',
@@ -7133,6 +7221,7 @@ function renderSkinPreview(dt,now){
     }catch{
       stage.failed=true;canvas.hidden=true;canvas.style.display='none';
       $('previewMove').hidden=true;
+      $('previewRank').parentElement.hidden=true;
       return;
     }
     stage.scene=new THREE.Scene();
@@ -7149,7 +7238,7 @@ function renderSkinPreview(dt,now){
     stage.width=width;stage.height=height;stage.renderer.setSize(width,height,false);
     stage.camera.aspect=width/height;stage.camera.updateProjectionMatrix();
   }
-  const cls=$('skinClass').value||myClass,skin=stage.skin||resolveSkin(skinFor()),level=charLevel(cls);
+  const cls=$('skinClass').value||myClass,skin=stage.skin||resolveSkin(skinFor()),level=Number($('previewRank').value)||charLevel(cls);
   const key=cls+':'+skin+':'+level;
   if(stage.key!==key){
     disposeModel(stage.model,true);
