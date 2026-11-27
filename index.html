@@ -550,10 +550,10 @@ const CLASSES={
   sword:{name:'Blacksmith',hp:125,speed:6.8,desc:'Forge better swords by dealing damage. Empower adds 2% damage per use for the round.',
     skills:[{k:'LMB',n:'Forge Strike'},{id:'forge',k:'Q',n:'Empower',cd:10}],
     ctrl:[['light','Forge Wood → Iron → Gold → Diamond → Doombringer by landing hits'],['q','Gain +2% damage for this round per use'],['passive','Last Stand · Survive one fatal hit at 1 HP with a 30 HP shield']]},
-  soul:{name:'Soul Link',hp:135,speed:6.8,ult:'Soul Sanctuary',ultHint:'Linked damage charges the ultimate. Grants invincibility and restores 20 HP per second for 7 seconds.',
+  soul:{name:'Soul Link',hp:180,speed:6.8,ult:'Soul Sanctuary',ultHint:'Linked damage charges the ultimate. Grants invincibility and restores 20 HP per second for 7 seconds.',
     desc:'A green-robed support who shares attacks and empowers linked allies.',
-    skills:[{id:'link',k:'LMB',n:'Soul Link',cd:.65},{id:'unlink',k:'RMB',n:'Unlink',cd:.35},{id:'renewSelf',k:'Q',n:'Mend Soul',cd:9},{id:'soulEmpower',k:'E',n:'Empower',cd:14},{id:'saturate',k:'F',n:'Saturate',cd:18}],
-    ctrl:[['light','Link to a teammate within 24 units and share 50% of their damage'],['heavy','Unlink the selected ally, or clear all links'],['q','Restore 38 HP to yourself'],['e','Linked allies gain +25% speed, +20% damage and 20% damage reduction for 7 seconds'],['f','Spend HP down to 10 and divide the healing among linked allies']]},
+    skills:[{id:'link',k:'LMB',n:'Soul Link',cd:.65},{id:'unlink',k:'RMB',n:'Unlink',cd:.35},{id:'renewSelf',k:'Q',n:'Mend Soul',cd:7},{id:'soulEmpower',k:'E',n:'Empower',cd:14},{id:'saturate',k:'F',n:'Saturate',cd:18}],
+    ctrl:[['light','Link to a teammate within 24 units and share 50% of their damage'],['heavy','Unlink the selected ally, or clear all links'],['q','Restore 60 HP to yourself'],['e','Linked allies gain +25% speed, +20% damage and 20% damage reduction for 7 seconds'],['f','Spend HP down to 20 to burst-heal linked allies at 3 HP per HP spent']]},
   mage:{name:'Mage',hp:85,speed:6.6,mana:120,ult:'Divine Ascension',desc:'A healer who shields the party and can revive fallen allies with their gear and abilities at 50 max HP, once per expedition.',
     skills:[{id:'mend',k:'LMB',n:'Mending Ray',cost:9,cd:.6},{id:'fireball',k:'RMB',n:'Fireball',cost:16,cd:.9},{id:'sanct',k:'Q',n:'Sanctuary',cost:35,cd:12},{id:'burst',k:'E',n:'Healing Burst',cost:30,cd:8},{id:'ward',k:'F',n:'Arcane Ward',cost:30,cd:16}],
     ctrl:[['light','Mending Ray, small heal on the targeted ally (9 mana)'],['heavy','Fireball deals 39 damage (16 mana)'],['q','Sanctuary, healing circle placed at the targeted ally (35 mana)'],['e','Healing Burst, large instant heal around you (30 mana)'],['f','Arcane Ward, allies take reduced damage; nearby enemies are damaged and stunned (30 mana)']]},
@@ -621,7 +621,7 @@ const FORGE_BLADES=[
 const UPGRADES={
   jester:[['Q','Blazing Bomb','Fire Bomb hits for 56 damage before igniting the ground.'],['E','Glacial Bomb','Ice Bomb hits for 40 damage and slows the boss for 5 seconds.']],
   sword:[['Q','Empower','Gain +2% damage per use.'],['Q','Empower','Gain +2% damage per use.']],
-  soul:[['Q','Mend Soul','Mend Soul restores 44 HP.'],['Q','Mend Soul','Mend Soul restores 50 HP.']],
+  soul:[['Q','Mend Soul','Mend Soul restores 70 HP.'],['Q','Mend Soul','Mend Soul restores 80 HP.']],
   mage:[['F','Radiant Ward','Ward lasts 7 seconds and bursts for 30 damage.'],['F','Dawn Aegis','Ward lasts 8 seconds and restores 18 health to nearby allies.']],
   archer:[['Q','Hunter’s Volley','Fire five arrows in a spread.'],['Q','Siege Bolt','Fire a heavy bolt that bursts on impact. Replaces your bow with a crossbow.']],
   warlock:[['Q','Grave Rift','Create a wider rift that deals more damage.'],['Q','Soul Well','A lingering rift that heals nearby allies.']],
@@ -650,11 +650,11 @@ const MOVE_GUIDE={
     ['q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks with every use.'],
     ['passive','Last Stand','Once per fight, a hit that would kill you leaves you at 1 HP with a 30 HP shield instead.']],
   soul:[
-    ['light','Soul Link','Link to a teammate within 24 units. You take 50% of the damage they receive, and their damage charges your ultimate.'],
+    ['light','Soul Link','Link to a teammate within 24 units. You take 50% of the damage they receive, and their damage charges your ultimate. While linked allies are injured, you transfer up to 6 HP per second across them, leaving yourself at least 20 HP.'],
     ['heavy','Unlink','Remove the link from the selected teammate, or clear every link.'],
-    ['q','Mend Soul','Restore 38 HP to yourself.'],
+    ['q','Mend Soul','Restore 60 HP to yourself.'],
     ['e','Empower','For 7 seconds, linked allies move 25% faster, deal 20% more damage and take 20% less damage.'],
-    ['f','Saturate','Spend your own HP down to 10 and share that healing among your linked allies.']],
+    ['f','Saturate','Spend your own HP down to 20 to burst-heal linked allies at triple efficiency. Spend only what the party needs.']],
   mage:[
     ['light','Mending Ray','Heal the targeted ally (or yourself) for 8 HP.'],
     ['heavy','Fireball','Throw a fireball that deals 39 damage.'],
@@ -719,8 +719,8 @@ const ULT_GUIDE={
 const MASTERY_GUIDE={
   sword:[['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks with every use.','New gear only. Abilities are unchanged.'],
          ['Q','Empower','Permanently raise your damage by 2% for the rest of this fight. Stacks with every use.','New gear only. Abilities are unchanged.']],
-  soul:[['Q','Mend Soul','Restore 44 HP to yourself.','Mend Soul heals 44 HP (was 38).'],
-        ['Q','Mend Soul','Restore 50 HP to yourself.','Mend Soul heals 50 HP (was 44).']],
+  soul:[['Q','Mend Soul','Restore 70 HP to yourself.','Mend Soul heals 70 HP (was 60).'],
+        ['Q','Mend Soul','Restore 80 HP to yourself.','Mend Soul heals 80 HP (was 70).']],
   mage:[['F','Radiant Ward','Allies within 13 units take 45% less damage for 7 seconds. Enemies within 7 units take 30 damage and are stunned.','Arcane Ward lasts 7s (was 5s) and deals 30 damage (was 18).'],
         ['F','Dawn Aegis','Allies within 13 units take 45% less damage for 8 seconds and are healed for 18 HP. Enemies within 7 units take 30 damage and are stunned.','Ward lasts 8s and also heals allies for 18 HP.']],
   archer:[['Q','Hunter\'s Volley','Fire five arrows in a wide spread, 22 damage each.','Triple Shot becomes a 5-arrow volley (22 each).'],
@@ -893,7 +893,7 @@ function useSoulActions(){
   }
   if(consume('q')&&ready('renewSelf')){
     useSkill('renewSelf');startGesture('renewSelf');
-    const healed=restoreHealth([38,44,50][combatTier(P.level)-1]);
+    const healed=restoreHealth([60,70,80][combatTier(P.level)-1]);
     ringFx(P.x,P.z,0x8efac4,2.8,.44);SFX.heal();
     if(healed>0)floatText('+'+Math.round(healed),P.x,2.7,P.z,'heal');
     return true;
@@ -904,17 +904,28 @@ function useSoulActions(){
     useSkill('soulEmpower');startGesture('soulEmpower');emit('soulGift',{kind:'power',ids:allies});return true;
   }
   if(consume('f')&&ready('saturate')){
-    const missing=soulAllies(id).map(to=>{
-      const ally=combatPlayer(to);
-      return [to,Math.max(0,ally.mhp-ally.hp)];
-    });
-    const total=missing.reduce((sum,[,n])=>sum+n,0),spent=Math.max(0,P.hp-10);
-    if(!total||!spent){toast('Saturate needs an injured linked ally and more than 10 HP');return false;}
-    useSkill('saturate');startGesture('saturate');P.hp-=spent;P.lastHit=gameTime;
-    emit('soulGift',{kind:'heal',ids:missing.map(([to])=>to),amounts:missing.map(([,n])=>spent*n/total)});
+    if(!transferSoulHealth(Infinity,3)){
+      toast('Saturate needs an injured linked ally and more than 20 HP');return false;
+    }
+    useSkill('saturate');startGesture('saturate');
+    ringFx(P.x,P.z,0x8efac4,5,.55);SFX.heal();
     return true;
   }
   return false;
+}
+function transferSoulHealth(budget,multiplier=1){
+  if(P.dead||P.afk||P.hp<=20)return false;
+  const missing=soulAllies(localPlayerId()).map(id=>{
+    const ally=combatPlayer(id);
+    return [id,Math.max(0,ally.mhp-ally.hp)];
+  }).filter(([,hp])=>hp>0);
+  const total=missing.reduce((sum,[,hp])=>sum+hp,0);
+  const spent=Math.min(P.hp-20,budget,total/multiplier);
+  if(!(spent>0))return false;
+  P.hp-=spent;
+  emit('soulGift',{kind:multiplier===1?'transfer':'heal',ids:missing.map(([id])=>id),
+    amounts:missing.map(([,hp])=>spent*multiplier*hp/total)});
+  return true;
 }
 function applySoulGift(d,from){
   from=from||localPlayerId();
@@ -929,10 +940,10 @@ function applySoulGift(d,from){
   if(from!==me&&G.links.get(me)!==from)return;
   if(d.kind==='power'){P.soulPowerUntil=gameTime+(masterworkPerk(sender)?.powerDuration??7);ringFx(P.x,P.z,0x74f9b2,3,.44);}
   if(d.kind==='ult'){P.soulInvUntil=gameTime+7;P.soulHealUntil=P.soulInvUntil;}
-  if(d.kind==='heal'&&Number.isFinite(d.amounts?.[i])){
-    const healed=restoreHealth(clamp(d.amounts[i],0,125));
+  if((d.kind==='heal'||d.kind==='transfer')&&from!==me&&Number.isFinite(d.amounts?.[i])){
+    const healed=restoreHealth(clamp(d.amounts[i],0,480));
     creditPartyHealing(from,healed);
-    if(healed>0){floatText('+'+Math.round(healed),P.x,2.7,P.z,'heal');SFX.heal();}
+    if(healed>0&&d.kind==='heal'){floatText('+'+Math.round(healed),P.x,2.7,P.z,'heal');SFX.heal();}
   }
 }
 function outgoingDamageMultiplier(){
@@ -5111,6 +5122,10 @@ function updatePlayer(dt){
   P.regen=!P.dead&&gameTime-P.lastHit>5&&P.hp<P.maxHp;
   if(P.soulHealUntil>gameTime)restoreHealth(20*dt);
   if(P.regen)restoreHealth(P.maxHp*.018*dt,'passive');
+  if(P.cls==='soul'&&gameTime>=(P.nextSoulTransfer||0)){
+    P.nextSoulTransfer=gameTime+1;
+    transferSoulHealth(6);
+  }
   let ix=(held('right')?1:0)-(held('left')?1:0),iz=(held('up')?1:0)-(held('down')?1:0);
   if(TC.x||TC.y){ix+=TC.x;iz-=TC.y;}
   const viewYaw=cam.yaw+(lockTarget?cam.lookAside:0),sy=Math.sin(viewYaw),cy=Math.cos(viewYaw);
