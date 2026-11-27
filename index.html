@@ -333,11 +333,14 @@ body.village-active>canvas:active{cursor:grabbing}
 #localMicTag{z-index:5;pointer-events:none}
 #voicePlayBtn{position:fixed;right:12px;top:74px;z-index:10;padding:4px 6px}
 .onlinePlayer{flex:1;min-width:0}
+#lesson{position:absolute;left:50%;top:12%;transform:translateX(-50%);width:max-content;max-width:82vw;padding:9px 15px;border:1px solid #ac8653;border-radius:6px;background:#151a24ee;color:#f6e4bf;text-align:center;font-size:14px}
+#partyAwards{padding:10px 16px;text-align:center;line-height:1.7;border:1px solid #6b5942;border-radius:6px;color:#ffe0a0}
+@media(max-width:620px){#lobby .lobbyWrap{width:100%;gap:8px}#lobby .lobbyWrap>.panel{width:min(460px,100%);min-width:0}#lobby .slot{min-width:0;flex-wrap:wrap}#lobby #slots{max-height:29dvh}}
 </style>
 </head>
 <body>
 <section id="hub" aria-label="Hollow Crown village">
-  <header class="hub-header"><h1>Hollow Crown</h1><div><button class="sm" id="hubChatBtn" type="button" aria-controls="villageChat" aria-expanded="false">Chat</button> <button class="sm" id="hubOnlineBtn" type="button" aria-controls="onlineRoster">Online</button> <button class="sm" id="hubSettings">Settings</button></div></header>
+  <header class="hub-header"><h1>Hollow Crown</h1><div><button class="sm" id="hubClassBtn" type="button">Characters</button> <button class="sm" id="hubChatBtn" type="button" aria-controls="villageChat" aria-expanded="false">Chat</button> <button class="sm" id="hubOnlineBtn" type="button" aria-controls="onlineRoster">Online</button> <button class="sm" id="hubSettings">Settings</button></div></header>
   <section id="villageChat" class="hidden" aria-label="Village chat">
     <div class="row"><b>Village chat</b><button class="sm" id="villageChatClose" type="button">Close</button></div>
     <div id="villageChatLog" role="log"></div>
@@ -401,7 +404,7 @@ body.village-active>canvas:active{cursor:grabbing}
     <div class="field"><label>Difficulty</label><select id="soloDiff"></select></div>
     <div class="desc" id="soloDesc"></div>
   </div>
-  <div class="row"><button class="big" id="soloStart">Begin</button><button class="big alt" id="soloBack">Back</button></div>
+  <div class="row"><button class="big" id="soloStart">Begin</button><button class="big alt" id="tutorialBtn">Combat Tutorial</button><button class="big alt" id="soloBack">Back</button></div>
 </div>
 
 <div id="mp" class="screen hidden">
@@ -455,7 +458,7 @@ body.village-active>canvas:active{cursor:grabbing}
     <div id="runCoins"></div>
 <div id="buffs"></div>
   </div>
-  <div id="team"></div><div id="incoming" class="hidden"></div>
+  <div id="team"></div><div id="lesson" class="hidden"></div><div id="incoming" class="hidden"></div>
   <div id="lockTag"></div>
   <div id="specTag" class="hidden"></div>
   <div class="boss"><div class="name" id="bossName"></div><div class="bar"><i id="bChip"></i><i id="bFill"></i></div><div id="poiseTrack"><b id="poiseLabel">Stagger</b><span><i id="poiseProgress"></i></span></div></div>
@@ -515,7 +518,7 @@ body.village-active>canvas:active{cursor:grabbing}
 
 <div id="end" class="screen hidden">
   <h1 id="endTitle">YOU HAVE FALLEN</h1>
-  <div id="endStats"></div>
+  <div id="endStats"></div><div id="partyAwards" class="hidden"></div>
   <div class="row" id="endBtns"></div>
   <div class="status" id="endNote" style="color:#a99878"></div>
 </div>
@@ -696,7 +699,7 @@ const MOVE_GUIDE={
   rogue:[
     ['light','Dagger Flurry','Rapid dagger stabs, 15 damage each.'],
     ['heavy','Piercing Shuriken','Throw a shuriken that passes through enemies, 23 damage to each.'],
-    ['q','Shadow Step','Teleport behind your target, briefly invulnerable.'],
+    ['q','Shadow Step','Teleport behind your enemy from anywhere in the arena. With no enemy target, blink forward.'],
     ['e','Envenom','For 6 seconds your hits deal +3 damage and poison the target (4 damage every 0.5s for 3 seconds).'],
     ['f','Smoke Bomb','The boss loses track of you for 2.5 seconds.'],
     ['passive','Evasion','10% chance to dodge any incoming hit completely.']]
@@ -790,7 +793,7 @@ function renderMasteryTrack(level,points){
     <div class="mhow">Earn mastery by playing this class: 3 points every 20 seconds in battle, 4 to 10 per minion, 50 per boss defeated.</div>`;
 }
 function gainMastery(amount){
-  if(!G||P.afk)return;
+  if(!G||G.cfg.practice||P.afk)return;
   profile=readProfile()||profile;
   const cls=G.original.cls;
   const previous=charLevel(cls);
@@ -928,6 +931,7 @@ function applySoulGift(d,from){
   if(d.kind==='ult'){P.soulInvUntil=gameTime+7;P.soulHealUntil=P.soulInvUntil;}
   if(d.kind==='heal'&&Number.isFinite(d.amounts?.[i])){
     const healed=restoreHealth(clamp(d.amounts[i],0,125));
+    creditPartyHealing(from,healed);
     if(healed>0){floatText('+'+Math.round(healed),P.x,2.7,P.z,'heal');SFX.heal();}
   }
 }
@@ -1004,9 +1008,13 @@ function loseHealth(dmg){
 }
 function creditMageHealing(caster,hp){
   if(!(hp>0))return;
+  creditPartyHealing(caster,hp);
   const to=caster||'me',amount=hp*.25/Math.sqrt(G.np);
   if(to===(NET.id||'me'))gainUlt(amount);
   else nsend({t:'g',d:{k:'ev',e:'healCredit',to,amount}});
+}
+function creditPartyHealing(caster,hp){
+  if(G.mode==='mp'&&caster&&caster!==NET.id&&hp>0)nsend({t:'g',d:{k:'ev',e:'partyHeal',to:caster,hp}});
 }
 function applyGuard(d){
   if(!P.dead&&Math.hypot(P.x-d.x,P.z-d.z)<=d.r){
@@ -1093,7 +1101,7 @@ const BOSSES={
     enrage:['THE MATRIARCH UNLEASHES THE BLIZZARD','Ice now falls without mercy'],d:'An ice sorceress. Frostbite deals damage over time and slows movement by 8%.',
     moves:{near:[['nova',3],['blink',2.5],['volley',1]],mid:[['volley',3],['frost',2],['rain',1.5],['mirrorIce',2.5]],far:[['volley',2],['rain',2],['frost',2],['blink',1],['mirrorIce',1.6]]},
     p2:{near:[['comboC',2.5],['frost',1.5],['mirrorIce',2]],mid:[['rain',2],['frost',2],['comboG',1.5]],far:[['rain',2],['volley',2],['comboG',1.5]]},
-    combos:{comboC:['nova','blink'],comboG:['frost','volley']},blinkFollow:'nova'},
+    combos:{comboC:['nova','blink'],comboG:['frost','volley']},p3:[['mirrorIce',4],['comboG',3]],blinkFollow:'nova'},
   ignar:{n:'Ignar, the Molten Colossus',arena:'forge',hp:4200,r:2.8,speed:2.7,height:8,reach:5.4,slamR:4.3,sweepR:9,novaR:6.5,dmg:1.15,model:'colossus',both:true,
     col:0xff5a10,dust:0x3a2a20,fireCol:0xff6a10,pillar:0xff7a20,spikeCol:0xff8a20,shockCol:0xff5a10,rainFx:'meteor',p2emis:0x5a1404,
     enrage:['THE COLOSSUS ERUPTS','Molten fury pours from the earth'],d:'A giant of stone and magma. Its fissures and fire leave victims Scorched.',
@@ -1105,7 +1113,7 @@ const BOSSES={
     enrage:['THE REAPER SHEDS ITS VEIL','Shadows strike from every direction'],d:'A wraith that raises undead minions. Soul Harvest inflicts Withered, slowing ultimate charge.',
     moves:{near:[['reap',3],['cross',2.5],['dashes',1],['soulHarvest',2]],mid:[['dashes',3],['cage',2],['raiseDead',2.2]],far:[['dashes',2.5],['cage',1.5],['rain',1],['raiseDead',2.5]]},
     p2:{near:[['comboD',3],['cage',1.5],['raiseDead',2.4],['soulHarvest',2.5]],mid:[['comboE',2],['cage',2],['rain',1.5]],far:[['rain',2],['cage',2],['dashes',2]]},
-    combos:{comboD:['reap','cross'],comboE:['dashes','reap']}},
+    combos:{comboD:['reap','cross'],comboE:['dashes','reap']},p3:[['soulHarvest',4],['cage',3]]},
   thoruun:{n:'Zeus, the Storm Tyrant',arena:'storm',hp:4600,r:1.9,speed:4.7,height:6.4,reach:4.2,slamR:3.2,sweepR:7,novaR:5.2,dmg:1.05,model:'storm',coolMul:.7,enrageSpeed:1.25,enrageAt:.65,poiseMul:1.6,
     col:0x6ad0ff,dust:0x77786e,fireCol:0x8ad8ff,pillar:0xbfe8ff,spikeCol:0x6ad0ff,shockCol:0x8ad8ff,rainFx:'ice',p2emis:0x0a2a4a,
     enrage:['ZEUS CALLS DOWN THE STORM','Lightning attacks inflict Zapped'],d:'Leaps into the party with shockwaves, charges through the arena, and calls down lightning on several players at once. Enrages at 65% health outside Ultra. Zapped lasts 10 seconds, halves passive recovery, and reduces ability healing by 30%.',
@@ -1119,7 +1127,7 @@ const BOSSES={
     p2:{near:[['oathSeal',2.8],['cross',1.6],['brokenVow',2.1]],mid:[['oathSeal',3],['cage',1]],far:[['oathSeal',2.7],['cage',1.25],['brokenVow',2]]}}
 };
 
-const EXPEDITION_BOSSES=['varkhul','thoruun'];
+const EXPEDITION_BOSSES=['varkhul','thoruun','sylvara','morvane'];
 const CAMPAIGN_AVAILABLE=false;
 const CAMPAIGN=[
   {type:'boss',boss:'varkhul',arena:'keep',t:'CHAMBER I',s:"The Warden's Hall"},
@@ -3522,6 +3530,13 @@ function voiceTick(now){
   if(onlineOpen)for(const el of $('onlineRows').querySelectorAll('[data-voice-id]'))updateMicBadge(el,el.dataset.voiceId);
 }
 function onNet(m){
+  if(m.t==='runContribution'){
+    if(G?.mode==='mp'&&['play','end'].includes(state)&&G.cfg.players.some(p=>p.id===m.id)){
+      G.contributions.set(m.id,{damage:m.damage,healing:m.healing});
+      if(state==='end')renderPartyAwards();
+    }
+    return;
+  }
   if(m.t==='voiceAudio'){receiveVoiceFrame(m);return;}
   if(m.t==='voice'){
     const peer=partyMember(m.id);if(peer)peer.voice=!!m.on;
@@ -3604,6 +3619,7 @@ function handleEv(e,d,from,local){
     case 'jesterImpact':if(NET.isHost)resolveJesterImpact(d,from);break;
     case 'proj':if(!local)spawnProj(Object.assign({},d,{own:false}));break;
     case 'zone':addZone(d.z);break;
+    case 'partyHeal':if(d.to===NET.id&&remotes.has(from)&&Number.isFinite(d.hp)&&d.hp>0)stats.allyHealing+=Math.min(150,d.hp);break;
     case 'healCredit':if(d.to===NET.id&&P.cls==='mage'&&remotes.has(from)&&Number.isFinite(d.amount)&&d.amount>0)gainUlt(Math.min(10,d.amount));break;
     case 'healburst':healBurst(d.x,d.z,d.r,d.amt,from,d.credit);break;
     case 'mageCastFx':mageCastFx(d);break;
@@ -3749,9 +3765,19 @@ function updateIncoming(){
 function updateDangers(dt){
   for(let i=dangers.length-1;i>=0;i--){const d=dangers[i];
     if(!d.det){d.t+=dt*dangerRate(d);const k=clamp(d.t/d.delay,0,1);
-      if(curTheme?.storm)d.fill.material.opacity=.1+.46*k;
+      if(curTheme?.storm){
+        const imminent=ease((.48-(d.delay-d.t)/dangerRate(d))/.48);
+        d.fill.material.opacity=.10+.29*k+.22*imminent;
+        d.edge.material.color.setHex(imminent>.15?0xffd28d:0xc6efff);
+      }
       else if(d.s.type==='rect')d.fill.scale.set(1,1,k);else d.fill.scale.set(k,1,k);
       d.outline.material.opacity=.11+.15*k;d.edge.material.opacity=.58+.37*k;
+      if(d.owner==='storm'&&!d.warned&&(d.delay-d.t)/dangerRate(d)<.34){
+        d.warned=true;
+        if(inside(d.s,P.x,P.z,.35)&&gameTime>=(P.stormCueAt||0)){
+          P.stormCueAt=gameTime+.40;SFX.ice();
+        }
+      }
       if(d.t>=d.delay){d.det=true;d.fill.scale.set(1,1,1);d.fill.material.color.setHex(0xffd8b0);d.fill.material.opacity=.75;
         const o=d.o;
         if((!B.dead||o.minion!==undefined)&&!P.dead&&inside(d.s,P.x,P.z,.35)){
@@ -4159,7 +4185,7 @@ function damageBoss(dmg,poise,heavy,from,stun,reflected=false,charge=!reflected)
   B.hp-=dmg;B.chipT=.8;B.flash=1;
   if(B.hp<=0){B.hp=0;killBoss();return;}
   const enrageAt=G.diff.ultra?.5:(G.boss.enrageAt||.5);
-  if(B.hp<=B.maxHp*enrageAt&&(B.phase===1||(G.diff.ultra&&B.phase===2))){
+  if(!G.cfg.practice&&B.hp<=B.maxHp*enrageAt&&(B.phase===1||(G.diff.ultra&&B.phase===2))){
     const phase=G.diff.ultra?3:2;
     for(const owner of ['melee','storm'])emit('cancel',{owner});
     B.queue=[];B.air=false;B.y=0;B.dashId=0;
@@ -4900,7 +4926,8 @@ function renderSmokeGrenade(d){
 }
 function shadowStep(){
   const ox=P.x,oz=P.z;let x,z;
-  if(LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<32){x=LT.x-Math.sin(LT.f)*(LT.r+1.4);z=LT.z-Math.cos(LT.f)*(LT.r+1.4);}
+  const target=lockTarget?.kind==='ally'?null:lockTarget||bossLock()||enemyLock(mins.get(nearestMinionId()));
+  if(target){x=target.x-Math.sin(target.f)*(target.r+1.4);z=target.z-Math.cos(target.f)*(target.r+1.4);}
   else{const a=aimAngle();x=P.x+Math.sin(a)*8;z=P.z+Math.cos(a)*8;}
   [x,z]=clampArena(x,z,.8);P.x=x;P.z=z;P.facing=bossAngle();P.iframe=.45;P.vx=P.vz=0;P.kx=P.kz=0;
   emit('pstep',{x,z,ox,oz,ninja:true});
@@ -5786,7 +5813,7 @@ function setBossPhase(phase){
   B.maxPoise=bossPoise(phase===3?195:170);B.poise=B.maxPoise;
 }
 function updateBoss(dt){
-  if(!BM)return;
+  if(!BM||G.cfg.practice)return;
   B.flash=Math.max(0,B.flash-dt*6);
   if(B.chipT>0)B.chipT-=dt;else B.chip=Math.max(B.hp,B.chip-dt*B.maxHp*.17);
   if(B.action&&B.action.name==='death'){ATK.death(dt,B.action);applyBossPose(dt);return;}
@@ -6289,7 +6316,37 @@ function setHudMarkup(id,markup){
   const el=$(id);
   if(el._combatMarkup!==markup){el.innerHTML=markup;el._combatMarkup=markup;}
 }
+function updateLesson(){
+  const el=$('lesson');
+  el.classList.toggle('hidden',!G.cfg.practice);
+  if(!G.cfg.practice)return;
+  const hint=(action,touch)=>touchOn()?touch:keyName(BINDS[action],true);
+  if(G.lesson===0&&stats.dealt>0){
+    G.lesson=1;
+    G.nextDrill=gameTime+.5;
+  }
+  if(G.lesson===1){
+    if(stats.perfectRolls>0){
+      G.lesson=2;P.hp=Math.min(P.hp,P.maxHp-35);P.lastHit=gameTime;
+      if(G.practiceDanger)cancelDangers('practice');
+    }else if(gameTime>=G.nextDrill){
+      G.practiceDanger=addDanger({type:'circle',x:P.x,z:P.z,r:5},{delay:1.4,dmg:1,srcX:B.x,srcZ:B.z,owner:'practice',fx:'slam'});
+      G.nextDrill=gameTime+4;
+    }
+  }
+  if(G.lesson===2&&stats.flasks>0&&P.healed){
+    G.lesson=3;
+    showMsg('TUTORIAL COMPLETE','Use flasks after an attack while the boss is recovering.',4);
+  }
+  el.textContent=[
+    'Hit the training boss with '+hint('light','Attack')+'. Hold it to repeat.',
+    'Roll with '+hint('roll','Dodge')+' just before the marked strike lands. Watch the countdown.',
+    'Drink a health flask with '+hint('heal','Heal')+' while the boss is recovering.',
+    'Training complete. Open the pause menu to return to the village.'
+  ][G.lesson];
+}
 function updateHUD(spec){
+  updateLesson();
   updateTouchHUD();updateForgeProgress();updateIncoming();
   updateHealthBar();
   if(P.cls==='mage'){$('manaFill').style.width=(P.mana/P.maxMana*100)+'%';$('manaTxt').textContent=Math.floor(P.mana)+' / '+P.maxMana;}
@@ -6413,11 +6470,22 @@ function startGame(cfg){
   P={cls:myClass,level,skin,kit:C,x:0,z:0,facing:Math.PI,hp:C.hp,maxHp:C.hp,chip:C.hp,mana:C.mana||0,maxMana:C.mana||0,flasks:G.diff.flasks,maxFlasks:G.diff.flasks,
     vx:0,vz:0,runT:0,rollCd:0,state:'idle',t:0,combo:0,hitDone:false,iframe:0,hurtInv:0,blockStart:-9,kx:0,kz:0,rx:0,rz:0,healed:false,walk:0,dead:false,cd:{},ward:0,guard:0,thornsUntil:0,effects:{},charge:0,lastDash:0,lastHit:gameTime,regen:false,tok:0};
   C.skills.forEach(s=>{if(s.id)P.cd[s.id]=0;});
-  stats={start:performance.now(),taken:0,flasks:0,parries:0,dealt:0,perfectRolls:0,healed:0};
+  stats={start:performance.now(),taken:0,flasks:0,parries:0,dealt:0,perfectRolls:0,healed:0,allyHealing:0};
+  G.contributions=new Map();
   lockOn=cameraPrefs.autoLock;hadLock=false;endTimer=-1;timeScale=1;specIdx=0;
   clearCombatInput();
   NET.combatHost=cfg.host??null;NET.isHost=G.mode==='solo'||cfg.host===NET.id;
   setupRoom(def,true);
+  if(cfg.practice){
+    P.z=B.z+B.r+2;
+    B.hp=B.maxHp=B.chip=10000;
+    G.lesson=0;
+    showMsg('COMBAT TUTORIAL','Practice attacks, rolls and flask timing',2);
+  }
+  if(G.mode==='mp'){
+    const lineup=players.map(p=>p.name).join(' · ');
+    showMsg('VERSUS '+G.boss.n.toUpperCase(),lineup,3.2);
+  }
   const touchLaunch=usingTouch;
   state='play';paused=false;setScreen(null);
   $('hud').classList.remove('hidden');$('crosshair').classList.remove('hidden');showTouch(touchOn());
@@ -6641,9 +6709,22 @@ function updateEProjs(dt){
     if(hit)hurtPlayer(p.dmg,{x:ox-p.vx,z:oz-p.vz,blockable:true,parry:false,minion:p.minion});
     if(hit||p.life<=0||Math.hypot(p.x,p.z)>ARENA+2){burst(p.x,1.3,p.z,6,p.col,3,.12,.35);disposeEnemyProjectile(p);eprojs.splice(i,1);}}
 }
+function renderPartyAwards(){
+  const el=$('partyAwards');
+  el.classList.toggle('hidden',G.mode!=='mp');
+  if(G.mode!=='mp')return;
+  const awards=[['Damage MVP','damage'],['Healing MVP','healing']].map(([label,key])=>{
+    const score=p=>p.id===NET.id?(key==='damage'?stats.dealt:stats.allyHealing):G.contributions.get(p.id)?.[key]||0;
+    const high=Math.max(0,...G.cfg.players.map(score));
+    const leaders=G.cfg.players.filter(p=>high>0&&score(p)===high);
+    return '<b>'+label+'</b> · '+(leaders.length?leaders.map(p=>esc(p.name)).join(', ')+' · '+Math.round(high):'—');
+  });
+  el.innerHTML=awards.join('<br>');
+}
 function endGame(win){
   if(state!=='play')return;
   if(soulTethers)soulTethers.visible=false;
+  if(G.mode==='mp')nsend({t:'runContribution',damage:stats.dealt,healing:stats.allyHealing});
   state='end';try{document.exitPointerLock();}catch(e){}
   const secs=Math.round((performance.now()-stats.start)/1000),tm=`${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
   showTouch(false);setScreen('end');$('end').classList.toggle('dead',!win);$('hud').classList.add('hidden');$('crosshair').classList.add('hidden');$('chargeWrap').classList.add('hidden');
@@ -6652,6 +6733,7 @@ function endGame(win){
   $('endStats').innerHTML=`<b>+${G.earned} mastery earned · ${profile.mastery[G.original.cls]||0} total</b><br>`+(G.campaign?`Campaign · ${G.diff.n}<br>`+(win?`All ${CAMPAIGN.length} chambers conquered<br>Time Elapsed: ${tm}`:`Fell in ${G.room.t}: ${G.room.s}<br>Time Survived: ${tm}`):`${G.boss.n} · ${G.diff.n}<br>`+(win?`Time Elapsed: ${tm}`:`Boss Health Remaining: ${Math.round(B.hp/B.maxHp*100)}%<br>Time Survived: ${tm}`))+
     `<br>Damage Dealt: ${Math.round(stats.dealt)}<br>Damage Taken: ${Math.round(stats.taken)}<br>Flasks Consumed: ${stats.flasks}<br>HP Recovered: ${Math.round(stats.healed)}<br>Perfect Dodges: ${stats.perfectRolls}`+(stats.parries?`<br>Successful Parries: ${stats.parries}`:'');
   renderEndButtons();
+  renderPartyAwards();
 }
 function renderEndButtons(){
   const btns=$('endBtns');$('endNote').textContent='';
@@ -6838,6 +6920,12 @@ $('soloMode').onchange=soloDesc;
 $('soloBoss').onchange=()=>{$('soloArena').value=BOSSES[$('soloBoss').value].arena;soloDesc();};$('soloArena').onchange=soloDesc;$('soloDiff').onchange=soloDesc;
 function openSoloBooth(){initAudio();state='solo';setScreen('solo');soloDesc();}
 $('soloBack').onclick=toMenu;
+$('tutorialBtn').onclick=()=>{
+  const selected=myClass;
+  startGame({mode:'solo',gm:'boss',boss:'varkhul',diff:'easy',practice:true,
+    players:[{id:'me',name:myName(),cls:'berserker'}]});
+  myClass=selected;
+};
 $('soloStart').onclick=()=>startGame({mode:'solo',gm:$('soloMode').value,boss:$('soloBoss').value,arena:$('soloArena').value,diff:$('soloDiff').value});
 async function openPartyBooth(){
   if(hub.opening)return;
@@ -7097,7 +7185,7 @@ function buildVillage(){
     const rug=new THREE.Mesh(new THREE.PlaneGeometry(1.48,1.34),mat);
     rug.rotation.x=-Math.PI/2;rug.position.set(0,.064,front-.75);h.add(rug);
   }
-  const fountain=grp(0,0,1.5,villageScene);
+  const fountain=grp(0,0,0,villageScene);
   function vessel(r1,r2,height,y,material){
     const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,height,16),material);
     m.position.y=y;m.castShadow=true;m.receiveShadow=true;fountain.add(m);
@@ -7105,7 +7193,7 @@ function buildVillage(){
   vessel(1.34,1.52,.32,.16,stone);vessel(1.2,1.31,.15,.39,plasterStone);
   vessel(1.1,1.1,.055,.48,std(0x55a9b1,{roughness:.27}));
   vessel(.16,.26,.81,.83,plasterStone);vessel(.43,.19,.13,1.29,plasterStone);
-  villageSpace(fountain,0,0,2.17,2.17);
+  villageSpace(fountain,0,0,3.15,3.15);
   const leaves=[std(0x466d48),std(0x527954),std(0x638751),std(0x587b58)];
   const canopy=new THREE.IcosahedronGeometry(1,0);
   for(let i=0;i<40;i++){
@@ -7436,6 +7524,7 @@ function returnToHub(){
 function initHub(){
   $('skinClass').innerHTML=Object.entries(CLASSES).map(([id,c])=>`<option value="${id}">${c.name}</option>`).join('');
   $('skinClass').onchange=renderSkins;
+  $('hubClassBtn').onclick=()=>hubEnter('class');
   for(const button of $('skins').querySelectorAll('[data-preview-skin]')){
     button.onclick=()=>{skinPreviewState.skin=button.dataset.previewSkin;renderSkins();};
   }
