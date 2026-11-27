@@ -72,7 +72,7 @@ function makeCode(): string {
 }
 const clean = (s: any, n = 16) => String(s ?? "").replace(/[\u0000-\u001f<>]/g, "").trim().slice(0, n) || "Adventurer";
 const cls = (c: any) => (CLASSES.includes(c) ? c : "sword");
-const charLevel = (value: unknown) => value === 2 || value === 3 ? value : 1;
+const charLevel = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5 ? value : 1;
 
 function view(r: Room) {
   return {
