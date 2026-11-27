@@ -1138,7 +1138,15 @@ const BOSSES={
     p2:{near:[['oathSeal',2.8],['cross',1.6],['brokenVow',2.1]],mid:[['oathSeal',3],['cage',1]],far:[['oathSeal',2.7],['cage',1.25],['brokenVow',2]]}}
 };
 
-const EXPEDITION_BOSSES=['varkhul','thoruun','sylvara','morvane'];
+BOSSES.azrael={
+  n:'Azrael, the Fallen Angel',arena:'void',hp:3900,r:1.65,speed:4,height:6.1,reach:4,slamR:3.6,sweepR:7,novaR:5.6,dmg:1,model:'fallen',
+  col:0xff9f61,dust:0x6a4656,fireCol:0xffa76b,pillar:0xffc178,spikeCol:0xffc178,shockCol:0xffa76b,rainFx:'spear',p2emis:0x48203d,
+  enrage:['AZRAEL TAKES FLIGHT','Ranged attacks can reach him. Watch the spear markers.'],
+  d:'A fallen angel wielding a gilded spear. When enraged, he flies briefly and rains spears. Projectiles can reach him in the air. Punish his recovery after landing.',
+  moves:{near:[['angelSweep',4],['angelJudgment',2]],mid:[['angelJudgment',4],['angelSweep',1]],far:[['angelJudgment',5]]},
+  p2:{near:[['angelFlight',5]],mid:[['angelFlight',6]],far:[['angelFlight',6]]},p3:[['angelFlight',4]]
+};
+const EXPEDITION_BOSSES=['varkhul','thoruun','sylvara','morvane','azrael'];
 const CAMPAIGN_AVAILABLE=false;
 const CAMPAIGN=[
   {type:'boss',boss:'varkhul',arena:'keep',t:'CHAMBER I',s:"The Warden's Hall"},
@@ -2872,7 +2880,7 @@ function updateDrapes(parts,time,motion,lean,bank,s){
 }
 function makeBossModel(type){
   const root=grp(),body=grp(0,0,0,root);
-  let hipL,hipR,upper,armR,armL,flashMat,eyeLight,knees=null,elbows=null;
+  let hipL,hipR,upper,armR,armL,flashMat,eyeLight,knees=null,elbows=null,fallenWings=null;
   if(type==='warden'){
     const iron=std(0x50515e,{metalness:.37,roughness:.44}),rust=std(0x4a2a1c,{metalness:.5,roughness:.7}),bone=std(0x7a6b5a),glow=new THREE.MeshBasicMaterial({color:0xff3a14}),cape=std(0x3a0c0c,{roughness:.9,side:THREE.DoubleSide});
     flashMat=iron;
@@ -2919,6 +2927,56 @@ function makeBossModel(type){
     knees=[mountLimbJoint(hipL,1.13),mountLimbJoint(hipR,1.13)];
     elbows=[mountLimbJoint(armL,1.04),mountLimbJoint(armR,1.04)];
     eyeLight=new THREE.PointLight(0xff3a14,1.2,9,2);eyeLight.position.set(0,5.2,1.2);
+  }else if(type==='fallen'){
+    const plate=std(0x3b344a,{metalness:.48,roughness:.40}),gold=std(0xb88a57,{metalness:.54,roughness:.34});
+    const dark=std(0x231a2e,{roughness:.83}),feather=std(0x4d3653,{roughness:.75});
+    const ivory=std(0xb6a9b3,{roughness:.7}),ember=new THREE.MeshBasicMaterial({color:0xffae72});
+    flashMat=plate;
+    hipL=grp(-.48,2.5,0,body);hipR=grp(.48,2.5,0,body);
+    for(const leg of [hipL,hipR]){
+      segmentedLimb(leg,plate,.64,.72,2.44,1.18);
+      hewnBlock(.7,.36,1.0,gold,0,-2.3,.17,leg);
+      relief(leg,[[0,.36],[.29,.13],[.19,-.42],[0,-.53],[-.19,-.42],[-.29,.13]],gold,.07,0,-1.45,.35);
+    }
+    upper=grp(0,2.5,0,body);
+    hewnBlock(1.8,1.88,1.13,plate,0,.97,0,upper);
+    relief(upper,[[0,.65],[.77,.32],[.63,-.29],[0,-.57],[-.63,-.29],[-.77,.32]],gold,.10,0,1.02,.56);
+    gearGem(upper,ember,0,1.16,.71,.23,[.70,1.25,.37]);
+    const mantle=bossCape(1.8,2.75,std(0x39213a,{side:THREE.DoubleSide}),upper,.34,-.56);
+    mantle.rotation.x=.15;
+    gearGem(upper,ivory,0,2.21,.04,.51,[.85,1.17,.90]);
+    const visor=relief(upper,[[0,.31],[.43,.09],[.31,-.22],[0,-.37],[-.31,-.22],[-.43,.09]],plate,.12,0,2.22,.38);
+    for(const side of [-1,1]){
+      box(.19,.051,.02,ember,side*.165,.02,.139,visor).rotation.z=side*.22;
+      const horn=gearGem(upper,gold,side*.38,2.58,-.03,.17,[.62,2.75,.68]);horn.rotation.z=-side*.53;
+    }
+    const halo=new THREE.Mesh(new THREE.TorusGeometry(.66,.045,7,36,Math.PI*1.49),ember);
+    halo.position.set(0,2.98,-.17);halo.rotation.set(1.03,0,-.55);upper.add(halo);
+    fallenWings=[];
+    for(const side of [-1,1]){
+      const wing=grp(side*.35,1.51,-.62,upper);fallenWings.push(wing);wing.userData.side=side;
+      for(let i=0;i<12;i++){
+        const flight=gearGem(wing,i%3?dark:feather,side*(.58+i*.17),.77-i*.14,-.03*i,.24,[.62,3.6-i*.12,.35]);
+        flight.rotation.z=side*(.69+i*.069);
+        if(i<8){
+          const cover=gearGem(wing,feather,side*(.34+i*.19),.71-i*.137,-.135-i*.03,.21,[.78,2.25,.43]);
+          cover.rotation.z=side*(.53+i*.075);
+        }
+      }
+      relief(wing,[[0,0],[side*.8,.99],[side*1.65,.59],[side*.75,.50]],gold,.065,0,.18,-.12);
+    }
+    armR=grp(1.14,1.63,0,upper);armL=grp(-1.14,1.63,0,upper);
+    for(const arm of [armR,armL]){
+      segmentedLimb(arm,plate,.58,.61,2.1,1);
+      hewnBlock(.79,.39,.84,gold,0,.06,0,arm);
+      hewnBlock(.6,.38,.63,dark,0,-1.82,.04,arm);
+    }
+    knees=[mountLimbJoint(hipL,1.18),mountLimbJoint(hipR,1.18)];
+    elbows=[mountLimbJoint(armL,1),mountLimbJoint(armR,1)];
+    const spear=grp(0,-.9,.12,elbows[1]);spear.rotation.x=-1.0;
+    const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.077,.095,3.25,12),gold);shaft.position.y=-.64;spear.add(shaft);
+    relief(spear,[[0,-.85],[.29,-.24],[.17,.18],[0,.10],[-.17,.18],[-.29,-.24]],ember,.085,0,-2.25,-.035);
+    eyeLight=new THREE.PointLight(0xff9f75,1.8,10,2);eyeLight.position.set(0,4.7,1);
   }else if(type==='witch'){
     const robe=std(0x1e3550,{roughness:.7}),robe2=std(0x2a4a70,{roughness:.6}),ice=std(0xbfe8ff,{metalness:.2,roughness:.1,emissive:0x2a6a9a,emissiveIntensity:.7,transparent:true,opacity:.92}),skin=std(0xcfd8e0,{roughness:.5}),glow=new THREE.MeshBasicMaterial({color:0x9fe8ff});
     flashMat=robe;
@@ -3134,7 +3192,7 @@ function makeBossModel(type){
   root.add(eyeLight);
   root.traverse(o=>{if(o.isMesh)o.castShadow=true;});
   scene.add(root);
-  return {root,body,upper,armR,armL,hipL,hipR,flashMat,eyeLight,knees,elbows,weapon:elbows?.[1].children.find(o=>o.userData.bossWeapon),drapes:collectDrapes(upper),pose:{armR:-.3,armL:-.2,upperY:0,lean:0,crouch:0,legL:0,legR:0}};
+  return {root,body,upper,armR,armL,hipL,hipR,flashMat,eyeLight,knees,elbows,fallenWings,weapon:elbows?.[1].children.find(o=>o.userData.bossWeapon),drapes:collectDrapes(upper),pose:{armR:-.3,armL:-.2,upperY:0,lean:0,crouch:0,legL:0,legR:0}};
 }
 
 // ==== STATE ====
@@ -3719,7 +3777,7 @@ function handleEv(e,d,from,local){
       showCombatBubble(from===localPlayerId()?PM:remotes.get(from)?.model,0xffd792,7);break;
     case 'reviveRequest':requestRevival(from);break;
     case 'revive':revivePlayer(d);break;
-    case 'hit':if(NET.isHost)damageBoss(d.dmg,d.poise,d.heavy,from,d.stun,d.reflected,d.charge);break;
+    case 'hit':if(NET.isHost)damageBoss(d.dmg,d.poise,d.heavy,from,d.stun,d.reflected,d.charge,d.ranged===true);break;
     case 'bossCredit':if(!NET.isHost&&from===NET.combatHost&&d.to===NET.id&&BM)creditBossHit(d.dmg,d.heavy,d.charge);break;
     case 'parry':if(NET.isHost&&B.action&&bossCanStagger())staggerBoss(1.5);break;
     case 'bossDead':
@@ -3793,20 +3851,29 @@ function addDanger(s,o){
   const outline=new THREE.Mesh(geo,surface(col,.16)),fill=new THREE.Mesh(geo,surface(col,.42));
   const edgeColor=new THREE.Color(col).lerp(new THREE.Color(0xfff2de),.56);
   const edge=new THREE.LineLoop(dangerBorder(s),new THREE.LineBasicMaterial({color:edgeColor,transparent:true,opacity:.58,depthWrite:false}));
+  let spear;
+  if(o.fall==='spear'){
+    spear=grp(0,18,0,g);
+    const gold=surface(0xffcf8a,1);
+    const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,2.1,7),gold);shaft.position.y=1.42;spear.add(shaft);
+    const point=new THREE.Mesh(new THREE.ConeGeometry(.22,.76,5),gold);point.rotation.x=Math.PI;point.position.y=.39;spear.add(point);
+  }
   if(frostWarning){
     const border=new THREE.Mesh(shapeGeo(s.type==='rect'?{...s,w:s.w+.30,len:s.len+.15}:{...s,r:s.r+.15}),surface(0x301315,.82));
     border.position.y=-.009;g.add(border);
   }
   if(curTheme?.storm){fitDangerToTerrain(geo,s);fitDangerToTerrain(edge.geometry,s);}
   fill.position.y=.004;edge.position.y=.012;edge.renderOrder=4;g.add(outline,fill,edge);scene.add(g);
-  const d={s,o,g,outline,fill,edge,frostWarning,t:0,det:false,ft:0,delay:o.delay,owner:o.owner};
-  if(o.fall)fallFx(s.x,s.z,o.delay,o.fall);
+  const d={s,o,g,outline,fill,edge,spear,frostWarning,t:0,det:false,ft:0,delay:o.delay,owner:o.owner};
+  if(o.fall&&o.fall!=='spear')fallFx(s.x,s.z,o.delay,o.fall);
   dangers.push(d);return d;
 }
 function disposeDanger(d){
   scene.remove(d.g);
-  for(const child of d.g.children)child.material.dispose();
-  for(const geometry of new Set(d.g.children.map(child=>child.geometry)))geometry.dispose();
+  const mats=new Set(),geos=new Set();
+  d.g.traverse(child=>{if(child.material)mats.add(child.material);if(child.geometry)geos.add(child.geometry);});
+  for(const material of mats)material.dispose();
+  for(const geometry of geos)geometry.dispose();
 }
 function inside(s,px,pz,pad){
   pad=pad||0;const dx=px-s.x,dz=pz-s.z;
@@ -3837,6 +3904,7 @@ function updateIncoming(){
 function updateDangers(dt){
   for(let i=dangers.length-1;i>=0;i--){const d=dangers[i];
     if(!d.det){d.t+=dt*dangerRate(d);const k=clamp(d.t/d.delay,0,1);
+      if(d.spear)d.spear.position.y=lerp(18,0,k*k);
       if(curTheme?.storm){
         const imminent=ease((.48-(d.delay-d.t)/dangerRate(d))/.48);
         d.fill.material.opacity=.10+.29*k+.22*imminent;
@@ -3871,6 +3939,7 @@ function cancelDangers(owner){for(let i=dangers.length-1;i>=0;i--){const d=dange
 function detFx(d){
   const o=d.o,s=d.s,c=G.boss;
   switch(o.fx){
+    case 'spear':SFX.slam();ringFx(s.x,s.z,0xffcb8f,s.r,.31);burst(s.x,.3,s.z,16,0xffb071,6,.14,.4,4);break;
     case 'slam':SFX.slam();shake(.6);burst(s.x,.3,s.z,26,c.dust,9,.3,.9);burst(s.x,.3,s.z,10,c.shockCol,6,.18,.5);break;
     case 'leap':SFX.slam();shake(.9);burst(s.x,.3,s.z,34,c.dust,11,.32,1);burst(s.x,.3,s.z,14,c.shockCol,8,.2,.6);break;
     case 'nova':SFX.ice();shake(.5);burst(s.x,1,s.z,40,c.dust,10,.22,.8,4);break;
@@ -4039,11 +4108,11 @@ function projMesh(kind){
 }
 function spawnProj(o){
   const m=projMesh(o.kind);m.position.set(o.x,o.y,o.z);m.rotation.y=Math.atan2(o.vx,o.vz);scene.add(m);
-  projs.push({m,x:o.x,y:o.y,z:o.z,vx:o.vx,vz:o.vz,kind:o.kind,dmg:o.dmg||0,poise:o.poise||0,own:o.own,venom:o.venom||0,hits:o.kind==='shuriken'?new Set():null,life:2.5});
+  projs.push({m,x:o.x,y:o.y,z:o.z,vx:o.vx,vz:o.vz,vy:Number.isFinite(o.vy)?o.vy:0,kind:o.kind,dmg:o.dmg||0,poise:o.poise||0,own:o.own,venom:o.venom||0,hits:o.kind==='shuriken'?new Set():null,life:2.5});
 }
 function lanceBurst(x,z,projectile,airborneHit=false){
   emit('ultfx',{k:'lanceImpact',x,z});
-  if(airborneHit)hitBoss(projectile.dmg,projectile.poise,false,x,projectile.y,z);
+  if(airborneHit)hitBoss(projectile.dmg,projectile.poise,false,x,projectile.y,z,false,false,true);
   aoeHit(x,z,3.2,projectile.dmg,projectile.poise,false,false);
 }
 function siegeBurst(x,z,dmg,poise){
@@ -4055,9 +4124,12 @@ function removeProjectile(p){
 }
 function updateProjs(dt){
   for(let i=projs.length-1;i>=0;i--){const p=projs[i];p.life-=dt;
-    const ox=p.x,oz=p.z;p.x+=p.vx*dt;p.z+=p.vz*dt;p.m.position.set(p.x,p.y,p.z);
+    const ox=p.x,oy=p.y,oz=p.z;p.x+=p.vx*dt;p.z+=p.vz*dt;p.y+=p.vy*dt;p.m.position.set(p.x,p.y,p.z);
+    if(p.vy)p.m.rotation.x=-Math.atan2(p.vy,Math.hypot(p.vx,p.vz));
     if(p.kind==='card'){p.m.rotation.y+=dt*20;p.m.rotation.z+=dt*7;}
-    const segD=(cx,cz)=>{const sx=p.x-ox,sz=p.z-oz,L2=sx*sx+sz*sz||1e-6;let t=((cx-ox)*sx+(cz-oz)*sz)/L2;t=clamp(t,0,1);return Math.hypot(ox+sx*t-cx,oz+sz*t-cz);};
+    const segD=(cx,cz)=>{const sx=p.x-ox,sz=p.z-oz,L2=sx*sx+sz*sz||1e-6;const t=clamp(((cx-ox)*sx+(cz-oz)*sz)/L2,0,1);return Math.hypot(ox+sx*t-cx,oz+sz*t-cz);};
+    const by=BM?.root.position.y||0,flightHit=G.bossId==='azrael'&&B.air;
+    const reachesBoss=(low,high)=>Math.max(oy,p.y)>=low&&Math.min(oy,p.y)<=high;
     if(p.kind==='shuriken'){
       p.m.rotation.y+=dt*26;
       const strike=(key,x,z,r,damage)=>{
@@ -4067,7 +4139,7 @@ function updateProjs(dt){
         burst(x,p.y,z,6,0xa9ebe1,4,.12,.35,5);
       };
       mins.forEach(m=>strike(m.id,m.x,m.z,m.r,()=>{if(p.venom)applyVenom(m);hitMinion(m,p.dmg+p.venom,false,true);}));
-      if(!B.dead&&BM&&p.y>=B.y-.25)strike('boss',B.x,B.z,B.r,()=>{if(p.venom)applyVenom(B);hitBoss(p.dmg+p.venom,p.poise,false,p.x,p.y,p.z);});
+      if(!B.dead&&BM&&(flightHit?reachesBoss(by-.35,by+G.boss.height):p.y>=B.y-.25))strike('boss',B.x,B.z,B.r,()=>{if(p.venom)applyVenom(B);hitBoss(p.dmg+p.venom,p.poise,false,p.x,p.y,p.z,false,false,true);});
       if(p.life<=0||Math.hypot(p.x,p.z)>ARENA+2){
         removeProjectile(p);projs.splice(i,1);
       }
@@ -4078,20 +4150,20 @@ function updateProjs(dt){
     else if(p.kind==='arrowU')burst(p.x,p.y,p.z,2,0xffc040,1,.15,.4,0);
     else if(p.kind==='bolt'&&Math.random()<.7)burst(p.x,p.y,p.z,1,0x9a4aff,.6,.12,.35,0);
     let hit=false;
-    let hm=null;if(mins.size){mins.forEach(m=>{if(!hm&&segD(m.x,m.z)<m.r+.5)hm=m;});}
+    let hm=null;if(mins.size){mins.forEach(m=>{if(!hm&&(!p.vy||reachesBoss(arenaHeight(m.x,m.z),arenaHeight(m.x,m.z)+2.6))&&segD(m.x,m.z)<m.r+.5)hm=m;});}
     if(hm&&p.kind==='lance'){if(p.own)lanceBurst(hm.x,hm.z,p);removeProjectile(p);projs.splice(i,1);continue;}
     if(hm&&p.kind==='siege'){if(p.own)siegeBurst(p.x,p.z,p.dmg,p.poise);removeProjectile(p);projs.splice(i,1);continue;}
     if(hm&&p.kind==='arrowU'){if(p.own)archerUltBoom(p.x,p.z);removeProjectile(p);projs.splice(i,1);continue;}
     if(hm){if(p.own)hitMinion(hm,p.dmg,p.kind==='arrowC');burst(p.x,p.y,p.z,8,0xffd27a,5,.12,.4,8);removeProjectile(p);projs.splice(i,1);continue;}
-    if(!B.dead&&BM){const rr=B.r+(p.kind==='inferno'?.9:.35),by=BM.root.position.y;
-      if(segD(B.x,B.z)<rr&&p.y>by-.5&&p.y<by+G.boss.height)hit=true;}
+    if(!B.dead&&BM){const rr=B.r+(p.kind==='inferno'?.9:.35);
+      if(segD(B.x,B.z)<rr&&reachesBoss(by-.5,by+G.boss.height))hit=true;}
     if(hit){
       if(p.kind==='inferno'){SFX.boom();shake(.35);burst(p.x,p.y,p.z,36,0xff6a10,10,.3,.8,6);burst(p.x,p.y,p.z,14,0xffd27a,7,.2,.6,6);}
       else if(p.kind==='fire'){burst(p.x,p.y,p.z,12,0xffa040,6,.16,.5,6);}
-      if(p.kind==='arrowU'){if(p.own){if(B.air)hitBoss(76,20,true,B.x,p.y,B.z);archerUltBoom(p.x,p.z);}}
-      else if(p.kind==='siege'){if(p.own){if(B.air)hitBoss(p.dmg,p.poise,true,B.x,p.y,B.z);siegeBurst(p.x,p.z,p.dmg,p.poise);}}
+      if(p.kind==='arrowU'){if(p.own){if(B.air)hitBoss(76,20,true,B.x,p.y,B.z,false,false,true);archerUltBoom(p.x,p.z);}}
+      else if(p.kind==='siege'){if(p.own){if(B.air)hitBoss(p.dmg,p.poise,true,B.x,p.y,B.z,false,false,true);siegeBurst(p.x,p.z,p.dmg,p.poise);}}
       else if(p.kind==='lance'){if(p.own)lanceBurst(B.x,B.z,p,B.air);}
-      else if(p.own)hitBoss(p.dmg,p.poise,p.kind==='inferno'||p.kind==='arrowC',p.x,p.y,p.z);
+      else if(p.own)hitBoss(p.dmg,p.poise,p.kind==='inferno'||p.kind==='arrowC',p.x,p.y,p.z,false,false,true);
     }
     if(!hit&&p.kind==='arrowU'&&(p.life<=0||Math.hypot(p.x,p.z)>ARENA)){if(p.own)archerUltBoom(p.x,p.z);removeProjectile(p);projs.splice(i,1);continue;}
     if(hit||p.life<=0||Math.hypot(p.x,p.z)>ARENA+3){if(!hit&&p.kind!=='arrow'&&p.kind!=='arrowC'&&p.life>0)burst(p.x,p.y,p.z,8,0xffa040,4,.15,.4);
@@ -4237,13 +4309,13 @@ function reflectDamage(src,dmg){
 function killPlayer(){clearCombatInput();P.hp=0;P.dead=true;P.state='dead';P.t=0;if(P.skin==='pixel')pixelDeath(P.x,P.z,P.cls);else SFX.hurt();shake(.6);
   if(G.mode==='solo')endTimer=2.4;else{emit('fallen',{x:P.x,z:P.z});showMsg('YOU HAVE FALLEN','Spectating your allies · A Mage can revive you once',3.5);}}
 function gainUlt(n){if(P&&!P.dead&&P.kit.ult&&P.state!=='ult'&&!(P.ultNo>gameTime))P.ult=Math.min(100,(P.ult||0)+n*(activeEffect('withered') ? .65 : 1));}
-function hitBoss(dmg,poise,heavy,hx,hy,hz,quiet,stun){
-  if(B.dead||P.afk)return;
+function hitBoss(dmg,poise,heavy,hx,hy,hz,quiet,stun,ranged=false){
+  if(B.dead||P.afk||(G.bossId==='azrael'&&B.air&&!ranged))return;
   dmg*=outgoingDamageMultiplier();
   if(!quiet){burst(hx,hy,hz,heavy?20:10,0xffd27a,heavy?9:6,.12,.45,10);SFX.hit();hitstop=Math.max(hitstop,heavy?.09:.04);shake(heavy?.3:.15);}
   if(!quiet&&P.skin==='pixel')pixelImpact(hx,hy,hz,heavy);
   B.flash=1;
-  toHost('hit',{dmg,poise,heavy:!!heavy,stun:!!stun,charge:P.state!=='ult'&&!(P.ultNo>gameTime)});
+  toHost('hit',{dmg,poise,heavy:!!heavy,stun:!!stun,ranged,charge:P.state!=='ult'&&!(P.ultNo>gameTime)});
 }
 function creditBossHit(dmg,heavy,charge){
   recordDamage(dmg);if(charge)gainUlt(dmg*.07);
@@ -4252,8 +4324,8 @@ function creditBossHit(dmg,heavy,charge){
 function bossDamageTaken(dmg,reflected=false){
   return dmg*(B.action?.name==='stagger'&&!reflected?1.5:1)*(B.phase===3?.9:1);
 }
-function damageBoss(dmg,poise,heavy,from,stun,reflected=false,charge=!reflected){
-  if(B.dead)return;
+function damageBoss(dmg,poise,heavy,from,stun,reflected=false,charge=!reflected,ranged=false){
+  if(B.dead||(G.bossId==='azrael'&&B.air&&!ranged))return;
   dmg=Math.min(B.hp,bossDamageTaken(dmg,reflected));
   if(!(dmg>0))return;
   const to=from||'me';
@@ -4343,6 +4415,10 @@ function startCast(c){P.state='cast';P.t=0;P.cast=Object.assign({fired:false,mov
 function shoot(kind,dmg,poise,speed,off){
   const a=P.facing+(off||0),x=P.x+Math.sin(a)*.8,z=P.z+Math.cos(a)*.8,y=arenaHeight(P.x,P.z)+(kind==='inferno'?1.8:1.5);
   const o={kind,x,y,z,vx:Math.sin(a)*speed,vz:Math.cos(a)*speed};
+  if(G.bossId==='azrael'&&B.air&&!B.dead&&(!lockTarget||lockTarget.kind==='boss')&&Math.abs(wrap(a-Math.atan2(B.x-P.x,B.z-P.z)))<.24){
+    const distance=Math.max(1,Math.hypot(B.x-x,B.z-z));
+    o.vy=clamp((B.y+2.25-y)*speed/distance,0,speed*1.8);
+  }
   if(kind==='shuriken'&&P.poisonT>0)o.venom=venomBonus();
   spawnProj(Object.assign({},o,{dmg,poise,own:true}));
   if(G.mode==='mp')nsend({t:'g',d:Object.assign({k:'ev',e:'proj'},o)});
@@ -4627,8 +4703,9 @@ function fireDawnpiercer(charge){
   const [minDamage,maxDamage]=SENTINEL_DAMAGE.dawnpiercer;
   const dmg=Math.round(lerp(minDamage,maxDamage,power));
   const area={type:'rect',x:P.x,z:P.z,a:P.facing,w:lerp(4,5,power),len:lerp(16,22,power)};
-  emit('ultfx',{k:'dawnpiercer',x:area.x,z:area.z,a:area.a,r:area.w/2,len:area.len});
-  if(!B.dead&&!B.air&&BM&&inside(area,B.x,B.z,B.r))hitBoss(dmg,32,true,B.x,B.y+2.8,B.z);
+  const lift=G.bossId==='azrael'&&B.air&&inside(area,B.x,B.z,B.r)?B.y:0;
+  emit('ultfx',{k:'dawnpiercer',x:area.x,z:area.z,a:area.a,r:area.w/2,len:area.len,lift});
+  if(!B.dead&&(!B.air||G.bossId==='azrael')&&BM&&inside(area,B.x,B.z,B.r))hitBoss(dmg,32,true,B.x,B.y+2.8,B.z,false,false,true);
   mins.forEach(m=>{if(inside(area,m.x,m.z,m.r))hitMinion(m,dmg,true);});
   emit('healburst',{x:P.x,z:P.z,r:15,amt:42});
   P.ufin=true;P.beamRelease=P.t;
@@ -4644,12 +4721,13 @@ function beamChargeProgress(){
 function fireVoidBeam(charge){
   const power=clamp(charge/BEAM_MAX,0,1),a=P.facing,dx=Math.sin(a),dz=Math.cos(a);
   const x=P.x+dx*.65,z=P.z+dz*.65,r=.62+1.65*power,len=22+13*power,dmg=Math.round(106+240*power+104*power*power);
-  emit('ultfx',{k:'voidBeam',x,z,a,r,len});
   const hit=(tx,tz,tr)=>{
     const along=(tx-x)*dx+(tz-z)*dz;
     return along>=-tr&&along<=len+tr&&Math.abs((tx-x)*dz-(tz-z)*dx)<=r+tr;
   };
-  if(!B.dead&&BM&&B.y<2.6+r&&hit(B.x,B.z,B.r))hitBoss(dmg,Math.round(26+52*power),true,B.x,B.y+2.8,B.z);
+  const lift=G.bossId==='azrael'&&B.air&&hit(B.x,B.z,B.r)?B.y:0;
+  emit('ultfx',{k:'voidBeam',x,z,a,r,len,lift});
+  if(!B.dead&&BM&&(B.y<2.6+r||G.bossId==='azrael')&&hit(B.x,B.z,B.r))hitBoss(dmg,Math.round(26+52*power),true,B.x,B.y+2.8,B.z,false,false,true);
   mins.forEach(m=>{if(hit(m.x,m.z,m.r))hitMinion(m,dmg,true);});
   P.ufin=true;P.beamRelease=P.t;shake(.25+.5*power);
 }
@@ -4658,9 +4736,11 @@ function renderBeam(d){
   const g=grp(d.x,arenaHeight(d.x,d.z)+1.42,d.z,scene);g.rotation.y=d.a;
   const core=new THREE.MeshBasicMaterial({color:light,transparent:true,opacity:.84,depthWrite:false,blending:THREE.AdditiveBlending});
   const halo=new THREE.MeshBasicMaterial({color:glow,transparent:true,opacity:.64,depthWrite:false,blending:THREE.AdditiveBlending});
-  const meshes=[new THREE.Mesh(new THREE.CylinderGeometry(d.r*.42,d.r*.7,d.len,10),core),
-    new THREE.Mesh(new THREE.CylinderGeometry(d.r,d.r*1.18,d.len,12),halo)];
-  for(const m of meshes){m.rotation.x=Math.PI/2;m.position.z=d.len/2;g.add(m);}
+  const rise=Number.isFinite(d.lift)?clamp(d.lift,0,7):0;
+  const length=Math.hypot(d.len,rise),tilt=Math.atan2(rise,d.len);
+  const meshes=[new THREE.Mesh(new THREE.CylinderGeometry(d.r*.42,d.r*.7,length,10),core),
+    new THREE.Mesh(new THREE.CylinderGeometry(d.r,d.r*1.18,length,12),halo)];
+  for(const m of meshes){m.rotation.x=Math.PI/2-tilt;m.position.set(0,rise/2,d.len/2);g.add(m);}
   for(let i=0;i*3.1<d.len;i++){const k=i*3.1;burst(d.x+Math.sin(d.a)*k,1.45,d.z+Math.cos(d.a)*k,7,i%2?(dawn?glow:0xa66dff):(dawn?light:0xf6bbff),3.5,.21,.48,1);}
   if(dawn)SFX.cast();else{tone(420,62,.65,'sawtooth',.063);noise(.43,310,.19,1.2);}
   addFx({dur:.68,update(dt,k){const scale=.4+.6*ease(k/.14);g.scale.set(scale,scale,1);core.opacity=.88*(1-k);halo.opacity=.61*(1-k);},
@@ -5406,6 +5486,7 @@ function chooseAttack(dist){
     if(mins.size||B.taunt?.active)o=o.filter(([name])=>name!=='raiseDead');
     else if(B.phase>=2&&!B.summonedOnEnrage){B.summonedOnEnrage=true;startAction('raiseDead');return;}
   }
+  if(G.bossId==='azrael'&&gameTime-(B.lastFlight??-Infinity)<8)o=o.filter(([name])=>name!=='angelFlight');
   const hist=B.hist||(B.hist=[]);
   o=o.map(([n,w])=>[n,w*(n===hist[0]?.1:n===hist[1]?.4:n===hist[2]?.7:1)]);
   let tot=o.reduce((s,x)=>s+x[1],0),r=Math.random()*tot,pick=o[0][0];
@@ -5415,6 +5496,58 @@ function chooseAttack(dist){
   else startAction(pick);
 }
 const ATK={
+  angelSweep(dt,a){
+    a.t+=dt;const p=B.pose;
+    if(a.t<.28)trackTurn(dt,5);
+    if(a.t>=.28&&!a.go){
+      a.go=true;hostDanger({type:'arc',x:B.x,z:B.z,a:B.facing,r:7.5,half:1.35},
+        {delay:.82/B.speedMul,dmg:D(34),srcX:B.x,srcZ:B.z,owner:'melee',color:0xffab68,fx:'whoosh'});
+    }
+    const wind=ease(a.t/.58),cut=ease((a.t-.89)/.28),rest=ease((a.t-1.22)/.48);
+    p.armR=-.35-2*wind+1.24*cut+.76*rest;p.armL=-.2-.84*wind+.84*rest;
+    p.upperY=.88*wind-1.68*cut+.80*rest;p.lean=.27*cut*(1-rest);
+    return a.t>1.76;
+  },
+  angelJudgment(dt,a){
+    a.t+=dt;const p=B.pose;
+    if(a.t>=.4&&!a.go){
+      a.go=true;
+      const angle=Math.atan2(T.x-B.x,T.z-B.z);
+      hostDanger({type:'rect',x:B.x,z:B.z,a:angle,len:ARENA*1.6,w:2.35},
+        {delay:1/B.speedMul,dmg:D(36),srcX:B.x,srcZ:B.z,owner:'melee',color:0xfa8c60,fx:'volley'});
+    }
+    const rise=ease(a.t/.85),strike=ease((a.t-1.16)/.3),rest=ease((a.t-1.45)/.5);
+    p.armR=-.35-2.56*rise+1.46*strike+1.1*rest;p.armL=-.2-1.16*rise+1.16*rest;
+    p.lean=-.24*rise+.53*strike-.29*rest;
+    return a.t>2;
+  },
+  angelFlight(dt,a){
+    a.t+=dt;const p=B.pose;
+    const rise=ease((a.t-.22)/.53),land=ease((a.t-3.10)/.58);
+    B.y=6.8*rise*(1-land);B.air=B.y>.45;
+    trackTurn(dt,2.7);
+    if(!a.announced&&B.air){a.announced=true;emit('msg',{a:'HEAVENLY SPEARS',b:'Ranged attacks only while airborne · dodge the marked strikes',dur:2.6});}
+    a.wave??=0;
+    if(a.wave<(B.phase===3?3:2)&&a.t>=.82+a.wave*.72){
+      const wave=a.wave++,targets=stormTargets();
+      const count=Math.min(targets.length,B.phase===3?5:3);
+      const spots=[];
+      for(let i=0;i<count;i++){
+        const target=targets[(wave*count+i)%targets.length];
+        const [x,z]=clampArena(target.x+target.vx*.12,target.z+target.vz*.12,1.25);
+        if(spots.some(pt=>Math.hypot(pt[0]-x,pt[1]-z)<3))continue;
+        spots.push([x,z]);
+        hostDanger({type:'circle',x,z,r:2.75},{delay:1.03/B.speedMul,dmg:D(38),srcX:x,srcZ:z,owner:'melee',
+          color:0xff8739,blockable:false,fall:'spear',fx:'spear'});
+      }
+    }
+    const raise=rise*(1-land),throwing=raise*Math.sin(a.t*8)**4;
+    p.armR=-.35-2.65*raise+1.41*throwing;p.armL=-.2-1.34*raise;
+    p.lean=-.15*raise+.27*throwing;p.legL=-.40*raise;p.legR=.28*raise;
+    p.crouch=-.47*Math.sin(Math.PI*land);
+    return a.t>4.65;
+  },
+
   thunderVault(dt,a){
     a.t+=dt;
     const p=B.pose,launch=.57,air=.83;
@@ -5968,7 +6101,8 @@ const ATK={
   },
   roar(dt,a){a.t+=dt;const p=B.pose;p.armR=-2.6;p.armL=-2.6;p.lean=-.45;p.crouch=-.2;
     if(a.t>.5&&!a.r){a.r=true;const phase=a.phase||2;setBossPhase(phase);
-      if(phase===3&&G.boss.p3)B.queue.push(G.boss.p3[0][0]);
+      if(G.bossId==='azrael')B.queue.push('angelFlight');
+      else if(phase===3&&G.boss.p3)B.queue.push(G.boss.p3[0][0]);
       emit('roarfx',{});if(G.boss.seal)emit('oathSeal',{});
       if(G.bossId==='thoruun')stormHazard({type:'circle',x:B.x,z:B.z,r:phase===3?9:7},1,28);
       else emit('shock',{x:B.x,z:B.z,sp:10,max:ARENA,dmg:D(20),col:G.boss.shockCol});
@@ -5998,7 +6132,7 @@ function updateBoss(dt){
   }
   if(B.dead)return;
   const sdt=dt*B.speedMul*chillRate(B);
-  if(!['leap','thunderVault'].includes(B.action?.name)){B.air=false;B.y=0;}
+  if(!['leap','thunderVault','angelFlight'].includes(B.action?.name)){B.air=false;B.y=0;}
   if(!B.action||(B.action.name!=='charge'&&B.action.name!=='dashes'))B.dashId=0;
   if(!B.action||B.action.name!=='blink')B.fade=1;
   B.poiseT-=dt;if(B.poiseT<=0)B.poise=Math.min(B.maxPoise,B.poise+14*dt);
@@ -6017,6 +6151,7 @@ function updateBoss(dt){
   }else{
     if(ATK[B.action.name](['stagger','confused'].includes(B.action.name)?dt:sdt,B.action)){
       const was=B.action.name;B.action=null;
+      if(was==='angelFlight')B.lastFlight=gameTime;
       if(B.queue.length&&was!=='stagger'&&was!=='confused'&&!T.none)startAction(B.queue.shift(),{fast:true});
       else{if(B.taunt?.active){B.taunt=null;B.tgtT=0;}B.queue=[];B.cool=(B.phase>=2?rand(.25,.7):rand(.6,1.3))*(G.boss.coolMul||1);}
     }
@@ -6058,6 +6193,11 @@ function applyBossPose(dt){
     const carry=-1.48-m.armR.rotation.x-m.elbows[1].rotation.x;
     const attack=ease((Math.abs(p.armR)-.6)/.52);
     m.weapon.rotation.x=lerp(m.weapon.rotation.x,lerp(carry,-.25,attack),s);
+  }
+  for(const wing of m.fallenWings||[]){
+    const side=wing.userData.side;
+    wing.rotation.y=lerp(wing.rotation.y,side*(B.air?.19:.69),s);
+    wing.rotation.z=lerp(wing.rotation.z,side*(B.air?Math.sin(gameTime*9)*.41:-.37),s);
   }
   updateDrapes(m.drapes,gameTime,Math.min(1,Math.abs(p.legL)+Math.abs(p.legR)+(height>0?.6:0)),p.lean,support,s);
   const base=B.phase===3?(G.bossId==='thoruun'?0x3259a0:0x66100b):B.phase===2?c.p2emis:0,br=((base>>16)&255)/255,bg=((base>>8)&255)/255,bb=(base&255)/255;
