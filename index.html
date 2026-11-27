@@ -90,6 +90,8 @@ button.sm:hover{filter:brightness(1.3)}
 .codeShow{font-size:.8em;letter-spacing:.3em;color:#f2c75a;margin-left:10px;padding:2px 12px;border:1px solid #6a5030;border-radius:4px;background:#1a1208}
 .lobbyWrap{display:flex;gap:18px;flex-wrap:wrap;justify-content:center}
 .slot{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #33291f;border-radius:4px;margin-bottom:6px;background:#17120e;min-width:290px}
+#slots{max-height:min(395px,49dvh);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.slot .nm{min-width:0;overflow-wrap:anywhere}
 .slot.emptySlot{opacity:.35}
 .slot .nm{flex:1;font-size:14px}
 .slot .cls{font-size:12px;color:#b5a991;letter-spacing:.08em}
@@ -124,6 +126,10 @@ button.sm:hover{filter:brightness(1.3)}
 #forgeFill{width:0%;background:linear-gradient(90deg,#92502a,var(--blade-color,#d8af76))}
 #buffs{margin-top:6px;font-size:12px;color:#9fd8ff;letter-spacing:.1em;min-height:16px}
 #team{position:absolute;left:28px;top:150px;width:220px}
+#team.largeParty{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(260px,44vw);gap:5px 9px}
+#team.largeParty .tm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:0;font-size:11px}
+#team.largeParty .tm .cls{display:none}
+#team.largeParty .tm .tb{height:4px;margin-top:2px}
 .tm{margin-bottom:8px;font-size:12px;color:#d8ccb0;text-shadow:0 1px 2px #000}
 .tm .tb{height:6px;background:rgba(0,0,0,.6);border:1px solid #3b3128;margin-top:3px;position:relative}
 .tm .tb i{position:absolute;left:0;top:0;bottom:0;background:#b8352a}
@@ -384,7 +390,7 @@ body.village-active>canvas:active{cursor:grabbing}
   <h2 id="mpTitle">Party Booth</h2>
   <div class="panel wide">
     <div class="field"><label for="partyName">Your name</label><input id="partyName" maxlength="16" placeholder="Adventurer"></div>
-    <div class="field"><label for="partySize">Party size</label><select id="partySize"><option>2</option><option>3</option><option>4</option><option selected>5</option></select></div>
+    <div class="field"><label for="partySize">Party size</label><select id="partySize"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select></div>
     <div class="mpRow"><button class="big" id="createBtn">Open Booth</button><label class="chk"><input type="checkbox" id="pubChk" checked> Public party</label></div>
     <div class="mpRow"><input id="codeIn" class="code" maxlength="5" placeholder="CODE"><button class="big alt" id="joinBtn">Join by Code</button></div>
     <div class="listHead"><span>Open Lobbies</span><button class="sm" id="refreshBtn">Refresh</button></div>
@@ -403,7 +409,7 @@ body.village-active>canvas:active{cursor:grabbing}
       <div class="panelTitle">Your Class</div>
       <div id="lobbyClasses" class="clsBtns"></div>
       <div class="panelTitle" style="margin-top:16px">Expedition Settings</div>
-      <div class="field"><label for="lCapacity">Party size</label><select id="lCapacity"><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+      <div class="field"><label for="lCapacity">Party size</label><select id="lCapacity"><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option></select></div>
       <div class="field"><label>Mode</label><select id="lMode"><option value="boss">Boss Expedition</option><option value="campaign" disabled>Campaign (temporarily unavailable)</option></select></div>
       <div class="field"><label>Boss</label><select id="lBoss"></select></div>
       <div class="field"><label>Arena</label><select id="lArena" disabled></select></div>
@@ -931,11 +937,16 @@ function updateSoulTethers(){
   if(!links.length){if(soulTethers)soulTethers.visible=false;return;}
   if(!soulTethers){
     const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(30),3));
     soulTethers=new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0x93ffbe,transparent:true,opacity:.72}));
     soulTethers.frustumCulled=false;scene.add(soulTethers);
   }
-  const positions=soulTethers.geometry.attributes.position;
+  const geometry=soulTethers.geometry;
+  if(!geometry.attributes.position||geometry.attributes.position.count<links.length*2){
+    // Allocate space for both ends of every active link and refresh the existing GPU buffer.
+    geometry.dispose();
+    geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(links.length*6),3).setUsage(THREE.DynamicDrawUsage));
+  }
+  const positions=geometry.attributes.position;
   let count=0;
   for(const ids of links)for(const id of ids){
     const model=id===localPlayerId()?PM:remotes.get(id).model;
@@ -6218,7 +6229,8 @@ function updateHUD(spec){
     el.querySelector('.cdt').textContent=sealed?Math.ceil(P.seal.until-gameTime)+'s':cd>.05&&s.cd>=1?cd.toFixed(cd<10?1:0):'';
     el.classList.toggle('nomana',!!(s.cost&&P.mana<s.cost));});
   let teamH='';
-  remotes.forEach(r=>{teamH+=`<div class="tm ${r.dead?'dead':''}">${esc(r.name)} <span style="color:#8a806a">·  ${classData(r.cls).name}${r.dead?' · Fallen':r.afk?' · AFK':''}</span><div class="tb"><i style="width:${r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100)}%"></i></div></div>`;});
+  $('team').classList.toggle('largeParty',remotes.size>4);
+  remotes.forEach(r=>{teamH+=`<div class="tm ${r.dead?'dead':''}">${esc(r.name)} <span class="cls" style="color:#8a806a">· ${classData(r.cls).name}</span>${r.dead?' · Fallen':r.afk?' · AFK':''}<div class="tb"><i style="width:${r.dead?0:Math.max(0,r.hp/(r.mhp||100)*100)}%"></i></div></div>`;});
   setHudMarkup('team',teamH);
   const sp=$('specTag');
   if(P.dead&&G.mode==='mp'){sp.classList.remove('hidden');sp.innerHTML=spec?`Spectating ${esc(spec.name)}<small>Left click to switch ally</small>`:'All allies have fallen';}else sp.classList.add('hidden');
@@ -6789,7 +6801,7 @@ const VILLAGE_PLACES={
   solo:{title:'Solo Gate',x:0,z:-17,yaw:0,kind:'gate',roof:0x647384,wall:0x999d9f},
   skins:{title:'Skin House',x:11,z:-11,yaw:-.32,kind:'house',roof:0x8d536e,wall:0xedc8ba},
   small:{title:'Party Booth',hint:'2 slots',x:-15,z:4,yaw:Math.PI/2,kind:'booth',roof:0x3e8090,wall:0xb49470},
-  large:{title:'Party Booth',hint:'5 slots',x:15,z:4,yaw:-Math.PI/2,kind:'booth',roof:0x8f6042,wall:0xc4a07a},
+  large:{title:'Party Booth',hint:'10 slots',x:15,z:4,yaw:-Math.PI/2,kind:'booth',roof:0x8f6042,wall:0xc4a07a},
   board:{title:'Find a Party',x:0,z:15,yaw:Math.PI,kind:'board',roof:0x76614b,wall:0xa78a5d},
   news:{title:'Notice Board',hint:'Updates',x:-8.5,z:10,yaw:Math.atan2(8.5,-10),kind:'notice',roof:0x5d4a3a,wall:0x9c7f58}
 };
@@ -6822,7 +6834,7 @@ const NEWS=[
     'Mastery IV and V unlock class regalia. Preview both at the Skin House.',
     'Mobile touch controls with a customisable layout, and in-game chat with /.']},
   {date:'23 Nov 2026',title:'Launch',items:[
-    'Hollow Crown multiplayer: parties of up to five, permanent death and spectating.',
+    'Hollow Crown multiplayer: parties of up to ten, permanent death and spectating.',
     'Classes, bosses, arenas, difficulties, a Campaign mode of eight chambers, ultimates on G and a keybind editor.']}
 ];
 function renderNews(){
@@ -7305,7 +7317,7 @@ function hubEnter(id){
   if(id==='skins'){skinPreviewState.skin=null;$('skinClass').value=myClass;state='skins';setScreen('skins');renderSkins();return;}
   if(id==='solo'){openSoloBooth();return;}
   if(id==='news'){state='news';setScreen('news');renderNews();return;}
-  $('partySize').value=id==='small'?'2':'5';$('mpTitle').textContent=id==='board'?'Find a Party':'Party Booth';
+  $('partySize').value=id==='small'?'2':id==='large'?'10':'5';$('mpTitle').textContent=id==='board'?'Find a Party':'Party Booth';
   openPartyBooth();
 }
 function returnToHub(){
