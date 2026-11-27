@@ -564,6 +564,26 @@ const MASTERY_REGALIA={
   paladin:['Dawnward',0x48617f,0xffdc80,'plate'],sentinel:['Sunstone',0x236568,0xa3fff1,'plate']
 };
 const combatTier=rank=>Math.min(3,rank);
+const VETERAN_FLASK=50;
+const flaskHealing=rank=>rank>=4?VETERAN_FLASK:45;
+const MASTERWORK_PERKS={
+  sword:{shield:40,text:'Last Stand grants 40 shield instead of 30.'},
+  archer:{drawTime:.60,text:'Charged Shot fully draws in 0.60 seconds instead of 0.70.'},
+  mage:{manaRegen:18,text:'Regenerate 18 mana per second instead of 15.'},
+  jester:{fireDuration:5,text:'Fire Bomb leaves burning ground for 5 seconds instead of 4.'},
+  rogue:{poisonDuration:10,text:'Envenom coats weapons for 10 seconds instead of 8.'},
+  soul:{powerDuration:8,text:'Soul Empower buffs linked teammates for 8 seconds instead of 7.'},
+  warlock:{curseDuration:7,text:'Curse lasts 7 seconds instead of 6.'},
+  berserker:{rageDuration:12,text:'Blood Rage lasts 12 seconds instead of 10.'},
+  paladin:{blockCharge:.50,text:'Shield blocks convert 50% of prevented damage to ultimate charge instead of 42%.'},
+  sentinel:{wardDuration:5,text:'Aegis wards allies for 5 seconds instead of 4.'}
+};
+function masterworkPerk(player){
+  return player?.level>=5?MASTERWORK_PERKS[player.cls]:undefined;
+}
+function chargedShotTime(){
+  return masterworkPerk(P)?.drawTime??CHARGE;
+}
 const FORGE_BLADES=[
   {name:'Wood',damage:15,time:.54,threshold:0,color:0xa56536},
   {name:'Iron',damage:25,time:.50,threshold:240,color:0xb7c4d0},
@@ -741,8 +761,8 @@ function renderMasteryTrack(level,points){
   $('upgradePanel').innerHTML=`<div class="mh"><b>${esc(CLASSES[myClass].name)} Mastery ${level}</b><span>${next?`${points} / ${next} points to Rank ${level+1}`:`${points} points · Max rank`}</span></div>
     <div class="mbar"><i style="width:${pct}%"></i></div>
     <div class="mranks">${step(1,'Base kit','Every move as listed below.','')}${ranks.map((r,i)=>step(i+2,r[1]+' ('+r[0]+')',r[3]||r[2],gear[i])).join('')}
-    ${step(4,'Veteran Regalia','Reinforced bracers and greaves in your class colors.','')}
-    ${step(5,MASTERY_REGALIA[myClass][0],'Signature mantle, sculpted trim and an animated crest.','')}</div>
+    ${step(4,'Veteran Regalia','Flasks restore '+VETERAN_FLASK+' HP instead of 45.','Class bracers and greaves')}
+    ${step(5,MASTERY_REGALIA[myClass][0],MASTERWORK_PERKS[myClass].text,'Signature mantle, sculpted trim and an animated crest')}</div>
     <div class="mhow">Earn mastery by playing this class: 3 points every 20 seconds in battle, 4 to 10 per minion, 50 per boss defeated.</div>`;
 }
 function gainMastery(amount){
@@ -880,7 +900,7 @@ function applySoulGift(d,from){
   const i=d.ids.indexOf(me);
   if(i<0||P.dead||P.afk)return;
   if(from!==me&&G.links.get(me)!==from)return;
-  if(d.kind==='power'){P.soulPowerUntil=gameTime+7;ringFx(P.x,P.z,0x74f9b2,3,.44);}
+  if(d.kind==='power'){P.soulPowerUntil=gameTime+(masterworkPerk(sender)?.powerDuration??7);ringFx(P.x,P.z,0x74f9b2,3,.44);}
   if(d.kind==='ult'){P.soulInvUntil=gameTime+7;P.soulHealUntil=P.soulInvUntil;}
   if(d.kind==='heal'&&Number.isFinite(d.amounts?.[i])){
     const healed=restoreHealth(clamp(d.amounts[i],0,125));
@@ -944,8 +964,8 @@ function loseHealth(dmg){
   if(absorbed>0)P.forgeShield-=absorbed;
   const hp=P.hp;
   if(P.cls==='sword'&&!P.lastStand&&dmg-absorbed>=hp){
-    P.lastStand=true;P.hp=1;P.forgeShield=30;
-    floatText('LAST STAND · 30 SHIELD',P.x,2.9,P.z,'label');
+    P.lastStand=true;P.hp=1;P.forgeShield=masterworkPerk(P)?.shield??30;
+    floatText('LAST STAND · '+P.forgeShield+' SHIELD',P.x,2.9,P.z,'label');
     ringFx(P.x,P.z,0xffba67,3,.6);
   }else P.hp=Math.max(0,hp-(dmg-absorbed));
   const lost=Math.max(0,hp-P.hp);
@@ -3973,7 +3993,7 @@ function hurtPlayer(dmg,src){
   if(P.guard>0)dmg*=.7;
   const shielding=P.cls==='paladin'&&P.state==='block';
   if(shielding){
-    gainUlt(dmg*.7*.42);
+    gainUlt(dmg*.7*(masterworkPerk(P)?.blockCharge??.42));
     dmg*=.3;
   }
   if(P.state==='whirl')dmg*=.6;
@@ -4207,7 +4227,7 @@ function renderJesterBomb(d,own){
 function hitWithJesterBomb(kind,x,z,rain,r){
   const bomb=JESTER_BOMBS[kind],damage=rain?bomb.rainDamage:bomb.damage[combatTier(P.level)-1];
   if(P.afk)return;
-  if(kind==='fire')emit('zone',{z:{kind:'firePatch',x,z,r,dur:rain?3:4,dmg:rain?3:4,owner:localPlayerId()}});
+  if(kind==='fire')emit('zone',{z:{kind:'firePatch',x,z,r,dur:rain?3:(masterworkPerk(P)?.fireDuration??4),dmg:rain?3:4,owner:localPlayerId()}});
   if(kind!=='fire')toHost('jesterImpact',{kind,x,z,rain});
   if(damage)for(const minion of mins.values()){
     if(Math.hypot(minion.x-x,minion.z-z)<=r+minion.r)hitMinion(minion,damage,true);
@@ -4301,7 +4321,7 @@ function tryActions(mx,mz,ml){
     if(consume('light')){P.state='cleave';P.combo=0;P.t=0;P.hitDone=false;P.tok=(P.tok||0)+1;aimAtBoss();return true;}
     if(consume('heavy')){P.state='crush';P.t=0;P.cr=false;P.hitDone=false;P.tok=(P.tok||0)+1;P.hs=false;aimAtBoss();return true;}
     if(gameTime-buf.q<.32&&ready('whirl')){buf.q=-9;useSkill('whirl');P.state='whirl';P.t=0;P.tick=0;SFX.heavySwing();emit('tornado',{dur:3});return true;}
-    if(gameTime-buf.e<.32&&ready('rage')){buf.e=-9;useSkill('rage');startGesture('rage');P.rageT=P.level>=2?10:8;if(P.level>=2){const r=P.level>=3?6.6:3.8;ringFx(P.x,P.z,0xde424b,r,.48);aoeHit(P.x,P.z,r,P.level>=3?43:25,15,true,P.level>=3);}SFX.roar();shake(.3);burst(P.x,1.2,P.z,30,0xc01a10,4,.14,.8,-1);floatText('BLOOD RAGE',P.x,2.9,P.z,'label');return true;}
+    if(gameTime-buf.e<.32&&ready('rage')){buf.e=-9;useSkill('rage');startGesture('rage');P.rageT=masterworkPerk(P)?.rageDuration??(P.level>=2?10:8);if(P.level>=2){const r=P.level>=3?6.6:3.8;ringFx(P.x,P.z,0xde424b,r,.48);aoeHit(P.x,P.z,r,P.level>=3?43:25,15,true,P.level>=3);}SFX.roar();shake(.3);burst(P.x,1.2,P.z,30,0xc01a10,4,.14,.8,-1);floatText('BLOOD RAGE',P.x,2.9,P.z,'label');return true;}
     if(gameTime-buf.f<.32&&ready('leap')){buf.f=-9;useSkill('leap');let tx,tz;
       if(LT.alive&&Math.hypot(LT.x-P.x,LT.z-P.z)<24){const a=Math.atan2(LT.x-P.x,LT.z-P.z),d=Math.max(0,Math.hypot(LT.x-P.x,LT.z-P.z)-LT.r-1.2);tx=P.x+Math.sin(a)*d;tz=P.z+Math.cos(a)*d;}
       else{const a=aimAngle();tx=P.x+Math.sin(a)*10;tz=P.z+Math.cos(a)*10;}
@@ -4310,7 +4330,7 @@ function tryActions(mx,mz,ml){
   }else if(P.cls==='warlock'){
     if(gameTime-buf.light<.32&&ready('bolt')){buf.light=-9;useSkill('bolt');P.facing=aimAngle();startCast({dur:.32,at:.12,pose:'bolt',move:.75,fn:()=>{shoot('bolt',20,4,36);SFX.cast();}});return true;}
     if(gameTime-buf.heavy<.32&&ready('curse')){buf.heavy=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>32){toast('No target in range');return false;}useSkill('curse');P.facing=bossAngle();const target={...LT};
-      startCast({dur:.4,at:.2,pose:'curse',move:.5,fn:()=>{P.curse={t:6,tick:.5,boss:target.boss,mid:target.id};emit('cursefx',{x:target.x,z:target.z});}});return true;}
+      startCast({dur:.4,at:.2,pose:'curse',move:.5,fn:()=>{P.curse={t:masterworkPerk(P)?.curseDuration??6,tick:.5,boss:target.boss,mid:target.id};emit('cursefx',{x:target.x,z:target.z});}});return true;}
     if(gameTime-buf.q<.32&&ready('rift')){buf.q=-9;useSkill('rift');const tg=rainTarget();startCast({dur:.55,at:.35,pose:'rift',move:.4,face:false,fn:()=>{emit('zone',{z:{kind:'rift',x:tg[0],z:tg[1],r:P.level===1?4.5:5.7,dur:P.level>=3?4.8:4,dmg:P.level>=2?13:11,owner:NET.id||'me'}});if(P.level>=3)emit('zone',{z:{kind:'heal',x:tg[0],z:tg[1],r:5.7,dur:6,rate:4}});}});return true;}
     if(gameTime-buf.e<.32&&ready('siphon')){buf.e=-9;if(!LT.alive||Math.hypot(LT.x-P.x,LT.z-P.z)>16){toast('No target in range');return false;}useSkill('siphon');P.state='siphon';P.t=0;P.tick=0;return true;}
     if(gameTime-buf.f<.32&&ready('blink')){buf.f=-9;useSkill('blink');startGesture('blink');const a=ml>0?Math.atan2(mx,mz):aimAngle();const ox=P.x,oz=P.z;let [x,z]=clampArena(P.x+Math.sin(a)*9,P.z+Math.cos(a)*9,.8);
@@ -4324,7 +4344,7 @@ function tryActions(mx,mz,ml){
     }
     if(gameTime-buf.q<.32&&ready('step')){buf.q=-9;useSkill('step');
       startCast({dur:.29,at:.12,pose:'ninjaStep',move:.32,fn:shadowStep});return true;}
-    if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');startGesture('poison');P.poisonT=P.level>=2?8:6;if(P.level>=3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
+    if(gameTime-buf.e<.32&&ready('poison')){buf.e=-9;useSkill('poison');startGesture('poison');P.poisonT=masterworkPerk(P)?.poisonDuration??(P.level>=2?8:6);if(P.level>=3){ringFx(P.x,P.z,0x80de64,5,.4);aoeHit(P.x,P.z,5,35,12,false);}SFX.cast();burst(P.x,1.2,P.z,20,0x6adf4a,3,.1,.7,-2);floatText('ENVENOMED',P.x,2.7,P.z,'label');return true;}
     if(gameTime-buf.f<.32&&ready('smoke')){buf.f=-9;useSkill('smoke');
       startCast({dur:.32,at:.11,pose:'ninjaSmoke',move:.65,face:false,fn:()=>{
         P.smoke=2.5;emit('smoke',{x:P.x,z:P.z,a:P.facing});
@@ -4337,7 +4357,7 @@ function tryActions(mx,mz,ml){
     }
     if(gameTime-buf.heavy<.32&&ready('ringguard')){
       buf.heavy=-9;useSkill('ringguard');startGesture('aegis');
-      emit('ward',{x:P.x,z:P.z,r:7.5,dur:4});
+      emit('ward',{x:P.x,z:P.z,r:7.5,dur:masterworkPerk(P)?.wardDuration??4});
       emit('ultfx',{k:'aegisImpact',x:P.x,z:P.z});
       aoeHit(P.x,P.z,7.5,SENTINEL_DAMAGE.aegis,18,true,false);return true;
     }
@@ -4891,7 +4911,7 @@ function updatePlayer(dt){
   P.iframe=Math.max(0,P.iframe-dt);P.hurtInv=Math.max(0,P.hurtInv-dt);P.t+=dt;P.ward=Math.max(0,P.ward-dt);P.guard=Math.max(0,(P.guard||0)-dt);P.rollCd-=dt;
   if(!P.dead)updateBossEffects();
   for(const k in P.cd)P.cd[k]=Math.max(0,P.cd[k]-dt);
-  if(P.cls==='mage'&&!P.dead)P.mana=Math.min(P.maxMana,P.mana+15*dt);
+  if(P.cls==='mage'&&!P.dead)P.mana=Math.min(P.maxMana,P.mana+(masterworkPerk(P)?.manaRegen??15)*dt);
   if(P.hot&&P.hot.t>0&&!P.dead){const h=restoreHealth(P.hot.rate*dt);P.hot.t-=dt;P.hot.acc=(P.hot.acc||0)+h;if(P.hot.acc>=9){floatText('+'+Math.round(P.hot.acc),P.x,2.6,P.z,'heal');P.hot.acc=0;}if(Math.random()<.3)burst(P.x+rand(-.4,.4),.4,P.z+rand(-.4,.4),1,0x8af0a0,.8,.1,.8,-2);}
   if(P.curse&&P.curse.t>0){P.curse.t-=dt;P.curse.tick-=dt;if(P.curse.tick<=.000001){P.curse.tick+=.5;
       if(P.curse.boss){if(!B.dead&&BM){hitBoss(7,0,false,B.x,BM.root.position.y+3,B.z,true);burst(B.x+rand(-1,1),BM.root.position.y+rand(1,4),B.z+rand(-1,1),3,0x8a2aff,1.5,.12,.6,-1);}}
@@ -5063,7 +5083,8 @@ function updatePlayer(dt){
       if(t>=c.dur)P.state='idle';
       break;}
     case 'draw':{
-      P.charge=Math.min(CHARGE,P.charge+dt);const k=P.charge/CHARGE;
+      const drawTime=chargedShotTime();
+      P.charge=Math.min(drawTime,P.charge+dt);const k=P.charge/drawTime;
       vx=mx*SPD*.6;vz=mz*SPD*.6;turnTo(aimAngle(),14,dt);
       P.walk+=dt*Math.hypot(vx,vz)*1.7;pose.legL=Math.sin(P.walk)*.35;pose.legR=-pose.legL;
       pose.armL=-1.57;pose.armR=-1.45+.1*ease(k);pose.armRz=-1.1*ease(k);pose.upperY=.4;pose.draw=.15+.85*ease(k);
@@ -5094,7 +5115,7 @@ function updatePlayer(dt){
       const t=P.t;vx=mx*1.8;vz=mz*1.8;if(ml>0&&!lockOn)turnTo(Math.atan2(mx,mz),6,dt);
       pose.armL=lerp(restL,-2.03,ease(t/.34)*(1-ease((t-.86)/.40)));pose.armR=restR;
       pose.upperY=-.14*Math.sin(Math.PI*clamp(t/1.3,0,1));pose.lean=.08;pose.knee=.14;
-      if(t>.75&&!P.healed){P.healed=true;const heal=restoreHealth(45,'flask');SFX.heal();burst(P.x,1.2,P.z,24,0xf2c75a,3,.12,.9,-2);if(heal>0)floatText('+'+Math.round(heal),P.x,2.6,P.z,'heal');}
+      if(t>.75&&!P.healed){P.healed=true;const heal=restoreHealth(flaskHealing(P.level),'flask');SFX.heal();burst(P.x,1.2,P.z,24,0xf2c75a,3,.12,.9,-2);if(heal>0)floatText('+'+Math.round(heal),P.x,2.6,P.z,'heal');}
       if(t>=1.3)P.state='idle';
       break;}
     case 'vault':{
@@ -6202,7 +6223,7 @@ function updateHUD(spec){
   const sp=$('specTag');
   if(P.dead&&G.mode==='mp'){sp.classList.remove('hidden');sp.innerHTML=spec?`Spectating ${esc(spec.name)}<small>Left click to switch ally</small>`:'All allies have fallen';}else sp.classList.add('hidden');
   const cw=$('chargeWrap');let ch=beamChargeProgress();
-  if(P.state==='draw')ch=P.charge/CHARGE;else if(P.state==='cast'&&P.cast.charge&&!P.cast.fired)ch=P.t/P.cast.at;
+  if(P.state==='draw')ch=P.charge/chargedShotTime();else if(P.state==='cast'&&P.cast.charge&&!P.cast.fired)ch=P.t/P.cast.at;
   if(ch>=0){cw.classList.remove('hidden');$('chargeFill').style.width=(clamp(ch,0,1)*100)+'%';}else cw.classList.add('hidden');
   // name tags
   const htg=lockTarget?.kind==='ally'&&!P.dead?lockTarget.id:P.cls==='mage'&&!P.dead?allyTarget().id:null;
@@ -6687,8 +6708,9 @@ function renderClassCards(){
   const rowsHtml=kit.ctrl.map(r=>{const key=r[0]==='passive'?'Passive':keyName(BINDS[r[0]],true);const name=r.length>2?r[1]:'';const desc=r.length>2?r[2]:r[1];const meta=cdText(r[0]);
     return `<div class="mv"><span class="mk">${esc(key)}</span><div class="mt"><b>${esc(name)}</b>${meta?`<span class="mcd">${esc(meta)}</span>`:''}<p>${esc(desc)}${r[0]==='light'?' Hold to keep attacking.':''}</p></div></div>`;}).join('');
   const ultHtml=kit.ult?`<div class="mv ult"><span class="mk">${esc(keyName(BINDS[ultimateBinding(kit)],true))}</span><div class="mt"><b>${esc(kit.ult)}</b><span class="mcd">Ultimate · charges as you deal damage</span><p>${esc(kit.ultHint||'')}</p></div></div>`:'';
-  const basics=`<div class="mv basic"><span class="mk">${esc(keyName(BINDS.roll,true))}</span><div class="mt"><b>Roll</b><p>Dodge in your movement direction. You are invulnerable for the first part of the roll.</p></div></div><div class="mv basic"><span class="mk">${esc(keyName(BINDS.heal,true))}</span><div class="mt"><b>Flask</b><p>Drink a flask to restore 45 HP. Limited uses per fight.</p></div></div>`;
-  $('classInfo').innerHTML=`<div class="mvTitle">${esc(CLASSES[myClass].name)} moves at Mastery ${charLevel(myClass)}</div><div class="mvGrid">${rowsHtml}${ultHtml}${basics}</div>`;
+  const basics=`<div class="mv basic"><span class="mk">${esc(keyName(BINDS.roll,true))}</span><div class="mt"><b>Roll</b><p>Dodge in your movement direction. You are invulnerable for the first part of the roll.</p></div></div><div class="mv basic"><span class="mk">${esc(keyName(BINDS.heal,true))}</span><div class="mt"><b>Flask</b><p>Drink a flask to restore ${flaskHealing(charLevel(myClass))} HP. Limited uses per fight.</p></div></div>`;
+  $('classInfo').innerHTML=`<div class="mvTitle">${esc(CLASSES[myClass].name)} moves at Mastery ${charLevel(myClass)}</div><div class="mvGrid">${rowsHtml}${ultHtml}${basics}</div>`+
+    (charLevel(myClass)>=5?`<p class="mhow">Rank V · ${esc(MASTERWORK_PERKS[myClass].text)}</p>`:'');
 }
 function fillSelects(b,a,d){
   b.innerHTML=EXPEDITION_BOSSES.map(id=>`<option value="${id}">${BOSSES[id].n}</option>`).join('');
